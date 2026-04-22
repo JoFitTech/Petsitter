@@ -36,3 +36,6 @@ build/
 ### Vaadin generated frontend ###
 src/main/frontend/generated/
 
+### Local Maven override ###
+.mvn/maven.config
+

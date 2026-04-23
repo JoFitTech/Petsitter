@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: compose
+  docker:
+    compose:
+      enabled: true
+      file: compose.yaml
+

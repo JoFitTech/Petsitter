@@ -7,11 +7,17 @@ Technisches Grundgeruest fuer das Uni-Projekt.
 - Projektgeruest initialisiert
 - Noch keine Fachlogik implementiert
 
-## Lokaler Start (Basis)
+## Lokaler Start (ohne Docker Compose)
+
+```powershell
+.\mvnw spring-boot:run
+```
+
+## Lokaler Start (mit Docker Compose Profil)
 
 ```powershell
 docker compose up -d
-.\mvnw spring-boot:run
+.\mvnw spring-boot:run -Dspring-boot.run.profiles=compose
 ```
 
 ## Testlauf

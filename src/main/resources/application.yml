@@ -6,13 +6,18 @@ spring:
     username: ${DB_USER:petsitter}
     password: ${DB_PASSWORD:petsitter}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      initialization-fail-timeout: -1
   jpa:
+    database-platform: org.hibernate.dialect.MySQLDialect
     hibernate:
       ddl-auto: none
     open-in-view: false
+    properties:
+      hibernate.boot.allow_jdbc_metadata_access: false
   docker:
     compose:
-      enabled: true
+      enabled: false
 
 vaadin:
   launch-browser: true

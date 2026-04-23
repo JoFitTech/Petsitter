@@ -6,15 +6,19 @@ import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import jakarta.annotation.security.PermitAll;
 
-@Route(value = "profil", layout = MainLayout.class)
-@PageTitle("Profil | Petsitter")
-public class ProfileView extends VerticalLayout {
+@Route(value = "", layout = MainLayout.class)
+@PageTitle("Start | Petsitter")
+@PermitAll
+public class StartView extends VerticalLayout {
 
-    public ProfileView() {
-        add(new H2("Profil"));
-        add(new Paragraph("Hier kannst du dein Petsitter-Profil pflegen."));
+    public StartView() {
+        add(new H2("Petsitter / Pawsitters"));
+        add(new Paragraph("Projektgeruest initialisiert"));
         setPadding(true);
+        setSpacing(true);
     }
 }
+
 

@@ -1,13 +1,9 @@
 package com.softwareengineering.petsitter.ui;
 
-import com.softwareengineering.petsitter.ui.views.BookingsView;
-import com.softwareengineering.petsitter.ui.views.DashboardView;
-import com.softwareengineering.petsitter.ui.views.MessagesView;
-import com.softwareengineering.petsitter.ui.views.PetsView;
-import com.softwareengineering.petsitter.ui.views.ProfileView;
+import com.softwareengineering.petsitter.ui.views.StartView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
-import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -18,30 +14,21 @@ import com.vaadin.flow.router.RouterLink;
 public class MainLayout extends AppLayout {
 
     public MainLayout() {
-        H3 title = new H3("Petsitter");
+        H3 title = new H3("Petsitter / Pawsitters");
         title.getStyle().set("margin", "0");
 
-        HorizontalLayout header = new HorizontalLayout(new DrawerToggle(), title);
+        Anchor logout = new Anchor("logout", "Logout");
+        logout.getElement().setAttribute("router-ignore", true);
+
+        HorizontalLayout header = new HorizontalLayout(new DrawerToggle(), title, logout);
         header.setWidthFull();
+        header.expand(title);
         header.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         header.getStyle().set("padding", "var(--lumo-space-m)");
 
-        Tabs navigationTabs = new Tabs(
-                createTab("Dashboard", DashboardView.class),
-                createTab("Buchungen", BookingsView.class),
-                createTab("Haustiere", PetsView.class),
-                createTab("Nachrichten", MessagesView.class),
-                createTab("Profil", ProfileView.class)
-        );
+        Tabs navigationTabs = new Tabs(new Tab(new RouterLink("Start", StartView.class)));
         navigationTabs.setWidthFull();
 
         addToNavbar(header, navigationTabs);
     }
-
-    private Tab createTab(String text, Class<? extends Component> navigationTarget) {
-        RouterLink link = new RouterLink(text, navigationTarget);
-        return new Tab(link);
-    }
 }
-
-

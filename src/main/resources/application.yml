@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: petsitter
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:petsitter}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+    username: ${DB_USER:petsitter}
+    password: ${DB_PASSWORD:petsitter}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  docker:
+    compose:
+      enabled: true
+
+vaadin:
+  launch-browser: true
+
+logging:
+  level:
+    root: INFO
+

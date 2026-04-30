@@ -1,0 +1,1 @@
+package com.softwareengineering.petsitter.favorite.domain;

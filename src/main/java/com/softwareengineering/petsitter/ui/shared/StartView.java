@@ -1,4 +1,4 @@
-package com.softwareengineering.petsitter.shared.ui;
+package com.softwareengineering.petsitter.ui.shared;
 
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;

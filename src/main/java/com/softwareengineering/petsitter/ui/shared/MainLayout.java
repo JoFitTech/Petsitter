@@ -1,5 +1,10 @@
-package com.softwareengineering.petsitter.shared.ui;
+package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.ui.booking.BookingView;
+import com.softwareengineering.petsitter.ui.chat.ChatView;
+import com.softwareengineering.petsitter.ui.offer.OfferView;
+import com.softwareengineering.petsitter.ui.pet.PetView;
+import com.softwareengineering.petsitter.ui.user.UserView;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.applayout.DrawerToggle;
 import com.vaadin.flow.component.html.Anchor;
@@ -25,7 +30,14 @@ public class MainLayout extends AppLayout {
         header.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         header.getStyle().set("padding", "var(--lumo-space-m)");
 
-        Tabs navigationTabs = new Tabs(new Tab(new RouterLink("Start", StartView.class)));
+        Tabs navigationTabs = new Tabs(
+                new Tab(new RouterLink("Start", StartView.class)),
+                new Tab(new RouterLink("Haustiere", PetView.class)),
+                new Tab(new RouterLink("Angebote", OfferView.class)),
+                new Tab(new RouterLink("Buchungen", BookingView.class)),
+                new Tab(new RouterLink("Chat", ChatView.class)),
+                new Tab(new RouterLink("Profil", UserView.class))
+        );
         navigationTabs.setWidthFull();
 
         addToNavbar(header, navigationTabs);

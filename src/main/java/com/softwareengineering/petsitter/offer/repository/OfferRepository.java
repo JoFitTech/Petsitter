@@ -1,0 +1,19 @@
+package com.softwareengineering.petsitter.offer.repository;
+
+import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import java.time.LocalDate;
+import java.util.List;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface OfferRepository extends JpaRepository<Offer, Long> {
+    List<Offer> findAllByTypeAndStatusAndCityAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+            OfferType type,
+            OfferStatus status,
+            String city,
+            LocalDate endDate,
+            LocalDate startDate
+    );
+}
+

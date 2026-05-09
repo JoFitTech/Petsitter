@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * BookingService – verwaltet Buchungen (Bookings) und die zentrale Akzeptanz-Logik.
@@ -79,7 +80,7 @@ public class BookingService {
      *         wenn Request.status != PENDING oder Offer.status != OPEN
      */
     @Transactional
-    public Booking acceptRequest(Long requestId, Long offerCreatorId) {
+    public Booking acceptRequest(UUID requestId, UUID offerCreatorId) {
         throw new UnsupportedOperationException("acceptRequest noch nicht implementiert");
     }
 
@@ -99,7 +100,7 @@ public class BookingService {
      * @throws com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException
      *         wenn {@code userId} weder Owner noch Sitter des Bookings ist
      */
-    public void cancelBooking(Long bookingId, Long userId) {
+    public void cancelBooking(UUID bookingId, UUID userId) {
         throw new UnsupportedOperationException("cancelBooking noch nicht implementiert");
     }
 

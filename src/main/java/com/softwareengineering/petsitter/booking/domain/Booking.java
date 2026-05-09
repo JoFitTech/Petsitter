@@ -20,6 +20,7 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Booking Entity – die tatsächliche Buchung einer Betreuung nach Acceptance eines Requests.
@@ -53,11 +54,11 @@ import java.time.LocalDateTime;
 public class Booking {
 
     /**
-     * Eindeutige ID. Auto-Increment Primary Key.
+     * Eindeutige ID als UUID. Auto-Generiert bei Erstellung.
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     /**
      * Das übergeordnete Offer – 1:1 Verhältnis.
@@ -144,11 +145,11 @@ public class Booking {
     public Booking() {
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

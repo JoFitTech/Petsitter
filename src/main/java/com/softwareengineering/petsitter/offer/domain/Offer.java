@@ -19,6 +19,7 @@ import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * Offer Entity – zentrale Entity für Betreuungsangebot oder Betreuungssuche.
@@ -57,11 +58,11 @@ import java.time.LocalDateTime;
 public class Offer {
 
     /**
-     * Eindeutige ID. Auto-Increment Primary Key.
+     * Eindeutige ID als UUID. Auto-Generiert bei Erstellung.
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     /**
      * Der User, der dieses Offer erstellt hat (Owner oder Sitter).
@@ -155,11 +156,11 @@ public class Offer {
     public Offer() {
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

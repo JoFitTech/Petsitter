@@ -17,6 +17,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * OfferRequest Entity – repräsentiert eine Anfrage/Request auf ein bestehendes Offer.
@@ -57,11 +58,11 @@ import java.time.LocalDateTime;
 public class OfferRequest {
 
     /**
-     * Eindeutige ID. Auto-Increment Primary Key.
+     * Eindeutige ID als UUID. Auto-Generiert bei Erstellung.
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     /**
      * Das Offer, auf das dieser Request bezieht.
@@ -114,11 +115,11 @@ public class OfferRequest {
     public OfferRequest() {
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

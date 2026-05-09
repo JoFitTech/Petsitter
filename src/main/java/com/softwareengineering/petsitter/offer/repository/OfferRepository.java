@@ -5,9 +5,10 @@ import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface OfferRepository extends JpaRepository<Offer, Long> {
+public interface OfferRepository extends JpaRepository<Offer, UUID> {
     List<Offer> findAllByTypeAndStatusAndCityAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
             OfferType type,
             OfferStatus status,

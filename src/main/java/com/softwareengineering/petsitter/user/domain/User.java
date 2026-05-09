@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * User Entity – repräsentiert einen Benutzer im Petsitter-System.
@@ -32,11 +33,11 @@ import java.time.LocalDateTime;
 public class User {
 
     /**
-     * Eindeutige ID. Auto-Increment Primary Key.
+     * Eindeutige ID als UUID. Auto-Generiert bei Erstellung.
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     /**
      * Email-Adresse – Unique, Login-ID, wird nicht geändert.
@@ -84,11 +85,11 @@ public class User {
     public User() {
     }
 
-    public Long getId() {
+    public UUID getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(UUID id) {
         this.id = id;
     }
 

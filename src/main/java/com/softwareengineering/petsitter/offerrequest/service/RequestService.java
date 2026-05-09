@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.offerrequest.service;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 /**
@@ -61,7 +62,7 @@ public class RequestService {
      * @throws com.softwareengineering.petsitter.shared.exception.DuplicateRequestException
      *         wenn es bereits einen Request von dieser User auf dieses Offer gibt
      */
-    public OfferRequest createRequest(Long offerId, Long requesterId, String message) {
+    public OfferRequest createRequest(UUID offerId, UUID requesterId, String message) {
         throw new UnsupportedOperationException("createRequest noch nicht implementiert");
     }
 
@@ -78,7 +79,7 @@ public class RequestService {
      * @throws com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException
      *         wenn {@code requesterId} != Request.requester.id
      */
-    public void cancelRequest(Long requestId, Long requesterId) {
+    public void cancelRequest(UUID requestId, UUID requesterId) {
         throw new UnsupportedOperationException("cancelRequest noch nicht implementiert");
     }
 
@@ -93,7 +94,7 @@ public class RequestService {
      * @throws com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException
      *         wenn {@code creatorId} != Offer.creator.id
      */
-    public List<OfferRequest> findRequestsForOffer(Long offerId, Long creatorId) {
+    public List<OfferRequest> findRequestsForOffer(UUID offerId, UUID creatorId) {
         return Collections.emptyList();
     }
 
@@ -103,7 +104,7 @@ public class RequestService {
      * @param userId Die User-ID
      * @return Liste aller Requests von diesem User (als Requester)
      */
-    public List<OfferRequest> findMyRequests(Long userId) {
+    public List<OfferRequest> findMyRequests(UUID userId) {
         return Collections.emptyList();
     }
 }

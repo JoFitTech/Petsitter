@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * OfferService – verwaltet die Erstellung, Änderung und Suche von Offers.
@@ -74,7 +75,7 @@ public class OfferService {
      * @throws com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException
      *         wenn startDate > endDate oder city leer
      */
-    public Offer createOwnerOffer(Long userId, Long petId, LocalDate startDate, LocalDate endDate,
+    public Offer createOwnerOffer(UUID userId, UUID petId, LocalDate startDate, LocalDate endDate,
                                    String city, String description) {
         throw new UnsupportedOperationException("createOwnerOffer noch nicht implementiert");
     }
@@ -102,7 +103,7 @@ public class OfferService {
      * @throws com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException
      *         wenn startDate > endDate oder city leer
      */
-    public Offer createSitterOffer(Long userId, LocalDate startDate, LocalDate endDate,
+    public Offer createSitterOffer(UUID userId, LocalDate startDate, LocalDate endDate,
                                     String city, BigDecimal pricePerWeek, String description) {
         throw new UnsupportedOperationException("createSitterOffer noch nicht implementiert");
     }
@@ -133,7 +134,7 @@ public class OfferService {
      *         wenn Offer.status != OPEN oder Validierung schlägt fehl
      */
     @Transactional
-    public Offer updateOffer(Long offerId, Long userId, LocalDate startDate, LocalDate endDate,
+    public Offer updateOffer(UUID offerId, UUID userId, LocalDate startDate, LocalDate endDate,
                              String description, BigDecimal pricePerWeek) {
         throw new UnsupportedOperationException("updateOffer noch nicht implementiert");
     }
@@ -154,7 +155,7 @@ public class OfferService {
      * @throws com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException
      *         wenn Offer.status != OPEN
      */
-    public void cancelOffer(Long offerId, Long userId) {
+    public void cancelOffer(UUID offerId, UUID userId) {
         throw new UnsupportedOperationException("cancelOffer noch nicht implementiert");
     }
 
@@ -176,7 +177,7 @@ public class OfferService {
      * @param userId Die User-ID
      * @return List der passenden, offenen Offers (Typ + Stadt + Zeitraum stimmen)
      */
-    public List<Offer> findMatchingOffersForUser(Long userId) {
+    public List<Offer> findMatchingOffersForUser(UUID userId) {
         return Collections.emptyList();
     }
 

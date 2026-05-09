@@ -4,6 +4,8 @@ import com.softwareengineering.petsitter.config.PetsitterSecurityProperties;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.Locale;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class DatabaseUserDetailsService implements UserDetailsService {
+
+    private static final Logger log = LoggerFactory.getLogger(DatabaseUserDetailsService.class);
 
     private final UserRepository userRepository;
     private final PetsitterSecurityProperties securityProperties;
@@ -37,8 +41,13 @@ public class DatabaseUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(username)
-                .orElse(null);
+        User user = null;
+        try {
+            user = userRepository.findByEmail(username).orElse(null);
+        } catch (RuntimeException ex) {
+            // Bei fehlendem Schema/DB-Problemen weiterhin Demo-Login erlauben statt 500.
+            log.warn("DB-User-Lookup fehlgeschlagen, pruefe Demo-Fallback fuer {}: {}", username, ex.getMessage());
+        }
 
         if (user != null) {
             return org.springframework.security.core.userdetails.User

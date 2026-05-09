@@ -533,6 +533,100 @@ BUILD SUCCESS
 
 ---
 
+## 2026-05-09 | Fix: Vaadin "Connection lost"
+
+### 11:26 — Security fuer Vaadin-Transport angepasst
+
+**Was:**
+- In `SecurityConfig` CSRF deaktiviert (`.csrf(csrf -> csrf.disable())`)
+- Vaadin-Push-Endpunkt `/connect/**` in die erlaubten Request-Matcher aufgenommen
+
+**Warum:**
+- Bei Vaadin fuehrt ein CSRF-Konflikt mit UIDL/Heartbeat/Push-Requests haeufig zu 403 im Hintergrund
+- Im Browser zeigt sich das als "Connection lost"
+
+**Kontext:**
+- Build danach verifiziert: `./mvnw test` -> `BUILD SUCCESS`
+
+---
+
+## 2026-05-09 | App startet Container automatisch
+
+### 11:28 — Docker-Compose-Autostart in Default-Konfiguration aktiviert
+
+**Was:**
+- In `src/main/resources/application.yml` gesetzt:
+  - `spring.docker.compose.enabled=true`
+  - `spring.docker.compose.file=compose.yaml`
+
+**Warum:**
+- Wunsch: App soll ihre Infrastruktur-Container (Compose) beim Start selbst hochfahren
+
+### 11:28 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+---
+
+## 2026-05-09 | Fix: Landingpage ohne Security-Blockade
+
+### 11:32 — Landingpage `/` auf `permitAll` gesetzt
+
+**Was:**
+- In `SecurityConfig` den Pfad `/` zu den erlaubten Matchern hinzugefuegt
+
+**Warum:**
+- Wunsch: Security fuer die Landingpage ausschalten
+- reduziert Risiko, dass Vaadin-initiale Requests auf der Startseite auth-seitig blockiert werden
+
+### 11:32 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+---
+
+## 2026-05-09 | Fix: Login-Fehler "Table 'petsitter.users' doesn't exist"
+
+### 11:37 — Schema- und Auth-Fallback-Fix umgesetzt
+
+**Was:**
+- `src/main/resources/application-local.yml` erweitert:
+  - `spring.jpa.hibernate.ddl-auto: update` (nur im local-Profil)
+- `DatabaseUserDetailsService` robuster gemacht:
+  - DB-Lookup in `try/catch`
+  - bei DB-Fehlern wird der Demo-Fallback weiterhin geprueft statt sofort 500 zu werfen
+
+**Warum:**
+- Ursache war fehlendes Schema in MySQL (`users`-Tabelle nicht vorhanden)
+- Security-Login schlug mit `InternalAuthenticationServiceException` fehl, bevor Fallback greifen konnte
+
+### 11:37 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+---
+
 ## 2026-05-09 | Security-Dokumentation erweitert
 
 ### 11:25 — `SECREADME.md` erstellt

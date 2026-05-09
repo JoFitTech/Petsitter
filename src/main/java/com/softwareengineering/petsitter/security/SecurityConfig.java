@@ -20,12 +20,17 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+                // Vaadin verwendet eigene CSRF/UIDL-Mechanismen; Spring-CSRF blockiert sonst oft Requests
+                // und fuehrt im Browser zu "Connection lost".
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
+                                "/",
                                 "/login",
                                 "/error",
                                 "/VAADIN/**",
                                 "/frontend/**",
+                                "/connect/**",
                                 "/favicon.ico",
                                 "/images/**",
                                 "/icons/**",

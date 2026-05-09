@@ -221,14 +221,14 @@ Notification
 | **PasswordEncoder** | BCrypt Hashing | `SecurityConfig.java:50-53` |
 | **UserDetailsService** | Automatisch aus DB (Spring Security Integration) | `SecurityConfig.java:55+` |
 | **Security Filter Chain** | Form Login, CSRF aktiv, Auth required | `SecurityConfig.java:34-37` |
-| **Demo-Credentials** | env vars `DEMO_USERNAME`, `DEMO_PASSWORD` | `SecurityConfig.java:41-47` |
+| **Demo-Credentials** | env vars `PETSITTER_DEMO_USERNAME`, `PETSITTER_DEMO_PASSWORD` | `application.properties` |
 
 ### Für Demo (lokale Entwicklung)
 
 ```properties
-# In application.yml oder als Env-Var
-DEMO_USERNAME=localuser
-DEMO_PASSWORD=localpass
+# In application.properties oder als Env-Var
+PETSITTER_DEMO_USERNAME=localuser
+PETSITTER_DEMO_PASSWORD=localpass
 # Passwort wird mit BCrypt gehasht
 ```
 
@@ -330,7 +330,7 @@ src/main/java/com/softwareengineering/petsitter/
 
 - [ ] Flyway Migration `V1__create_schema.sql` (Tabellen + Constraints)
 - [ ] Flyway Migration `V2__insert_demo_data.sql` (Test-Daten: 4 User, 3 Pets, 5 Offers)
-- [ ] `docker compose up -d` + `./mvnw spring-boot:run -Dspring-boot.run.profiles=compose`
+- [ ] `docker compose up -d` + `./mvnw spring-boot:run -Dspring-boot.run.profiles=local`
 - [ ] Smoke Test: DB lädt, Demo-Daten sichtbar
 
 ### Phase 2: Geschäftslogik (3-4 Tage)
@@ -399,7 +399,7 @@ A: Sitter bietet generelle Betreuung an, nicht für ein spezifisches Haustier. P
 A: `@Transactional` in `BookingService.acceptRequest()`. Entweder alle Schritte erfolgreich oder Rollback.
 
 **F: Wie testen wir ohne echte MySQL während CI?**  
-A: H2 in-Memory DB in Tests. `application-test.yml` mit H2-Datasource. Flyway-Migrations laufen auch auf H2.
+A: H2 in-Memory DB in Tests. `src/test/resources/application.properties` mit H2-Datasource. Flyway-Migrations laufen auch auf H2.
 
 ---
 
@@ -408,7 +408,7 @@ A: H2 in-Memory DB in Tests. `application-test.yml` mit H2-Datasource. Flyway-Mi
 - [ ] Repo clonen
 - [ ] `./mvnw clean install` ausführen
 - [ ] `docker compose up -d` starten (MySQL)
-- [ ] `./mvnw spring-boot:run -Dspring-boot.run.profiles=compose` starten
+- [ ] `./mvnw spring-boot:run -Dspring-boot.run.profiles=local` starten
 - [ ] `http://localhost:8080` im Browser testen
 - [ ] `./mvnw test` ausführen (sollte grün sein)
 - [ ] Diese Datei durchlesen

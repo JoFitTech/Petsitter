@@ -17,5 +17,23 @@ services:
       timeout: 5s
       retries: 10
 
+  petsitter-mongo:
+    image: mongo:8
+    container_name: petsitter-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-petsitter}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-petsitter}
+      MONGO_INITDB_DATABASE: ${MONGO_DB:-petsitter_chat}
+    ports:
+      - "27017:27017"
+    volumes:
+      - petsitter-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   petsitter-mysql-data:
+  petsitter-mongo-data:

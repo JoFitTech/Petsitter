@@ -17,8 +17,14 @@ Technisches Grundgeruest fuer das Uni-Projekt.
 
 ```powershell
 docker compose up -d
-.\mvnw spring-boot:run -Dspring-boot.run.profiles=compose
+.\mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
+
+Dabei startet Compose aktuell:
+- `petsitter-mysql` (relationales App-Modell)
+- `petsitter-mongo` (Chat-Persistenz)
+
+Die App selbst laeuft lokal per Maven. Eine Containerisierung der App kann spaeter optional als dritter Container folgen.
 
 ## Testlauf
 

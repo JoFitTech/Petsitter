@@ -81,7 +81,7 @@ Das ist eine **atomare Transaktion** → entweder alles erfolgreich oder Rollbac
 
 # Starten (MySQL via Docker)
 docker compose up -d
-./mvnw spring-boot:run -Dspring-boot.run.profiles=compose
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 ## 7. Fragen?

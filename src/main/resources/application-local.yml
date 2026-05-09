@@ -1,0 +1,17 @@
+spring:
+  config:
+    activate:
+      on-profile: local
+  docker:
+    compose:
+      enabled: true
+      file: compose.yaml
+  data:
+    mongodb:
+      host: ${MONGO_HOST:localhost}
+      port: ${MONGO_PORT:27017}
+      database: ${MONGO_DB:petsitter_chat}
+      username: ${MONGO_USER:petsitter}
+      password: ${MONGO_PASSWORD:petsitter}
+      authentication-database: ${MONGO_AUTH_DB:admin}
+

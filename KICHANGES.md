@@ -94,7 +94,7 @@ Diese Exceptions werden in Phase 2 in Services geworfen, wenn Businessregeln ver
 Security ist nicht optional. BCrypt ist der Standard für Passwort-Hashing. Timestamps sind für Audit-Trails wichtig.
 
 **Kontext:**
-`application.yml` kann `DEMO_USERNAME` und `DEMO_PASSWORD` Env-Vars nutzen. Defaultfallback zu `localuser/localpass`.
+`application.properties` kann `PETSITTER_DEMO_USERNAME` und `PETSITTER_DEMO_PASSWORD` Env-Vars nutzen. Defaultfallback zu `localuser/localpass`.
 
 ---
 
@@ -291,7 +291,7 @@ Diese Items sind für den nächsten Run geplant:
 - [ ] `V2__insert_demo_data.sql` schreiben (4 User, 3 Pets, 5 Offers, 2 Requests)
 - [ ] `src/main/resources/db/migration/` Ordner erstellen
 - [ ] Docker Compose Start testen (`docker compose up -d`)
-- [ ] App starten (`./mvnw spring-boot:run -Dspring-boot.run.profiles=compose`)
+- [ ] App starten (`./mvnw spring-boot:run -Dspring-boot.run.profiles=local`)
 - [ ] Smoke Test: Demo-Daten sichtbar in DB
 
 ---
@@ -346,5 +346,224 @@ BUILD SUCCESS
 
 **Warum:**
 - Sicherstellen, dass die UUID-Umstellung vollständig konsistent ist und keine Compile-/Runtime-Probleme erzeugt
+
+---
+
+## 2026-05-09 | Config + Spring Security Ausbau
+
+### 11:00 — Security auf DB-Auth + konfigurierbaren Demo-Fallback umgestellt
+
+**Was:**
+- `SecurityConfig` umgebaut:
+  - `@EnableWebSecurity`, `@EnableMethodSecurity(jsr250Enabled = true)` aktiviert
+  - explizite Login-Seite `/login` konfiguriert
+  - zentrale Permit-Whitelist fuer Vaadin-Assets ergaenzt
+  - Logout-Flow mit Session-Invalidierung gesetzt
+- Neue Properties-Klasse angelegt: `PetsitterSecurityProperties`
+  - Prefix: `petsitter.security.demo.*`
+  - steuerbar ueber Env-Variablen
+- Neuen `DatabaseUserDetailsService` eingebaut:
+  - Login zunaechst ueber DB-User (`UserRepository.findByEmail(...)`)
+  - optionaler Demo-User-Fallback (konfigurierbar)
+- Neue Vaadin `LoginView` unter Route `/login` erstellt
+- `AuthenticatedUser` Helper-Komponente erstellt (aktuell eingeloggten Domain-User laden)
+
+**Warum:**
+- Security sollte nicht auf dauerhaftem In-Memory-Only-Setup bleiben
+- Konfigurierbarkeit ueber Properties ist sauberer als harte Werte im Code
+- Einheitlicher Login-Flow fuer Vaadin + Spring Security
+
+**Kontext:**
+- Demo-Zugang ist weiterhin moeglich, aber zentral konfigurierbar
+- DB-basierte Auth ist damit vorbereitet fuer echte Registrierung/Seed-User
+
+### 11:03 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+**Warum:**
+- Sicherstellen, dass der neue Security-Stack den Spring-Kontext sauber startet
+
+---
+
+## 2026-05-09 | Konfiguration von YAML auf .properties umgestellt
+
+### 11:05 — Config-Dateien migriert
+
+**Was:**
+- `src/main/resources/application.yml` nach `src/main/resources/application.properties` migriert
+- `src/main/resources/application-compose.yml` nach `src/main/resources/application-local.properties` migriert
+- `src/test/resources/application.yml` nach `src/test/resources/application.properties` migriert
+- alte YAML-Dateien entfernt, um Konflikte durch doppelte Quellen zu vermeiden
+
+**Warum:**
+- Vorgabe: Konfiguration soll nicht in YAML, sondern in `.properties` gepflegt werden
+- Eine einzige Konfigurationsart vermeidet Missverstaendnisse im Team
+
+**Kontext:**
+- Inhalte wurden 1:1 in Dot-Notation uebernommen (inkl. Security- und Compose-Profileinstellungen)
+
+### 11:07 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+**Warum:**
+- Sicherstellen, dass Spring die neuen `.properties` korrekt laedt (Main + Local-Profil + Tests)
+
+---
+
+## 2026-05-09 | Aufraeumen: Restliche .yml-Dateien entfernt + Doku aktualisiert
+
+### 11:09 — Letzte `.yml` im Repo entfernt
+
+**Was:**
+- `docker-compose.yml` geloescht
+- Local-Profil auf `compose.yaml` umgestellt:
+  - `src/main/resources/application-local.properties`
+  - `spring.docker.compose.file=compose.yaml`
+
+**Warum:**
+- Wunsch: keine `.yml`-Dateien mehr im Repo
+- Konfigurationsstand konsistent halten (Properties + compose.yaml)
+
+### 11:10 — Doku-Verweise auf YAML korrigiert
+
+**Was:**
+- `BACKEND_OVERVIEW.md` aktualisiert:
+  - Env-Variablen auf `PETSITTER_DEMO_USERNAME` / `PETSITTER_DEMO_PASSWORD`
+  - Verweise von `application.yml` auf `application.properties`
+  - Test-Config-Verweis auf `src/test/resources/application.properties`
+- `TECHNOLOGY_GUIDE.md` Profil-Dateinamen auf `.properties` umgestellt
+- `INFOFORME.md` Referenz auf `application-local.properties` + `compose.yaml` aktualisiert
+
+### 11:12 — Profilname von `compose` auf `local` umbenannt
+
+**Was:**
+- `application-compose.properties` in `application-local.properties` umbenannt
+- Aktivierungsprofil auf `spring.config.activate.on-profile=local` gesetzt
+- alten `application-compose.properties` entfernt
+
+**Warum:**
+- Wunsch aus Team: Profil soll fachlich als lokales Entwicklungsprofil benannt sein
+
+**Verifikation:**
+- `./mvnw test` ausgefuehrt
+- Ergebnis: `BUILD SUCCESS` (Tests run: 1, Failures: 0, Errors: 0)
+
+---
+
+## 2026-05-09 | Docker-Topologie erweitert (MySQL + MongoDB)
+
+### 11:15 — Zwei-DB-Containerstruktur umgesetzt
+
+**Was:**
+- `compose.yaml` erweitert um `petsitter-mongo` Service:
+  - Image: `mongo:8`
+  - Port: `27017`
+  - Persistentes Volume: `petsitter-mongo-data`
+  - Healthcheck via `mongosh` Ping
+- bestehender MySQL-Container bleibt unveraendert fuer den relationalen App-Kern
+- `application-local.properties` um Mongo-Properties ergaenzt:
+  - `spring.data.mongodb.host/port/database/username/password/authentication-database`
+- `README.md` Docker-Abschnitt aktualisiert (MySQL + Mongo klar dokumentiert)
+
+**Warum:**
+- Polyglot-Persistence macht fuer euren Scope Sinn:
+  - Relationales Domänenmodell (User, Offer, Booking, Request) in MySQL
+  - Chat-Messages dokumentenorientiert in MongoDB
+- Damit ist die Chat-Infrastruktur vorbereitet, ohne den bestehenden Kern umzubauen
+
+### 11:15 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+**Zusatzcheck Docker:**
+- `docker compose -f compose.yaml config` ausgefuehrt
+- Ergebnis: Compose-Datei ist valide (MySQL + Mongo Services werden korrekt aufgeloest)
+
+---
+
+## 2026-05-09 | Rueckumstellung Config auf YAML
+
+### 11:17 — `application*.properties` wieder auf `.yml` migriert
+
+**Was:**
+- `src/main/resources/application.properties` -> `src/main/resources/application.yml`
+- `src/main/resources/application-local.properties` -> `src/main/resources/application-local.yml`
+- `src/test/resources/application.properties` -> `src/test/resources/application.yml`
+- alte `application*.properties`-Dateien entfernt, um Doppelkonfiguration zu vermeiden
+
+**Warum:**
+- Vorgabe: Konfiguration soll wieder in YAML gepflegt werden
+
+**Kontext:**
+- Inhalte 1:1 uebernommen (DB, Security-Demo, local-Profil, Mongo-Settings, Test-H2)
+
+### 11:17 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
+
+---
+
+## 2026-05-09 | Security-Dokumentation erweitert
+
+### 11:25 — `SECREADME.md` erstellt
+
+**Was:**
+- Neue Datei `SECREADME.md` im Projekt-Root angelegt
+- Inhalt dokumentiert:
+  - aktuellen Security-Status
+  - Aufbau von `SecurityConfig` / `SecurityFilterChain`
+  - DB-basierten `UserDetailsService` inkl. Demo-Fallback
+  - Login-Flow mit Vaadin `LoginView`
+  - BCrypt / Method Security / Logout-Verhalten
+  - naechste Security-Schritte (Rollenmodell, Tests, Registrierung)
+
+**Warum:**
+- Wunsch: zentrale, verstaendliche Security-Doku fuer Teamabstimmung und Erklaerung
+- reduziert Einarbeitungsaufwand fuer Kollegen
+- `KICHANGES.md` veraltete Env-/Datei-Referenz korrigiert
+
+**Warum:**
+- Dokumentation muss den aktuellen technischen Stand 1:1 widerspiegeln
+
+### 11:10 — Build/Test verifiziert
+
+**Was:**
+- `./mvnw test` ausgefuehrt
+
+**Ergebnis:**
+```
+Tests run: 1, Failures: 0, Errors: 0
+BUILD SUCCESS
+```
 
 

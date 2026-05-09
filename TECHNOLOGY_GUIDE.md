@@ -30,7 +30,7 @@ public class PetsitterApplication {
 | Auto-Konfiguration | Datasource, JPA, Security, etc. automatisch konfiguriert |
 | Embedded Server | Tomcat mitgeliefert, keine separate Installation |
 | Dependency Management | `pom.xml` ist übersichtlich, keine Versionskonflikt |
-| Profil-Support | `application.yml`, `application-compose.yml`, `application-test.yml` |
+| Profil-Support | `application.properties`, `application-local.properties`, `src/test/resources/application.properties` |
 | Actuator | Health Checks, Metrics unter `/actuator` |
 
 ### Java 21 (wichtig zu verstehen)

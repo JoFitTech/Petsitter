@@ -26,3 +26,11 @@ logging:
   level:
     root: INFO
 
+petsitter:
+  security:
+    demo:
+      enabled: ${PETSITTER_DEMO_ENABLED:true}
+      username: ${PETSITTER_DEMO_USERNAME:localuser}
+      password: ${PETSITTER_DEMO_PASSWORD:localpass}
+      role: ${PETSITTER_DEMO_ROLE:USER}
+

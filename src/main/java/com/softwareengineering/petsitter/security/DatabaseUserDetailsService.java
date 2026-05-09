@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.security;
 
 import com.softwareengineering.petsitter.config.PetsitterSecurityProperties;
+import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.Locale;
@@ -53,7 +54,7 @@ public class DatabaseUserDetailsService implements UserDetailsService {
             return org.springframework.security.core.userdetails.User
                     .withUsername(user.getEmail())
                     .password(user.getPasswordHash())
-                    .roles("USER")
+                    .roles(toSecurityRole(user.getAccountRole()))
                     .build();
         }
 
@@ -71,6 +72,12 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         }
         return role.replace("ROLE_", "").toUpperCase(Locale.ROOT);
     }
-}
 
+    private String toSecurityRole(AccountRole accountRole) {
+        if (accountRole == null) {
+            return AccountRole.SIGNED_IN_USER.name();
+        }
+        return normalizeRole(accountRole.name());
+    }
+}
 

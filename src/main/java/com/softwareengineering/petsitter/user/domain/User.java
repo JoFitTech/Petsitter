@@ -2,6 +2,8 @@ package com.softwareengineering.petsitter.user.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -13,14 +15,13 @@ import java.util.UUID;
 /**
  * User Entity – repräsentiert einen Benutzer im Petsitter-System.
  *
- * <p>Ein User kann gleichzeitig in den Rollen "Tierhalter" (Owner) und "Tiersitter" (Sitter) tätig sein.
- * Die Rollen werden nicht durch separate Entities definiert, sondern ergeben sich aus der Nutzung:
- * - User mit Haustieren und Owner Offers → Owner
- * - User mit Sitter Offers → Sitter
+ * <p>Ein angemeldeter User hat eine technische Account-Rolle:
+ * ADMIN oder SIGNED_IN_USER. Nicht angemeldete Besucher sind Guest-User,
+ * werden aber nicht in dieser Tabelle gespeichert.
  *
  * <p>Verantwortlichkeiten:
  * - Speichert Authentifizierungsdaten (Email, Password-Hash)
- * - Speichert Kontaktdaten (Name, Phone, City)
+ * - Speichert Profil- und Adressdaten
  * - Wird referenziert von Pet (als Owner), Offer (als Creator), OfferRequest (als Requester)
  *
  * <p>Sicherheit:
@@ -66,15 +67,46 @@ public class User {
     private String lastName;
 
     /**
-     * Telefonnummer – optional, für Kontakt mit Bushmännern.
+     * Telefonnummer – optional, für Kontaktaufnahme.
      */
     private String phone;
 
     /**
-     * Stadt – wird für Matching-Logik verwendet (z.B. "Vienna", "Berlin").
-     * Optional: Sitter kann in mehreren Städten tätig sein.
+     * Straße der Hauptadresse.
      */
+    @Column(nullable = false)
+    private String street;
+
+    /**
+     * Hausnummer der Hauptadresse.
+     */
+    @Column(name = "house_number", nullable = false)
+    private String houseNumber;
+
+    /**
+     * Postleitzahl der Hauptadresse.
+     */
+    @Column(name = "postal_code", nullable = false)
+    private String postalCode;
+
+    /**
+     * Stadt – wird für Matching-Logik verwendet (z.B. "Vienna", "Berlin").
+     */
+    @Column(nullable = false)
     private String city;
+
+    /**
+     * Optionaler Adresszusatz wie Etage, Hinterhaus oder c/o.
+     */
+    @Column(name = "address_addition")
+    private String addressAddition;
+
+    /**
+     * Technische Account-Rolle für Login und Berechtigungen.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_role", nullable = false)
+    private AccountRole accountRole;
 
     /**
      * Zeitstempel der Erstellung – wird automatisch beim Speichern gesetzt.
@@ -133,12 +165,52 @@ public class User {
         this.phone = phone;
     }
 
+    public String getStreet() {
+        return street;
+    }
+
+    public void setStreet(String street) {
+        this.street = street;
+    }
+
+    public String getHouseNumber() {
+        return houseNumber;
+    }
+
+    public void setHouseNumber(String houseNumber) {
+        this.houseNumber = houseNumber;
+    }
+
+    public String getPostalCode() {
+        return postalCode;
+    }
+
+    public void setPostalCode(String postalCode) {
+        this.postalCode = postalCode;
+    }
+
     public String getCity() {
         return city;
     }
 
     public void setCity(String city) {
         this.city = city;
+    }
+
+    public String getAddressAddition() {
+        return addressAddition;
+    }
+
+    public void setAddressAddition(String addressAddition) {
+        this.addressAddition = addressAddition;
+    }
+
+    public AccountRole getAccountRole() {
+        return accountRole;
+    }
+
+    public void setAccountRole(AccountRole accountRole) {
+        this.accountRole = accountRole;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -156,4 +228,3 @@ public class User {
         }
     }
 }
-

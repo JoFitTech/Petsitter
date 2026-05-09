@@ -24,6 +24,12 @@ public class SecurityConfig {
                 // und fuehrt im Browser zu "Connection lost".
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
+                        // PUMA-Assets duerfen unter keinen Umstaenden ausgeliefert werden.
+                        .requestMatchers(
+                                "/themes/puma-theme/**",
+                                "/frontend/themes/puma-theme/**",
+                                "/puma/**"
+                        ).denyAll()
                         .requestMatchers(
                                 "/",
                                 "/login",

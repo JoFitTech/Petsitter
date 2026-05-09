@@ -40,3 +40,6 @@ src/main/frontend/generated/
 ### Local Maven override ###
 .mvn/maven.config
 
+### No PUMA files (lokal blockieren, nicht versionieren) ###
+**/puma-theme/
+**/*puma*

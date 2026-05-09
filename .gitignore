@@ -43,3 +43,6 @@ src/main/frontend/generated/
 ### No PUMA files (lokal blockieren, nicht versionieren) ###
 **/puma-theme/
 **/*puma*
+
+### No local environment variables ###
+application-local.yml

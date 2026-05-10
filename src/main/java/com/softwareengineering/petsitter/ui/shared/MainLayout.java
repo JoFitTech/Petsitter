@@ -100,19 +100,29 @@ public class MainLayout extends AppLayout {
 
         nav.add(findSitterBtn, findOwnerBtn);
 
-        // Right: Profile icon
-        Button profileBtn = new Button(new Icon(VaadinIcon.USER));
-        profileBtn.getStyle()
-                .set("width", "46px")
-                .set("height", "46px")
-                .set("border-radius", "50%")
-                .set("background", "#8db3c3")
-                .set("color", "white")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
+        // Right: Icon buttons (Nachrichten, Favoriten, Profil)
+        HorizontalLayout rightIcons = new HorizontalLayout();
+        rightIcons.setSpacing(false);
+        rightIcons.setAlignItems(FlexComponent.Alignment.CENTER);
+        rightIcons.getStyle().set("gap", "8px");
+
+        Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
+        mailBtn.addClickListener(e -> {
+            // TODO: UI.getCurrent().navigate("messages");
+            System.out.println("TODO: Nachrichten-Seite");
+        });
+
+        Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
+        heartBtn.addClickListener(e -> {
+            // TODO: UI.getCurrent().navigate("favorites");
+            System.out.println("TODO: Favoriten-Seite");
+        });
+
+        Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
-        header.add(logoWrapper, nav, profileBtn);
+        rightIcons.add(mailBtn, heartBtn, profileBtn);
+        header.add(logoWrapper, nav, rightIcons);
         return header;
     }
 
@@ -190,6 +200,20 @@ public class MainLayout extends AppLayout {
     }
 
     // ── Shared helpers ────────────────────────────────────────────────────
+    private Button headerIconButton(VaadinIcon icon, String background, String color) {
+        Button btn = new Button(new Icon(icon));
+        btn.getStyle()
+                .set("width", "42px")
+                .set("height", "42px")
+                .set("border-radius", "50%")
+                .set("background", background)
+                .set("color", color)
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("flex-shrink", "0");
+        return btn;
+    }
+
     private Button pillButton(String text, String background, String color) {
         Button button = new Button(text);
         button.getStyle()

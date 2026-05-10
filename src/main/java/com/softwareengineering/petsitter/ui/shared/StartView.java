@@ -1,7 +1,6 @@
 package com.softwareengineering.petsitter.ui.shared;
 
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.html.*;
@@ -11,11 +10,13 @@ import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.auth.AnonymousAllowed;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Route("")
+@AnonymousAllowed
 public class StartView extends VerticalLayout {
 
     private static final String DARK = "#4a3428";
@@ -166,21 +167,7 @@ public class StartView extends VerticalLayout {
 
         nav.add(findSitterButton, findOwnerButton);
 
-        Button profileButton = new Button(new Icon(VaadinIcon.USER));
-        profileButton.getStyle()
-                .set("width", "48px")
-                .set("height", "48px")
-                .set("border-radius", "50%")
-                .set("background", "#8db3c3")
-                .set("color", "white")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        profileButton.addClickListener(event -> onProfileClicked());
-
-        header.add(logoButton, nav, profileButton);
+        header.add(logoButton, nav, new ProfileMenu());
         return header;
     }
 
@@ -856,13 +843,6 @@ public class StartView extends VerticalLayout {
 
         // TODO:
         // UI.getCurrent().navigate("auftrag-erstellen");
-    }
-
-    private void onProfileClicked() {
-        System.out.println("Profil geklickt");
-
-        // TODO:
-        // UI.getCurrent().navigate("profil");
     }
 
     private void onLogoClicked() {

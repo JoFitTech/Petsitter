@@ -6,14 +6,15 @@ import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.user.domain.User;
-import com.softwareengineering.petsitter.user.repository.UserRepository;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -22,7 +23,10 @@ import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Optional;
 
 @Route(value = "create_offer", layout = MainLayout.class)
 @PageTitle("Angebot erstellen | Petsitter")
@@ -30,72 +34,89 @@ import java.util.List;
 public class CreateOfferView extends VerticalLayout {
 
     private final OfferRepository offerRepository;
+    private final Optional<User> currentUser;
 
+    private final ComboBox<OfferType> offerType = new ComboBox<>("Offer type");
     private final DatePicker startDate = new DatePicker("Start date");
     private final DatePicker endDate = new DatePicker("End date");
-    private final ComboBox<User> createUser = new ComboBox<>("Create user");
-    private final ComboBox<User> updateUser = new ComboBox<>("Update user");
+    private final Span dateSummary = new Span("Bitte Start- und Enddatum auswaehlen.");
     private final ComboBox<Pet> pet = new ComboBox<>("Pet");
-    private final ComboBox<OfferType> offerType = new ComboBox<>("Offer type");
-    private final BigDecimalField price = new BigDecimalField("Price");
+    private final BigDecimalField price = new BigDecimalField("Price per day");
     private final TextArea description = new TextArea("Description");
-    private final ComboBox<OfferStatus> status = new ComboBox<>("Status");
+    private final Button createOffer = new Button("createOffer", event -> saveOffer());
 
-    public CreateOfferView(OfferRepository offerRepository, UserRepository userRepository,
-            PetRepository petRepository) {
+    public CreateOfferView(OfferRepository offerRepository, PetRepository petRepository,
+            AuthenticatedUser authenticatedUser) {
         this.offerRepository = offerRepository;
+        this.currentUser = authenticatedUser.get();
 
         setSizeFull();
         setPadding(true);
         setSpacing(true);
 
-        configureFields(userRepository.findAll(), petRepository.findAll());
+        configureFields(loadOwnPets(petRepository));
 
         FormLayout form = new FormLayout(
+                offerType,
                 startDate,
                 endDate,
-                createUser,
-                updateUser,
+                dateSummary,
                 pet,
-                offerType,
                 price,
-                description,
-                status);
+                description);
         form.setMaxWidth("720px");
         form.setResponsiveSteps(
                 new FormLayout.ResponsiveStep("0", 1),
                 new FormLayout.ResponsiveStep("520px", 2));
+        form.setColspan(dateSummary, 2);
         form.setColspan(description, 2);
 
-        Button createOffer = new Button("createOffer", event -> saveOffer());
         createOffer.addThemeName("primary");
+        createOffer.setEnabled(currentUser.isPresent());
 
         add(new H2("Angebot erstellen"), form, createOffer);
+        if (currentUser.isEmpty()) {
+            showError("Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden.");
+        }
     }
 
-    private void configureFields(List<User> users, List<Pet> pets) {
-        startDate.setRequiredIndicatorVisible(true);
-        endDate.setRequiredIndicatorVisible(true);
+    private List<Pet> loadOwnPets(PetRepository petRepository) {
+        return currentUser
+                .map(user -> petRepository.findAllByOwnerId(user.getId()))
+                .orElseGet(List::of);
+    }
 
-        createUser.setItems(users);
-        createUser.setItemLabelGenerator(this::formatUser);
-        createUser.setRequiredIndicatorVisible(true);
-        createUser.addValueChangeListener(event -> {
-            if (updateUser.isEmpty()) {
-                updateUser.setValue(event.getValue());
+    private void configureFields(List<Pet> pets) {
+        offerType.setItems(OfferType.values());
+        offerType.setRequiredIndicatorVisible(true);
+
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        startDate.setMin(today);
+        startDate.setRequiredIndicatorVisible(true);
+        startDate.addValueChangeListener(event -> {
+            LocalDate selectedStart = event.getValue();
+            LocalDate minimumEndDate = selectedStart != null && selectedStart.isAfter(tomorrow)
+                    ? selectedStart
+                    : tomorrow;
+            endDate.setMin(minimumEndDate);
+            if (endDate.getValue() != null && endDate.getValue().isBefore(minimumEndDate)) {
+                endDate.clear();
             }
+            updateDateSummary();
         });
 
-        updateUser.setItems(users);
-        updateUser.setItemLabelGenerator(this::formatUser);
-        updateUser.setRequiredIndicatorVisible(true);
+        endDate.setMin(tomorrow);
+        endDate.setRequiredIndicatorVisible(true);
+        endDate.addValueChangeListener(event -> updateDateSummary());
+
+        dateSummary.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "var(--lumo-font-size-s)");
 
         pet.setItems(pets);
         pet.setItemLabelGenerator(this::formatPet);
         pet.setClearButtonVisible(true);
-
-        offerType.setItems(OfferType.values());
-        offerType.setRequiredIndicatorVisible(true);
 
         price.setPrefixComponent(new com.vaadin.flow.component.html.Span("EUR"));
         price.setClearButtonVisible(true);
@@ -103,10 +124,6 @@ public class CreateOfferView extends VerticalLayout {
         description.setMaxLength(255);
         description.setHeight("120px");
         description.setClearButtonVisible(true);
-
-        status.setItems(OfferStatus.values());
-        status.setValue(OfferStatus.OPEN);
-        status.setRequiredIndicatorVisible(true);
     }
 
     private void saveOffer() {
@@ -118,13 +135,13 @@ public class CreateOfferView extends VerticalLayout {
         Offer offer = new Offer();
         offer.setStartDate(startDate.getValue());
         offer.setEndDate(endDate.getValue());
-        offer.setCreateUser(createUser.getValue());
-        offer.setUpdateUser(updateUser.getValue());
+        offer.setCreateUser(currentUser.orElseThrow());
+        offer.setUpdateUser(currentUser.orElseThrow());
         offer.setPet(pet.getValue());
         offer.setOfferType(offerType.getValue());
         offer.setPrice(price.getValue());
         offer.setDescription(description.getValue());
-        offer.setStatus(status.getValue());
+        offer.setStatus(OfferStatus.OPEN);
 
         try {
             Offer savedOffer = offerRepository.save(offer);
@@ -137,30 +154,40 @@ public class CreateOfferView extends VerticalLayout {
     }
 
     private boolean isValid() {
-        if (startDate.isEmpty() || endDate.isEmpty() || createUser.isEmpty()
-                || updateUser.isEmpty() || offerType.isEmpty() || status.isEmpty()) {
+        if (currentUser.isEmpty() || offerType.isEmpty() || startDate.isEmpty() || endDate.isEmpty()) {
             return false;
         }
-        return !startDate.getValue().isAfter(endDate.getValue());
+
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        return !startDate.getValue().isBefore(today)
+                && !endDate.getValue().isBefore(tomorrow)
+                && !startDate.getValue().isAfter(endDate.getValue());
+    }
+
+    private void updateDateSummary() {
+        if (startDate.isEmpty() || endDate.isEmpty()) {
+            dateSummary.setText("Bitte Start- und Enddatum auswaehlen.");
+            return;
+        }
+
+        if (startDate.getValue().isAfter(endDate.getValue())) {
+            dateSummary.setText("Das Enddatum muss am oder nach dem Startdatum liegen.");
+            return;
+        }
+
+        long totalDays = ChronoUnit.DAYS.between(startDate.getValue(), endDate.getValue()) + 1;
+        dateSummary.setText("Gesamtdauer: " + totalDays + " Tag(e), inklusive Start- und Enddatum.");
     }
 
     private void clearForm() {
+        offerType.clear();
         startDate.clear();
         endDate.clear();
-        createUser.clear();
-        updateUser.clear();
+        updateDateSummary();
         pet.clear();
-        offerType.clear();
         price.clear();
         description.clear();
-        status.setValue(OfferStatus.OPEN);
-    }
-
-    private String formatUser(User user) {
-        if (user == null) {
-            return "";
-        }
-        return user.getFirstName() + " " + user.getLastName() + " (" + user.getEmail() + ")";
     }
 
     private String formatPet(Pet pet) {

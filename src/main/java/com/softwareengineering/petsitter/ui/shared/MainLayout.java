@@ -2,6 +2,7 @@ package com.softwareengineering.petsitter.ui.shared;
 
 import com.softwareengineering.petsitter.ui.booking.BookingView;
 import com.softwareengineering.petsitter.ui.chat.ChatView;
+import com.softwareengineering.petsitter.ui.offer.CreateOfferView;
 import com.softwareengineering.petsitter.ui.offer.OfferView;
 import com.softwareengineering.petsitter.ui.pet.PetView;
 import com.softwareengineering.petsitter.ui.user.UserView;
@@ -34,6 +35,7 @@ public class MainLayout extends AppLayout {
                 new Tab(new RouterLink("Start", StartView.class)),
                 new Tab(new RouterLink("Haustiere", PetView.class)),
                 new Tab(new RouterLink("Angebote", OfferView.class)),
+                new Tab(new RouterLink("Angebot erstellen", CreateOfferView.class)),
                 new Tab(new RouterLink("Buchungen", BookingView.class)),
                 new Tab(new RouterLink("Chat", ChatView.class)),
                 new Tab(new RouterLink("Profil", UserView.class))

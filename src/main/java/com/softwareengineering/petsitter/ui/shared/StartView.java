@@ -859,7 +859,7 @@ public class StartView extends VerticalLayout {
                 System.out.println("Auftrag anbieten geklickt");
 
                 // TODO:
-                // UI.getCurrent().navigate("auftrag-erstellen");
+                UI.getCurrent().navigate("create_offer");
         }
 
         private void onProfileClicked() {

@@ -9,12 +9,10 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface OfferRepository extends JpaRepository<Offer, UUID> {
-    List<Offer> findAllByTypeAndStatusAndCityAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+    List<Offer> findAllByOfferTypeAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
             OfferType type,
             OfferStatus status,
-            String city,
             LocalDate endDate,
             LocalDate startDate
     );
 }
-

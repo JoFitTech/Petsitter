@@ -15,7 +15,7 @@ import com.vaadin.flow.router.Route;
 import java.time.LocalDate;
 import java.util.List;
 
-@Route("")
+@Route(value = "", layout = MainLayout.class)
 public class StartView extends VerticalLayout {
 
     private static final String DARK = "#4a3428";
@@ -33,15 +33,11 @@ public class StartView extends VerticalLayout {
 
     public StartView() {
         setWidthFull();
-        setMinHeight("100vh");
         setPadding(false);
         setSpacing(false);
         setDefaultHorizontalComponentAlignment(Alignment.CENTER);
 
         getStyle()
-                .set("background", LIGHT_BG)
-                .set("font-family", "Inter, Arial, sans-serif")
-                .set("color", DARK)
                 .set("overflow-x", "hidden");
 
         add(createPageWrapper());
@@ -58,11 +54,9 @@ public class StartView extends VerticalLayout {
 
         wrapper.add(
                 createBackgroundBlobs(),
-                createHeader(),
                 createHeroSection(),
                 createOfferSection(),
-                createTrustBanner(),
-                createFooter()
+                createTrustBanner()
         );
 
         return wrapper;
@@ -108,81 +102,6 @@ public class StartView extends VerticalLayout {
         return container;
     }
 
-    private Component createHeader() {
-        HorizontalLayout header = new HorizontalLayout();
-        header.setWidthFull();
-        header.setAlignItems(FlexComponent.Alignment.CENTER);
-        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-
-        header.getStyle()
-                .set("position", "relative")
-                .set("z-index", "2")
-                .set("box-sizing", "border-box")
-                .set("max-width", "1180px")
-                .set("margin", "26px auto 0 auto")
-                .set("padding", "0 32px")
-                .set("height", "72px")
-                .set("background", "rgba(255,255,255,0.82)")
-                .set("border-radius", "30px")
-                .set("box-shadow", "0 8px 28px rgba(74, 52, 40, 0.06)");
-
-        Button logoButton = new Button();
-        logoButton.getStyle()
-                .set("background", "transparent")
-                .set("box-shadow", "none")
-                .set("padding", "0")
-                .set("cursor", "pointer");
-
-        HorizontalLayout logo = new HorizontalLayout();
-        logo.setAlignItems(FlexComponent.Alignment.CENTER);
-        logo.setSpacing(true);
-
-        Span logoIcon = new Span("🐾");
-        logoIcon.getStyle()
-                .set("font-size", "34px")
-                .set("line-height", "1");
-
-        Span logoText = new Span("Pawsitter");
-        logoText.getStyle()
-                .set("font-size", "36px")
-                .set("font-weight", "800")
-                .set("letter-spacing", "-1px")
-                .set("color", DARK);
-
-        logo.add(logoIcon, logoText);
-        logoButton.getElement().appendChild(logo.getElement());
-        logoButton.addClickListener(event -> onLogoClicked());
-
-        HorizontalLayout nav = new HorizontalLayout();
-        nav.setSpacing(true);
-        nav.setAlignItems(FlexComponent.Alignment.CENTER);
-
-        Button findSitterButton = pillButton("Tiersitter finden", "#f6e3bd", DARK);
-        findSitterButton.addClickListener(event -> onFindSitterClicked());
-
-        Button findOwnerButton = pillButton("Tierhalter finden", "#fff6e6", DARK);
-        findOwnerButton.getStyle().set("border", "1px solid #ead5ae");
-        findOwnerButton.addClickListener(event -> onFindOwnerClicked());
-
-        nav.add(findSitterButton, findOwnerButton);
-
-        Button profileButton = new Button(new Icon(VaadinIcon.USER));
-        profileButton.getStyle()
-                .set("width", "48px")
-                .set("height", "48px")
-                .set("border-radius", "50%")
-                .set("background", "#8db3c3")
-                .set("color", "white")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        profileButton.addClickListener(event -> onProfileClicked());
-
-        header.add(logoButton, nav, profileButton);
-        return header;
-    }
 
     private Component createHeroSection() {
         Div hero = new Div();
@@ -657,107 +576,6 @@ public class StartView extends VerticalLayout {
         return item;
     }
 
-    private Component createFooter() {
-        HorizontalLayout footer = new HorizontalLayout();
-        footer.setWidthFull();
-        footer.setAlignItems(FlexComponent.Alignment.CENTER);
-        footer.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-
-        footer.getStyle()
-                .set("position", "relative")
-                .set("z-index", "2")
-                .set("background", DARK)
-                .set("color", "white")
-                .set("padding", "34px 76px")
-                .set("box-sizing", "border-box")
-                .set("margin-top", "40px");
-
-        VerticalLayout brand = new VerticalLayout();
-        brand.setPadding(false);
-        brand.setSpacing(false);
-
-        H2 logo = new H2("Pawsitter");
-        logo.getStyle()
-                .set("margin", "0")
-                .set("font-size", "26px")
-                .set("color", "white");
-
-        Paragraph claim = new Paragraph("Freundliche Plattform für zuverlässige Tierbetreuung in deiner Nähe.");
-        claim.getStyle()
-                .set("margin", "4px 0 18px 0")
-                .set("font-size", "14px")
-                .set("color", "#e8d8c6");
-
-        Span copyright = new Span("© 2026 Pawsitter");
-        copyright.getStyle()
-                .set("font-size", "12px")
-                .set("color", "#e8d8c6");
-
-        brand.add(logo, claim, copyright);
-
-        HorizontalLayout links = new HorizontalLayout();
-        links.setSpacing(true);
-        links.getStyle().set("gap", "28px");
-
-        links.add(
-                footerLink("Über uns", "ueber-uns"),
-                footerLink("Kontakt", "kontakt"),
-                footerLink("Datenschutz", "datenschutz"),
-                footerLink("Impressum", "impressum"),
-                footerLink("Hilfe", "hilfe")
-        );
-
-        HorizontalLayout socials = new HorizontalLayout();
-        socials.setSpacing(true);
-
-        Button facebookButton = socialButton("f");
-        facebookButton.addClickListener(event -> onSocialClicked("facebook"));
-
-        Button instagramButton = socialButton("◎");
-        instagramButton.addClickListener(event -> onSocialClicked("instagram"));
-
-        socials.add(facebookButton, instagramButton);
-
-        footer.add(brand, links, socials);
-        return footer;
-    }
-
-    private Component footerLink(String text, String route) {
-        Button linkButton = new Button(text);
-
-        linkButton.getStyle()
-                .set("background", "transparent")
-                .set("color", "white")
-                .set("font-size", "14px")
-                .set("font-weight", "700")
-                .set("text-decoration", "none")
-                .set("box-shadow", "none")
-                .set("padding", "0")
-                .set("cursor", "pointer");
-
-        linkButton.addClickListener(event -> onFooterLinkClicked(route));
-
-        return linkButton;
-    }
-
-    private Button socialButton(String value) {
-        Button social = new Button(value);
-
-        social.getStyle()
-                .set("width", "32px")
-                .set("height", "32px")
-                .set("border-radius", "50%")
-                .set("background", "#87b2c3")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("font-weight", "800")
-                .set("color", "white")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-
-        return social;
-    }
 
     private Button pillButton(String text, String background, String color) {
         Button button = new Button(text);

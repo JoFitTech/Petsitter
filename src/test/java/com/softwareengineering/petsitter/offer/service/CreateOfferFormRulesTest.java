@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.offer.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,5 +45,23 @@ class CreateOfferFormRulesTest {
         assertThat(result.minimumEndDate()).isEqualTo(LocalDate.of(2026, 5, 11));
         assertThat(result.clearEndDate()).isFalse();
         assertThat(result.summary()).isEqualTo("Gesamtdauer: 3 Tag(e), inklusive Start- und Enddatum.");
+    }
+
+    @Test
+    void totalPriceCalculatesInclusiveDateRange() {
+        String result = rules.totalPrice(
+                LocalDate.of(2026, 5, 10),
+                LocalDate.of(2026, 5, 12),
+                new BigDecimal("25.50"));
+
+        assertThat(result).isEqualTo("Gesamtpreis: 76.50 EUR");
+    }
+
+    @Test
+    void totalPriceUsesPlaceholderUntilRequiredValuesAreSelected() {
+        assertThat(rules.totalPrice(null, LocalDate.of(2026, 5, 12), new BigDecimal("25.50")))
+                .isEqualTo("Gesamtpreis: - EUR");
+        assertThat(rules.totalPrice(LocalDate.of(2026, 5, 10), LocalDate.of(2026, 5, 12), null))
+                .isEqualTo("Gesamtpreis: - EUR");
     }
 }

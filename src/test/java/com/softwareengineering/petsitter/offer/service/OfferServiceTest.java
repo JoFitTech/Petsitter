@@ -78,6 +78,23 @@ class OfferServiceTest {
     }
 
     @Test
+    void summarizeCreateOfferTotalPriceUsesBackendFormRules() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                fixedCreateOfferFormRules()
+        );
+
+        String result = offerService.summarizeCreateOfferTotalPrice(
+                LocalDate.of(2026, 5, 10),
+                LocalDate.of(2026, 5, 12),
+                new BigDecimal("25.50"));
+
+        assertThat(result).isEqualTo("Gesamtpreis: 76.50 EUR");
+    }
+
+    @Test
     void createOfferSavesOpenOfferWithCurrentUserAndSelectedPet() {
         UUID savedOfferId = UUID.randomUUID();
         User owner = user(UUID.randomUUID());

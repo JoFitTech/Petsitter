@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.offer.service;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -13,6 +14,7 @@ final class CreateOfferFormRules {
 
     private static final String SELECT_DATES_MESSAGE = "Bitte Start- und Enddatum auswaehlen.";
     private static final String INVALID_DATE_RANGE_MESSAGE = "Das Enddatum muss am oder nach dem Startdatum liegen.";
+    private static final String MISSING_TOTAL_PRICE_MESSAGE = "Gesamtpreis: - EUR";
 
     private final Clock clock;
 
@@ -59,8 +61,19 @@ final class CreateOfferFormRules {
         return ChronoUnit.DAYS.between(startDate, endDate) + 1;
     }
 
-    private String totalPrice(LocalDate startDate, LocalDate endDate, BigDecimal price) {
-        return "Gesamtpreis: " + totalPrice(startDate, endDate, price) + " EUR";
+    String totalPrice(LocalDate startDate, LocalDate endDate, BigDecimal price) {
+        if (startDate == null || endDate == null || price == null) {
+            return MISSING_TOTAL_PRICE_MESSAGE;
+        }
+
+        if (startDate.isAfter(endDate)) {
+            return INVALID_DATE_RANGE_MESSAGE;
+        }
+
+        BigDecimal calculatedTotalPrice = price
+                .multiply(BigDecimal.valueOf(totalDays(startDate, endDate)))
+                .setScale(2, RoundingMode.HALF_UP);
+        return "Gesamtpreis: " + calculatedTotalPrice.toPlainString() + " EUR";
     }
 
     private String summarizeDateRange(LocalDate startDate, LocalDate endDate) {

@@ -114,6 +114,10 @@ public class OfferService {
         return createOfferFormRules.updateDateSelection(startDate, endDate);
     }
 
+    public String summarizeCreateOfferTotalPrice(LocalDate startDate, LocalDate endDate, BigDecimal price) {
+        return createOfferFormRules.totalPrice(startDate, endDate, price);
+    }
+
     @Transactional
     public CreateOfferResult createOffer(OfferType offerType, LocalDate startDate, LocalDate endDate,
             OfferPetOptionDto selectedPet, BigDecimal price, String description) {

@@ -35,6 +35,8 @@ public class CreateOfferView extends VerticalLayout {
     private final Span dateSummary = new Span();
     private final ComboBox<OfferPetOptionDto> pet = new ComboBox<>("Pet");
     private final BigDecimalField price = new BigDecimalField("Price per day");
+    private final Span priceSummary = new Span();
+    private final VerticalLayout priceField = new VerticalLayout(price, priceSummary);
     private final TextArea description = new TextArea("Description");
     private final Button createOffer = new Button("createOffer", event -> saveOffer());
 
@@ -54,7 +56,7 @@ public class CreateOfferView extends VerticalLayout {
                 endDate,
                 dateSummary,
                 pet,
-                price,
+                priceField,
                 description);
         form.setMaxWidth("720px");
         form.setResponsiveSteps(
@@ -96,6 +98,18 @@ public class CreateOfferView extends VerticalLayout {
 
         price.setPrefixComponent(new com.vaadin.flow.component.html.Span("EUR"));
         price.setClearButtonVisible(true);
+        price.setWidthFull();
+        price.addValueChangeListener(event -> updatePriceSummary());
+
+        priceField.setPadding(false);
+        priceField.setSpacing(false);
+        priceField.setWidthFull();
+        priceField.getStyle().set("gap", "var(--lumo-space-xs)");
+
+        priceSummary.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "var(--lumo-font-size-s)");
+        updatePriceSummary();
 
         description.setMaxLength(formData.descriptionMaxLength());
         description.setHeight("120px");
@@ -125,6 +139,7 @@ public class CreateOfferView extends VerticalLayout {
             endDate.clear();
         }
         dateSummary.setText(dateSelection.summary());
+        updatePriceSummary();
     }
 
     private void clearForm() {
@@ -135,6 +150,13 @@ public class CreateOfferView extends VerticalLayout {
         pet.clear();
         price.clear();
         description.clear();
+    }
+
+    private void updatePriceSummary() {
+        priceSummary.setText(offerService.summarizeCreateOfferTotalPrice(
+                startDate.getValue(),
+                endDate.getValue(),
+                price.getValue()));
     }
 
     private void showError(String message) {

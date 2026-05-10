@@ -1,6 +1,8 @@
 package com.softwareengineering.petsitter.offer.service;
 
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
+
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -53,6 +55,14 @@ final class CreateOfferFormRules {
         return DESCRIPTION_MAX_LENGTH;
     }
 
+    private long totalDays(LocalDate startDate, LocalDate endDate) {
+        return ChronoUnit.DAYS.between(startDate, endDate) + 1;
+    }
+
+    private String totalPrice(LocalDate startDate, LocalDate endDate, BigDecimal price) {
+        return "Gesamtpreis: " + totalPrice(startDate, endDate, price) + " EUR";
+    }
+
     private String summarizeDateRange(LocalDate startDate, LocalDate endDate) {
         if (startDate == null || endDate == null) {
             return SELECT_DATES_MESSAGE;
@@ -62,7 +72,7 @@ final class CreateOfferFormRules {
             return INVALID_DATE_RANGE_MESSAGE;
         }
 
-        long totalDays = ChronoUnit.DAYS.between(startDate, endDate) + 1;
+        long totalDays = totalDays(startDate, endDate);
         return "Gesamtdauer: " + totalDays + " Tag(e), inklusive Start- und Enddatum.";
     }
 }

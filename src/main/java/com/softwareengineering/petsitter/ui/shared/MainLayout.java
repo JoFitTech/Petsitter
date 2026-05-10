@@ -7,6 +7,7 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -34,13 +35,15 @@ public class MainLayout extends AppLayout {
     // ── Override showRouterLayoutContent to append the footer ─────────────
     @Override
     public void showRouterLayoutContent(HasElement content) {
-        // Wrap page content + footer in a full-height VerticalLayout
+        // Wrap page content + footer in a flex column that is at least full-height
         VerticalLayout wrapper = new VerticalLayout();
-        wrapper.setSizeFull();
+        wrapper.setWidthFull();
         wrapper.setPadding(false);
         wrapper.setSpacing(false);
         wrapper.getStyle()
                 .set("min-height", "100vh")
+                .set("display", "flex")
+                .set("flex-direction", "column")
                 .set("background", LIGHT_BG);
 
         // The actual routed view
@@ -69,33 +72,19 @@ public class MainLayout extends AppLayout {
                 .set("box-shadow", "0 2px 18px rgba(74, 52, 40, 0.07)")
                 .set("box-sizing", "border-box");
 
-        // Left: Logo
-        Button logoButton = new Button();
-        logoButton.getStyle()
-                .set("background", "transparent")
-                .set("box-shadow", "none")
-                .set("padding", "0")
-                .set("cursor", "pointer");
+        // Left: Logo (PNG image – rahmenlos via Div)
+        Image logoImg = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
+        logoImg.getStyle()
+                .set("height", "52px")
+                .set("width", "auto")
+                .set("display", "block");
 
-        HorizontalLayout logo = new HorizontalLayout();
-        logo.setAlignItems(FlexComponent.Alignment.CENTER);
-        logo.setSpacing(true);
-
-        Span logoIcon = new Span("🐾");
-        logoIcon.getStyle()
-                .set("font-size", "30px")
-                .set("line-height", "1");
-
-        Span logoText = new Span("Pawsitter");
-        logoText.getStyle()
-                .set("font-size", "30px")
-                .set("font-weight", "800")
-                .set("letter-spacing", "-1px")
-                .set("color", DARK);
-
-        logo.add(logoIcon, logoText);
-        logoButton.getElement().appendChild(logo.getElement());
-        logoButton.addClickListener(e -> UI.getCurrent().navigate(""));
+        Div logoWrapper = new Div(logoImg);
+        logoWrapper.getStyle()
+                .set("cursor", "pointer")
+                .set("display", "flex")
+                .set("align-items", "center");
+        logoWrapper.addClickListener(e -> UI.getCurrent().navigate(""));
 
         // Center: Navigation Pills
         HorizontalLayout nav = new HorizontalLayout();
@@ -123,7 +112,7 @@ public class MainLayout extends AppLayout {
                 .set("cursor", "pointer");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
-        header.add(logoButton, nav, profileBtn);
+        header.add(logoWrapper, nav, profileBtn);
         return header;
     }
 
@@ -147,15 +136,16 @@ public class MainLayout extends AppLayout {
         brand.setPadding(false);
         brand.setSpacing(false);
 
-        H2 brandLogo = new H2("Pawsitter");
-        brandLogo.getStyle()
-                .set("margin", "0")
-                .set("font-size", "26px")
-                .set("color", "white");
+        Image footerLogo = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
+        footerLogo.getStyle()
+                .set("height", "44px")
+                .set("width", "auto")
+                .set("display", "block")
+                .set("margin-bottom", "8px");
 
         Paragraph claim = new Paragraph("Freundliche Plattform für zuverlässige Tierbetreuung in deiner Nähe.");
         claim.getStyle()
-                .set("margin", "4px 0 18px 0")
+                .set("margin", "0 0 18px 0")
                 .set("font-size", "14px")
                 .set("color", "#e8d8c6");
 
@@ -164,7 +154,7 @@ public class MainLayout extends AppLayout {
                 .set("font-size", "12px")
                 .set("color", "#e8d8c6");
 
-        brand.add(brandLogo, claim, copyright);
+        brand.add(footerLogo, claim, copyright);
 
         // Links
         HorizontalLayout links = new HorizontalLayout();

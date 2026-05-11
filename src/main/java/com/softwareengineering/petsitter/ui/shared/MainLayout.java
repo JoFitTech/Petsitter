@@ -107,10 +107,7 @@ public class MainLayout extends AppLayout {
         rightIcons.getStyle().set("gap", "8px");
 
         Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
-        mailBtn.addClickListener(e -> {
-            // TODO: UI.getCurrent().navigate("messages");
-            System.out.println("TODO: Nachrichten-Seite");
-        });
+        mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
 
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> {

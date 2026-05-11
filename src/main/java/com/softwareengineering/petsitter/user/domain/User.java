@@ -51,7 +51,7 @@ public class User {
      * BCrypt-Hash des Passworts. NIEMALS Plaintext!
      * Format: $2a$10$... (BCrypt mit 10 Rounds)
      *
-     * Kann leer/null sein für passwortlose Authentifizierung (Email-Code-Flow).
+     * Wird für Passwort-Login als BCrypt-Hash gespeichert.
      */
     @Column(nullable = true, columnDefinition = "VARCHAR(255) DEFAULT ''")
     private String passwordHash;
@@ -111,10 +111,23 @@ public class User {
     private AccountRole accountRole;
 
     /**
-     * Zeitstempel der Erstellung – wird automatisch beim Speichern gesetzt.
+     * Verifikationsstatus des Accounts.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_status", nullable = false)
+    private AccountStatus accountStatus = AccountStatus.VERIFIED;
+
+    /**
+     * Zeitstempel der Erstellung - wird automatisch beim Speichern gesetzt.
      */
     @Column(nullable = false)
     private LocalDateTime createdAt;
+
+    /**
+     * Zeitpunkt, ab dem ein unverifizierter Account gelöscht werden darf.
+     */
+    @Column(name = "delete_after")
+    private LocalDateTime deleteAfter;
 
     public User() {
     }
@@ -215,6 +228,14 @@ public class User {
         this.accountRole = accountRole;
     }
 
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
@@ -223,10 +244,21 @@ public class User {
         this.createdAt = createdAt;
     }
 
+    public LocalDateTime getDeleteAfter() {
+        return deleteAfter;
+    }
+
+    public void setDeleteAfter(LocalDateTime deleteAfter) {
+        this.deleteAfter = deleteAfter;
+    }
+
     @PrePersist
     void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
+        }
+        if (accountStatus == null) {
+            accountStatus = AccountStatus.VERIFIED;
         }
     }
 }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.softwareengineering.petsitter.config.PetsitterSecurityProperties;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.lang.reflect.Proxy;
@@ -93,6 +94,7 @@ class DatabaseUserDetailsServiceTest {
         user.setEmail(email);
         user.setPasswordHash(passwordHash);
         user.setAccountRole(role);
+        user.setAccountStatus(AccountStatus.VERIFIED);
         return user;
     }
 

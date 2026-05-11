@@ -1,11 +1,11 @@
 package com.softwareengineering.petsitter.security.rememberme;
 
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +42,7 @@ import org.springframework.stereotype.Service;
  * <p><b>Sicherheits-Checkliste:</b>
  * - ✓ Wirft UsernameNotFoundException, falls User nicht existiert
  * - ✓ Prüft, dass Rolle nicht null ist (keine bösen Defaults)
- * - ✓ Handhabt leere/null Passwörter (für passwortlose Auth)
+ * - ✓ Handhabt leere/null Passwörter defensiv
  * - ✓ Logged nicht sensitive Daten
  *
  * <p><b>Aufruf-Flow:</b>
@@ -59,7 +59,7 @@ import org.springframework.stereotype.Service;
  * User ist eingeloggt (ohne Passwort eingegeben zu haben)!
  */
 @Service
-public class RememberMeUserDetailsService implements UserDetailsService {
+public class RememberMeUserDetailsService {
 
     private static final Logger log = LoggerFactory.getLogger(RememberMeUserDetailsService.class);
 
@@ -84,18 +84,17 @@ public class RememberMeUserDetailsService implements UserDetailsService {
      * - Falls nicht gefunden → UsernameNotFoundException (Token invalid)
      * - Falls gefunden → prüft, dass Rolle gültig ist
      * - Falls Rolle null → Token invalid (Sicherheit!)
-     * - Handhabt leere/null Passwörter (passwortlose Users OK)
+     * - Handhabt leere/null Passwörter defensiv
      *
      * <p><b>Warum diese Checks?</b>
      * - Verhindert, dass Admin-User with `null` Role akzeptiert werden
      * - Verhindert, dass gelöschte User weiter eingeloggt bleiben
-     * - Passwortlose User (passwordHash="") sind OK für Email+Code Auth
+     * - Leere Passwörter werden defensiv behandelt; Login selbst prüft Passwort und Accountstatus.
      *
      * @param username eigentlich Email-Adresse (Spring Security nutzt "username" als Key)
      * @return UserDetails für Spring Security
      * @throws UsernameNotFoundException falls User nicht existiert oder invalid
      */
-    @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.debug("RememberMe-Token Validierung für: {}", username);
 
@@ -106,6 +105,10 @@ public class RememberMeUserDetailsService implements UserDetailsService {
         if (user.getAccountRole() == null) {
             log.warn("User {} hat keine Rolle! Token ungültig.", username);
             throw new UsernameNotFoundException("User-Rolle missing: " + username);
+        }
+        if (user.getAccountStatus() != AccountStatus.VERIFIED) {
+            log.warn("User {} ist nicht verifiziert. Token ungültig.", username);
+            throw new UsernameNotFoundException("User nicht verifiziert: " + username);
         }
 
         String password = user.getPasswordHash();

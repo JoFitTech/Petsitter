@@ -10,6 +10,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.web.FilterChainProxy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 @SpringBootTest(properties = {
         "spring.docker.compose.enabled=false",
@@ -41,21 +42,34 @@ class SecurityIntegrationTest {
 
     @Test
     void demoLoginCreatesAuthenticatedSession() throws Exception {
-        // NOTE: formLogin existiert nicht mehr. Neuer Flow: Email+Code via LoginView.
-        // Dieser Test ist obsolet, könnte durch LoginCodeService-Unit-Test ersetzt werden.
-        // Für jetzt: einfach skipped, da Login-Mechanik sich geändert hat.
+        MockHttpServletRequest request = loginRequest();
+        MockHttpServletResponse response = execute(request);
+
+        assertThat(response.getStatus()).isEqualTo(302);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+        assertThat(request.getSession(false)
+                .getAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY))
+                .isNotNull();
     }
 
     @Test
     void logoutInvalidatesSessionAndRedirectsToLogin() throws Exception {
-        // NOTE: formLogin existiert nicht mehr. Ohne aktive Session kann Logout nicht getestet werden.
-        // Dieser Test ist obsolet in passwortlosem Flow.
-        // Für jetzt: einfach skipped.
+        MockHttpServletRequest loginRequest = loginRequest();
+        execute(loginRequest);
+        MockHttpSession session = (MockHttpSession) loginRequest.getSession(false);
+
+        MockHttpServletRequest logoutRequest = request("POST", "/logout");
+        logoutRequest.setSession(session);
+        MockHttpServletResponse response = execute(logoutRequest);
+
+        assertThat(response.getStatus()).isEqualTo(302);
+        assertThat(response.getRedirectedUrl()).isEqualTo("/?logout=true");
+        assertThat(session.isInvalid()).isTrue();
     }
 
     private MockHttpServletRequest loginRequest() {
         MockHttpServletRequest request = request("POST", "/login");
-        request.addParameter("username", "localuser");
+        request.addParameter("email", "localuser");
         request.addParameter("password", "localpass");
         return request;
     }

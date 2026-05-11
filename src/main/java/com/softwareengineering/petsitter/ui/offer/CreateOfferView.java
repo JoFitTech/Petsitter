@@ -124,13 +124,25 @@ public class CreateOfferView extends VerticalLayout {
         topRow.setWidthFull();
         topRow.setAlignItems(FlexComponent.Alignment.CENTER);
         topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        topRow.getStyle().set("margin-bottom", "8px");
+        topRow.getStyle().set("margin-bottom", "16px");
+
+        VerticalLayout titleLayout = new VerticalLayout();
+        titleLayout.setPadding(false);
+        titleLayout.setSpacing(false);
+
+        H1 headline = new H1("Neuen Auftrag erstellen");
+        headline.getStyle()
+                .set("font-size", "28px")
+                .set("color", DARK)
+                .set("margin", "0 0 4px 0");
 
         Paragraph subtitle = new Paragraph("Details für deine Haustierbetreung angeben");
         subtitle.getStyle()
                 .set("font-size", "15px")
                 .set("color", "#7b7069")
                 .set("margin", "0");
+
+        titleLayout.add(headline, subtitle);
 
         Button draftsButton = new Button("Entwürfe");
         draftsButton.getStyle()
@@ -145,7 +157,7 @@ public class CreateOfferView extends VerticalLayout {
                 .set("cursor", "pointer");
         draftsButton.addClickListener(e -> onDraftsClicked());
 
-        topRow.add(subtitle, draftsButton);
+        topRow.add(titleLayout, draftsButton);
 
         // ── Card ─────────────────────────────────────────────────────────
         Div card = new Div();

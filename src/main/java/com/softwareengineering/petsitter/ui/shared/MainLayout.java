@@ -96,7 +96,7 @@ public class MainLayout extends AppLayout {
 
         Button findOwnerBtn = pillButton("Tierhalter finden", "#fff6e6", DARK);
         findOwnerBtn.getStyle().set("border", "1px solid #ead5ae");
-        findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
+        findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate("petsitter-suche"));
 
         nav.add(findSitterBtn, findOwnerBtn);
 

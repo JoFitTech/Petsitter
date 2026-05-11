@@ -636,9 +636,9 @@ public class StartView extends VerticalLayout {
         System.out.println("Verdienst ab: " + minPrice);
         System.out.println("Umkreis: " + maxDistance);
 
-        // TODO:
+        // TODO: Filter-Parameter an Backend übergeben, z. B.:
         // offerService.searchOffers(startDate, endDate, minPrice, maxDistance);
-        // renderOffers(results);
+        UI.getCurrent().navigate("petsitter-suche");
     }
 
     private void onOfferDetailsClicked(Offer offer) {
@@ -671,9 +671,7 @@ public class StartView extends VerticalLayout {
 
     private void onCreateOfferClicked() {
         System.out.println("Auftrag anbieten geklickt");
-
-        // TODO:
-        // UI.getCurrent().navigate("auftrag-erstellen");
+        UI.getCurrent().navigate("auftrag-erstellen");
     }
 
     private void onProfileClicked() {

@@ -2,6 +2,7 @@ package com.softwareengineering.petsitter.auth.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -48,6 +49,14 @@ public class LoginCodeMailService {
     private static final Logger log = LoggerFactory.getLogger(LoginCodeMailService.class);
 
     /**
+     * DEV-Flag: Falls true → vollständiger Code im Terminal sichtbar.
+     * NIEMALS in PROD auf true setzen!
+     * Gesteuert via: petsitter.dev.show-login-code=true (application.yml)
+     */
+    @Value("${petsitter.dev.show-login-code:false}")
+    private boolean showLoginCodeInDev;
+
+    /**
      * Sendet den Login-Code per Mail/Log.
      *
      * <p><b>Aufruf:</b>
@@ -78,6 +87,19 @@ public class LoginCodeMailService {
         // Masked Telemetry für DEV-Debugging (ohne Secrets)
         String maskedCode = maskCode(plainCode);
         log.info("Login-Code für {} versendet (masked: {})", email, maskedCode);
+
+        // DEV-MODUS: Vollständiger Code im Terminal (nur wenn Flag gesetzt!)
+        // Gesteuert via application.yml: petsitter.dev.show-login-code=true
+        if (showLoginCodeInDev) {
+            log.warn("⚠️  [DEV-ONLY] LOGIN-CODE FÜR {} : {} (NIEMALS in PROD!)", email, plainCode);
+            System.out.printf("""
+                    %n╔══════════════════════════════════╗
+                    ║   🔑 DEV LOGIN-CODE               ║
+                    ║   Email : %-24s║
+                    ║   Code  : %-24s║
+                    ║   (Nur lokal, nicht in PROD!)     ║
+                    ╚══════════════════════════════════╝%n""", email, plainCode);
+        }
 
         // In PROD: SMTP versenden (spring-boot-starter-mail)
         // Der plainCode wird hier versendet, NICHT geloggt.

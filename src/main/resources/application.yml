@@ -28,6 +28,10 @@ vaadin:
 logging:
   level:
     root: INFO
+    # DEV: Login-Codes sichtbar im Terminal (nur für lokale Tests!)
+    # Zeigt den vollständigen maskierten Code + den Hinweis "masked: 734***"
+    # Für noch mehr Details (DEBUG zeigt ALLE Auth-Events):
+    com.softwareengineering.petsitter.auth: DEBUG
 
 petsitter:
   security:
@@ -36,3 +40,6 @@ petsitter:
       username: ${PETSITTER_DEMO_USERNAME:localuser}
       password: ${PETSITTER_DEMO_PASSWORD:localpass}
       role: ${PETSITTER_DEMO_ROLE:USER}
+  # DEV: Zeigt vollständigen Code im Log (ausschalten in PROD!)
+  dev:
+    show-login-code: ${PETSITTER_DEV_SHOW_LOGIN_CODE:true}

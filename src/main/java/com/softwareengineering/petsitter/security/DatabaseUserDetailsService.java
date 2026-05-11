@@ -51,9 +51,15 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         }
 
         if (user != null) {
+            // Unterstützung für passwortlose Auth: leerer/null passwordHash ist OK
+            String password = user.getPasswordHash();
+            if (password == null || password.isBlank()) {
+                password = ""; // Spring Security braucht einen non-null Wert
+            }
+
             return org.springframework.security.core.userdetails.User
                     .withUsername(user.getEmail())
-                    .password(user.getPasswordHash())
+                    .password(password)
                     .roles(toSecurityRole(user.getAccountRole()))
                     .build();
         }

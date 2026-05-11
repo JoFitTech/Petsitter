@@ -1,6 +1,22 @@
 package com.softwareengineering.petsitter.offer.service;
 
 import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
+import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.pet.domain.Pet;
+import com.softwareengineering.petsitter.pet.repository.PetRepository;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
+import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
+import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
+import com.softwareengineering.petsitter.shared.exception.NotFoundException;
+import com.softwareengineering.petsitter.user.domain.User;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -51,6 +67,90 @@ import java.util.UUID;
  */
 @Service
 public class OfferService {
+
+    private final OfferRepository offerRepository;
+    private final PetRepository petRepository;
+    private final AuthenticatedUser authenticatedUser;
+    private final CreateOfferFormRules createOfferFormRules;
+
+    @Autowired
+    public OfferService(OfferRepository offerRepository, PetRepository petRepository,
+            AuthenticatedUser authenticatedUser) {
+        this(offerRepository, petRepository, authenticatedUser, new CreateOfferFormRules());
+    }
+
+    OfferService(OfferRepository offerRepository, PetRepository petRepository,
+            AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules) {
+        this.offerRepository = offerRepository;
+        this.petRepository = petRepository;
+        this.authenticatedUser = authenticatedUser;
+        this.createOfferFormRules = createOfferFormRules;
+    }
+
+    public boolean hasAuthenticatedUser() {
+        return authenticatedUser.get().isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OfferPetOptionDto> findCurrentUserPetOptions() {
+        return authenticatedUser.get()
+                .map(user -> petRepository.findAllByOwnerId(user.getId()).stream()
+                        .map(this::toPetOption)
+                        .toList())
+                .orElseGet(List::of);
+    }
+
+    @Transactional(readOnly = true)
+    public CreateOfferFormData getCreateOfferFormData() {
+        return new CreateOfferFormData(
+                List.of(OfferType.values()),
+                findCurrentUserPetOptions(),
+                createOfferFormRules.minimumStartDate(),
+                createOfferFormRules.initialDateSelection(),
+                createOfferFormRules.descriptionMaxLength());
+    }
+
+    public CreateOfferDateSelection updateCreateOfferDateSelection(LocalDate startDate, LocalDate endDate) {
+        return createOfferFormRules.updateDateSelection(startDate, endDate);
+    }
+
+    public String summarizeCreateOfferTotalPrice(LocalDate startDate, LocalDate endDate, BigDecimal price) {
+        return createOfferFormRules.totalPrice(startDate, endDate, price);
+    }
+
+    @Transactional
+    public CreateOfferResult createOffer(OfferType offerType, LocalDate startDate, LocalDate endDate,
+            OfferPetOptionDto selectedPet, BigDecimal price, String description) {
+        return createOffer(new CreateOfferRequest(
+                offerType,
+                startDate,
+                endDate,
+                selectedPetId(selectedPet),
+                price,
+                description));
+    }
+
+    @Transactional
+    public CreateOfferResult createOffer(CreateOfferRequest request) {
+        User currentUser = authenticatedUser.get()
+                .orElseThrow(() -> new BusinessRuleViolationException(
+                        "Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden."));
+        validateCreateOfferRequest(request);
+
+        Offer offer = new Offer();
+        offer.setStartDate(request.startDate());
+        offer.setEndDate(request.endDate());
+        offer.setCreateUser(currentUser);
+        offer.setUpdateUser(currentUser);
+        offer.setPet(resolvePet(request.petId(), currentUser));
+        offer.setOfferType(request.offerType());
+        offer.setPrice(request.price());
+        offer.setDescription(request.description());
+        offer.setStatus(OfferStatus.OPEN);
+
+        Offer savedOffer = offerRepository.save(offer);
+        return new CreateOfferResult(savedOffer.getOfferId());
+    }
 
     /**
      * Erstellt ein OWNER_OFFER: Der Tierhalter sucht einen Sitter für sein Haustier.
@@ -189,5 +289,43 @@ public class OfferService {
      */
     public List<String> getOffers() {
         return Collections.emptyList();
+    }
+
+    private OfferPetOptionDto toPetOption(Pet pet) {
+        return new OfferPetOptionDto(pet.getId(), pet.getName(), pet.getSpecies());
+    }
+
+    private UUID selectedPetId(OfferPetOptionDto selectedPet) {
+        return selectedPet == null ? null : selectedPet.id();
+    }
+
+    private void validateCreateOfferRequest(CreateOfferRequest request) {
+        if (request == null || request.offerType() == null || request.startDate() == null || request.endDate() == null) {
+            throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
+        }
+
+        if (request.startDate().isBefore(createOfferFormRules.minimumStartDate())
+                || request.endDate().isBefore(createOfferFormRules.minimumEndDate(null))
+                || request.startDate().isAfter(request.endDate())) {
+            throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
+        }
+
+        if (request.description() != null
+                && request.description().length() > createOfferFormRules.descriptionMaxLength()) {
+            throw new BusinessRuleViolationException("Die Beschreibung darf maximal 255 Zeichen enthalten.");
+        }
+    }
+
+    private Pet resolvePet(UUID petId, User currentUser) {
+        if (petId == null) {
+            return null;
+        }
+
+        Pet pet = petRepository.findById(petId)
+                .orElseThrow(() -> new NotFoundException("Pet nicht gefunden."));
+        if (pet.getOwner() == null || !currentUser.getId().equals(pet.getOwner().getId())) {
+            throw new ForbiddenOperationException("Pet gehoert nicht dem aktuellen User.");
+        }
+        return pet;
     }
 }

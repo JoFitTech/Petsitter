@@ -50,8 +50,10 @@ public class User {
     /**
      * BCrypt-Hash des Passworts. NIEMALS Plaintext!
      * Format: $2a$10$... (BCrypt mit 10 Rounds)
+     *
+     * Kann leer/null sein für passwortlose Authentifizierung (Email-Code-Flow).
      */
-    @Column(nullable = false)
+    @Column(nullable = true, columnDefinition = "VARCHAR(255) DEFAULT ''")
     private String passwordHash;
 
     /**

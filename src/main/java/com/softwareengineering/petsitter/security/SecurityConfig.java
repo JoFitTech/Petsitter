@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.rememberme.TokenBasedReme
  * <p><b>Was macht die Klasse?</b>
  * Definiert alle Security-Regeln für die Anwendung:
  * - Welche Routes öffentlich vs. geschützt sind
- * - Wie Authentifizierung funktioniert (Email+Code)
+ * - Wie Authentifizierung funktioniert (E-Mail + Passwort)
  * - Wie Remember-Me Sessions verwaltet werden
  * - Logout-Verhalten
  *
@@ -80,7 +80,8 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            RememberMeServices rememberMeServices
+            RememberMeServices rememberMeServices,
+            DatabaseUserDetailsService databaseUserDetailsService
     ) throws Exception {
         http
                 // Vaadin verwendet eigene CSRF/UIDL-Mechanismen; Spring-CSRF blockiert sonst oft Requests
@@ -122,6 +123,14 @@ public class SecurityConfig {
                 .rememberMe(rm -> rm
                         .rememberMeServices(rememberMeServices)
                         .key("petsitter-remember-me-key")
+                )
+                .userDetailsService(databaseUserDetailsService)
+                .formLogin(form -> form
+                        .loginPage("/login")
+                        .usernameParameter("email")
+                        .passwordParameter("password")
+                        .defaultSuccessUrl("/", true)
+                        .permitAll()
                 )
                 // Logout
                 .logout(logout -> logout
@@ -179,7 +188,7 @@ public class SecurityConfig {
 
         TokenBasedRememberMeServices service = new TokenBasedRememberMeServices(
                 rememberMeKey,
-                rememberMeUserDetailsService
+                rememberMeUserDetailsService::loadUserByUsername
         );
         service.setTokenValiditySeconds(7 * 24 * 60 * 60); // 7 Tage
         service.setUseSecureCookie(true);
@@ -192,7 +201,7 @@ public class SecurityConfig {
      * BCrypt PasswordEncoder – sichere Passwort-Hashing Funktion.
      *
      * <p><b>Was macht die Methode?</b>
-     * Erstellt einen PasswordEncoder für Login-Codes und Passwörter.
+     * Erstellt einen PasswordEncoder für Registrierungscodes und Passwörter.
      *
      * <p><b>Wie macht sie das?</b>
      * - BCrypt mit Strength 10 (adaptiv: dauert ~0,1s pro Hash)
@@ -200,7 +209,7 @@ public class SecurityConfig {
      * - Unmöglich, einfach zu reversen (One-Way Hash)
      *
      * <p><b>Warum?</b>
-     * - Login-Codes werden als BCrypt-Hash gespeichert (nicht Plaintext!)
+     * - Registrierungscodes werden als BCrypt-Hash gespeichert (nicht Plaintext!)
      * - Wenn DB kompromittiert: Codes sind immer noch sicher
      * - Wird von LoginCodeService.requestLoginCode() verwendet
      * - Wird von LoginCodeService.validateLoginCode() für Hash-Vergleiche verwendet

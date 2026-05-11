@@ -11,11 +11,11 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
- * LoginCode Entity – repräsentiert einen temporären Login-Code für passwortlose Authentifizierung.
+ * LoginCode Entity - repräsentiert einen temporären Code für die Registrierungsbestätigung.
  *
  * <p>Verantwortlichkeiten:
  * - Speichert gehashte Codes (nie Plaintext!)
- * - Verfolgt Ablaufzeiten (standardmäßig 10 Minuten)
+ * - Verfolgt Ablaufzeiten
  * - Zählt Versuche (für Rate-Limiting)
  * - Blockiert wiederholte Nutzung (used_at-Timestamp)
  * - Speichert IP für Sicherheitsaudit
@@ -46,7 +46,7 @@ public class LoginCode {
     private String codeHash;
 
     /**
-     * Zeitpunkt, wann der Code abläuft (default: +10 Min).
+     * Zeitpunkt, wann der Code abläuft.
      */
     @Column(nullable = false)
     private LocalDateTime expiresAt;
@@ -187,4 +187,3 @@ public class LoginCode {
         return attempts >= 3;
     }
 }
-

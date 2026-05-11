@@ -4,36 +4,49 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.dto.UserAuthResult;
+import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
+import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
+import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.lang.reflect.Proxy;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 class UserServiceTest {
+
+    private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Test
     void findUserByIdLoadsUserFromRepository() {
         UUID userId = UUID.randomUUID();
         User user = user(userId);
-        AtomicReference<UUID> requestedId = new AtomicReference<>();
-        UserRepository userRepository = repositoryReturning(user, requestedId);
-        UserService userService = new UserService(userRepository, authenticatedUser(Optional.empty()));
+        UserRepositoryFake userRepository = new UserRepositoryFake(user);
+        UserService userService = service(userRepository.repository(), authenticatedUser(Optional.empty()), new LoginCodeServiceFake());
 
         Optional<User> result = userService.findUserById(userId);
 
         assertThat(result).contains(user);
-        assertThat(requestedId).hasValue(userId);
+        assertThat(userRepository.requestedId).hasValue(userId);
     }
 
     @Test
     void getCurrentUserProfileMapsAuthenticatedUserToDto() {
         UUID userId = UUID.randomUUID();
         User domainUser = user(userId);
-        UserService userService = new UserService(repositoryReturning(domainUser), authenticatedUser(Optional.of(domainUser)));
+        UserService userService = service(repositoryReturning(domainUser), authenticatedUser(Optional.of(domainUser)), new LoginCodeServiceFake());
 
         Optional<UserProfileDto> result = userService.getCurrentUserProfile();
 
@@ -42,28 +55,165 @@ class UserServiceTest {
             assertThat(profile.email()).isEqualTo("anna.mueller@petsitter.local");
             assertThat(profile.firstName()).isEqualTo("Anna");
             assertThat(profile.lastName()).isEqualTo("Mueller");
+            assertThat(profile.phone()).isEqualTo("+49 221 111222");
             assertThat(profile.street()).isEqualTo("Rosenweg");
             assertThat(profile.houseNumber()).isEqualTo("14");
             assertThat(profile.postalCode()).isEqualTo("50667");
             assertThat(profile.city()).isEqualTo("Koeln");
             assertThat(profile.addressAddition()).isEqualTo("2. OG links");
             assertThat(profile.accountRole()).isEqualTo(AccountRole.SIGNED_IN_USER);
+            assertThat(profile.accountStatus()).isEqualTo(AccountStatus.VERIFIED);
         });
     }
 
     @Test
     void getCurrentUserUsesAuthenticatedUsersFullName() {
         User domainUser = user(UUID.randomUUID());
-        UserService userService = new UserService(repositoryReturning(domainUser), authenticatedUser(Optional.of(domainUser)));
+        UserService userService = service(repositoryReturning(domainUser), authenticatedUser(Optional.of(domainUser)), new LoginCodeServiceFake());
 
         assertThat(userService.getCurrentUser()).isEqualTo("Anna Mueller");
     }
 
     @Test
     void getCurrentUserFallsBackToGuestWhenNoUserIsAuthenticated() {
-        UserService userService = new UserService(repositoryReturning(null), authenticatedUser(Optional.empty()));
+        UserService userService = service(repositoryReturning(null), authenticatedUser(Optional.empty()), new LoginCodeServiceFake());
 
         assertThat(userService.getCurrentUser()).isEqualTo("Gast");
+    }
+
+    @Test
+    void loginSucceedsForVerifiedUserWithPassword() {
+        User user = user(UUID.randomUUID());
+        user.setPasswordHash(passwordEncoder.encode("secret123"));
+        UserRepositoryFake userRepository = new UserRepositoryFake(user);
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), new LoginCodeServiceFake())
+                .login(new UserLoginRequest("  Anna.Mueller@Petsitter.Local  ", "secret123"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(result.userProfile().email()).isEqualTo("anna.mueller@petsitter.local");
+    }
+
+    @Test
+    void loginRejectsWrongPasswordOrUnknownEmail() {
+        User user = user(UUID.randomUUID());
+        user.setPasswordHash(passwordEncoder.encode("secret123"));
+        UserService userService = service(new UserRepositoryFake(user).repository(), authenticatedUser(Optional.empty()), new LoginCodeServiceFake());
+
+        assertThat(userService.login(new UserLoginRequest("anna.mueller@petsitter.local", "wrong")).success()).isFalse();
+        assertThat(userService.login(new UserLoginRequest("missing@petsitter.local", "secret123")).success()).isFalse();
+    }
+
+    @Test
+    void loginRejectsPendingAndBlockedUsers() {
+        User pending = user(UUID.randomUUID());
+        pending.setEmail("pending@petsitter.local");
+        pending.setAccountStatus(AccountStatus.PENDING);
+        User blocked = user(UUID.randomUUID());
+        blocked.setEmail("blocked@petsitter.local");
+        blocked.setAccountStatus(AccountStatus.BLOCKED);
+        UserRepositoryFake userRepository = new UserRepositoryFake(pending, blocked);
+        UserService userService = service(userRepository.repository(), authenticatedUser(Optional.empty()), new LoginCodeServiceFake());
+
+        assertThat(userService.login(new UserLoginRequest("pending@petsitter.local", "secret123")).success()).isFalse();
+        assertThat(userService.login(new UserLoginRequest("blocked@petsitter.local", "secret123")).success()).isFalse();
+    }
+
+    @Test
+    void startRegistrationCreatesPendingUserAndSendsCode() {
+        UserRepositoryFake userRepository = new UserRepositoryFake();
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .startRegistration(registrationRequest("new.user@petsitter.local"), "127.0.0.1");
+
+        assertThat(result.success()).isTrue();
+        assertThat(userRepository.savedUser).isNotNull();
+        assertThat(userRepository.savedUser.getAccountStatus()).isEqualTo(AccountStatus.PENDING);
+        assertThat(userRepository.savedUser.getDeleteAfter()).isAfter(LocalDateTime.now().plusHours(23));
+        assertThat(loginCodeService.requestedEmail).isEqualTo("new.user@petsitter.local");
+        assertThat(loginCodeService.requestedIp).isEqualTo("127.0.0.1");
+    }
+
+    @Test
+    void startRegistrationRejectsVerifiedUser() {
+        User verified = user(UUID.randomUUID());
+        UserRepositoryFake userRepository = new UserRepositoryFake(verified);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .startRegistration(registrationRequest("anna.mueller@petsitter.local"), "127.0.0.1");
+
+        assertThat(result.success()).isFalse();
+        assertThat(loginCodeService.requestedEmail).isNull();
+    }
+
+    @Test
+    void startRegistrationUpdatesPendingUserAndSendsNewCode() {
+        User pending = user(UUID.randomUUID());
+        pending.setAccountStatus(AccountStatus.PENDING);
+        pending.setDeleteAfter(LocalDateTime.now().minusHours(1));
+        UserRepositoryFake userRepository = new UserRepositoryFake(pending);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .startRegistration(registrationRequest("anna.mueller@petsitter.local"), "127.0.0.1");
+
+        assertThat(result.success()).isTrue();
+        assertThat(pending.getDeleteAfter()).isAfter(LocalDateTime.now().plusHours(23));
+        assertThat(loginCodeService.requestedEmail).isEqualTo("anna.mueller@petsitter.local");
+    }
+
+    @Test
+    void completeRegistrationVerifiesPendingUser() {
+        User pending = user(UUID.randomUUID());
+        pending.setAccountStatus(AccountStatus.PENDING);
+        pending.setDeleteAfter(LocalDateTime.now().plusHours(24));
+        UserRepositoryFake userRepository = new UserRepositoryFake(pending);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+        loginCodeService.validCode = true;
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .completeRegistration(new UserRegistrationConfirmationRequest("anna.mueller@petsitter.local", "123456"));
+
+        assertThat(result.success()).isTrue();
+        assertThat(pending.getAccountStatus()).isEqualTo(AccountStatus.VERIFIED);
+        assertThat(pending.getDeleteAfter()).isNull();
+        assertThat(loginCodeService.validatedEmail).isEqualTo("anna.mueller@petsitter.local");
+        assertThat(loginCodeService.validatedCode).isEqualTo("123456");
+    }
+
+    @Test
+    void completeRegistrationRejectsInvalidCode() {
+        User pending = user(UUID.randomUUID());
+        pending.setAccountStatus(AccountStatus.PENDING);
+        UserRepositoryFake userRepository = new UserRepositoryFake(pending);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+        loginCodeService.validCode = false;
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .completeRegistration(new UserRegistrationConfirmationRequest("anna.mueller@petsitter.local", "000000"));
+
+        assertThat(result.success()).isFalse();
+        assertThat(pending.getAccountStatus()).isEqualTo(AccountStatus.PENDING);
+        assertThat(userRepository.saveCount).isZero();
+    }
+
+    @Test
+    void cleanupExpiredPendingUsersDeletesExpiredPendingUsersAndInvalidatesCodes() {
+        User expired = user(UUID.randomUUID());
+        expired.setAccountStatus(AccountStatus.PENDING);
+        expired.setDeleteAfter(LocalDateTime.now().minusMinutes(1));
+        UserRepositoryFake userRepository = new UserRepositoryFake();
+        userRepository.expiredUsers = List.of(expired);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        int deleted = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .cleanupExpiredPendingUsers();
+
+        assertThat(deleted).isEqualTo(1);
+        assertThat(loginCodeService.invalidatedEmails).containsExactly(expired.getEmail());
+        assertThat(userRepository.deletedUsers).containsExactly(expired);
     }
 
     private User user(UUID userId) {
@@ -73,13 +223,39 @@ class UserServiceTest {
         user.setPasswordHash("$2y$10$uZHE15gXghc9i7PVWGhDOOJUt3vZgKg3oiknQQwv9D4lHzsIiBqP2");
         user.setFirstName("Anna");
         user.setLastName("Mueller");
+        user.setPhone("+49 221 111222");
         user.setStreet("Rosenweg");
         user.setHouseNumber("14");
         user.setPostalCode("50667");
         user.setCity("Koeln");
         user.setAddressAddition("2. OG links");
         user.setAccountRole(AccountRole.SIGNED_IN_USER);
+        user.setAccountStatus(AccountStatus.VERIFIED);
         return user;
+    }
+
+    private UserRegistrationRequest registrationRequest(String email) {
+        return new UserRegistrationRequest(
+                email,
+                "secret123",
+                "secret123",
+                "Anna",
+                "Mueller",
+                "+49 221 111222",
+                "Rosenweg",
+                "14",
+                "50667",
+                "Koeln",
+                "2. OG links"
+        );
+    }
+
+    private UserService service(
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            LoginCodeService loginCodeService
+    ) {
+        return new UserService(userRepository, authenticatedUser, passwordEncoder, loginCodeService);
     }
 
     private AuthenticatedUser authenticatedUser(Optional<User> user) {
@@ -92,26 +268,91 @@ class UserServiceTest {
     }
 
     private UserRepository repositoryReturning(User user) {
-        return repositoryReturning(user, new AtomicReference<>());
+        return new UserRepositoryFake(user).repository();
     }
 
-    private UserRepository repositoryReturning(User user, AtomicReference<UUID> requestedId) {
-        return (UserRepository) Proxy.newProxyInstance(
-                UserRepository.class.getClassLoader(),
-                new Class<?>[] {UserRepository.class},
-                (proxy, method, args) -> {
-                    if ("findById".equals(method.getName())) {
-                        requestedId.set((UUID) args[0]);
-                        return Optional.ofNullable(user);
-                    }
-                    if ("findByEmail".equals(method.getName())) {
-                        return Optional.ofNullable(user);
-                    }
-                    if ("toString".equals(method.getName())) {
-                        return "UserRepositoryTestDouble";
-                    }
-                    throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
+    private static class LoginCodeServiceFake extends LoginCodeService {
+        private String requestedEmail;
+        private String requestedIp;
+        private String validatedEmail;
+        private String validatedCode;
+        private boolean validCode = true;
+        private final List<String> invalidatedEmails = new ArrayList<>();
+
+        LoginCodeServiceFake() {
+            super(null, null, null);
+        }
+
+        @Override
+        public void requestLoginCode(String email, String requestIp) {
+            this.requestedEmail = email;
+            this.requestedIp = requestIp;
+        }
+
+        @Override
+        public boolean validateLoginCode(String email, String plainCode) {
+            this.validatedEmail = email;
+            this.validatedCode = plainCode;
+            return validCode;
+        }
+
+        @Override
+        public void invalidateCodesForEmail(String email) {
+            invalidatedEmails.add(email);
+        }
+    }
+
+    private static class UserRepositoryFake {
+        private final Map<String, User> usersByEmail = new HashMap<>();
+        private final AtomicReference<UUID> requestedId = new AtomicReference<>();
+        private User savedUser;
+        private int saveCount;
+        private List<User> expiredUsers = List.of();
+        private final List<User> deletedUsers = new ArrayList<>();
+
+        UserRepositoryFake(User... users) {
+            for (User user : users) {
+                if (user != null) {
+                    usersByEmail.put(user.getEmail(), user);
                 }
-        );
+            }
+        }
+
+        UserRepository repository() {
+            return (UserRepository) Proxy.newProxyInstance(
+                    UserRepository.class.getClassLoader(),
+                    new Class<?>[] {UserRepository.class},
+                    (proxy, method, args) -> {
+                        if ("findById".equals(method.getName())) {
+                            requestedId.set((UUID) args[0]);
+                            return usersByEmail.values().stream()
+                                    .filter(user -> args[0].equals(user.getId()))
+                                    .findFirst();
+                        }
+                        if ("findByEmail".equals(method.getName())) {
+                            return Optional.ofNullable(usersByEmail.get((String) args[0]));
+                        }
+                        if ("save".equals(method.getName())) {
+                            savedUser = (User) args[0];
+                            saveCount++;
+                            usersByEmail.put(savedUser.getEmail(), savedUser);
+                            return savedUser;
+                        }
+                        if ("findByAccountStatusAndDeleteAfterLessThanEqual".equals(method.getName())) {
+                            return expiredUsers;
+                        }
+                        if ("deleteAll".equals(method.getName())) {
+                            for (Object user : (Iterable<?>) args[0]) {
+                                deletedUsers.add((User) user);
+                            }
+                            return null;
+                        }
+                        if ("toString".equals(method.getName())) {
+                            return "UserRepositoryFake";
+                        }
+                        throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
+                    }
+            );
+        }
     }
 }

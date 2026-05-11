@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.security;
 
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.Optional;
@@ -27,7 +28,7 @@ public class AuthenticatedUser {
             return Optional.empty();
         }
         String username = authentication.getName();
-        return userRepository.findByEmail(username);
+        return userRepository.findByEmail(username)
+                .filter(user -> user.getAccountStatus() == AccountStatus.VERIFIED);
     }
 }
-

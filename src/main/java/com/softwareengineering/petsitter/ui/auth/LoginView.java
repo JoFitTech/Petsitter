@@ -1,354 +1,287 @@
 package com.softwareengineering.petsitter.ui.auth;
 
-import com.softwareengineering.petsitter.auth.service.AuthService;
-import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.dto.UserAuthResult;
+import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
+import com.softwareengineering.petsitter.user.dto.UserProfileDto;
+import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
+import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
+import com.softwareengineering.petsitter.user.service.UserService;
+import com.vaadin.flow.component.HasSize;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.dependency.CssImport;
-import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.EmailField;
+import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinSession;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
-import java.util.Optional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.Authentication;
+import java.util.List;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
-/**
- * LoginView – Vaadin-UI für passwortlose Email+Code Authentifizierung.
- *
- * <p>Fluss:
- * 1. User gibt Email ein -> "Code anfordern"
- * 2. Code wird per Mail versendet (bzw. geloggt in Dev)
- * 3. User gibt 6-stelligen Code ein -> "Anmelden"
- * 4. Bei Erfolg: Session setzen und zur StartView navigieren
- *
- * <p>Design: Clean, fokussiert auf Eingabe ohne ablenkende Elemente.
- */
 @Route("/login")
 @PageTitle("Anmelden – Petsitter")
 @AnonymousAllowed
 public class LoginView extends VerticalLayout {
 
-    private static final Logger log = LoggerFactory.getLogger(LoginView.class);
-
     private static final String COLOR_PRIMARY = "#7b5236";
     private static final String COLOR_BG = "#fbf8f1";
     private static final String COLOR_DANGER = "#c73e1d";
 
-    @Autowired
-    private AuthService authService;
+    private final UserService userService;
 
-    // UI Components
-    private EmailField emailField;
-    private TextField codeField;
-    private Button requestCodeButton;
-    private Button verifyCodeButton;
-    private Paragraph errorMessage;
-    private Span statusMessage;
+    private final Paragraph errorMessage = new Paragraph();
+    private final Span statusMessage = new Span();
 
-    // State
-    private String currentEmail = "";
-    private String clientIp = "";
+    private EmailField loginEmail;
+    private PasswordField loginPassword;
+    private EmailField registrationEmail;
+    private PasswordField registrationPassword;
+    private PasswordField registrationConfirmPassword;
+    private TextField firstName;
+    private TextField lastName;
+    private TextField phone;
+    private TextField street;
+    private TextField houseNumber;
+    private TextField postalCode;
+    private TextField city;
+    private TextField addressAddition;
+    private TextField registrationCode;
+    private String currentRegistrationEmail = "";
 
-    public LoginView(@Autowired AuthService authService) {
-        this.authService = authService;
+    public LoginView(UserService userService) {
+        this.userService = userService;
 
         setWidthFull();
-        setHeightFull();
+        setMinHeight("100vh");
         setPadding(false);
         setSpacing(false);
         setDefaultHorizontalComponentAlignment(Alignment.CENTER);
-
         getStyle()
                 .set("background", COLOR_BG)
-                .set("display", "flex")
-                .set("justify-content", "center")
-                .set("align-items", "center");
+                .set("justify-content", "center");
 
-        add(createLoginPanel());
+        add(createPanel());
     }
 
-    private Div createLoginPanel() {
+    private Div createPanel() {
         Div panel = new Div();
         panel.getStyle()
                 .set("width", "100%")
-                .set("max-width", "400px")
+                .set("max-width", "520px")
                 .set("background", "white")
-                .set("border-radius", "12px")
-                .set("padding", "40px 32px")
+                .set("border-radius", "8px")
+                .set("padding", "32px")
                 .set("box-shadow", "0 8px 24px rgba(0, 0, 0, 0.1)");
 
-        H1 title = new H1("Anmelden");
+        H1 title = new H1("Account");
         title.getStyle()
                 .set("font-size", "28px")
-                .set("margin", "0 0 8px 0")
+                .set("margin", "0 0 20px 0")
                 .set("color", COLOR_PRIMARY)
                 .set("text-align", "center");
 
-        Paragraph subtitle = new Paragraph("Mit E-Mail und Code");
-        subtitle.getStyle()
-                .set("margin", "0 0 24px 0")
-                .set("text-align", "center")
-                .set("color", "#7d746c")
-                .set("font-size", "14px");
+        configureMessages();
+        panel.add(title, errorMessage, statusMessage, createLoginSection(), createRegistrationSection());
+        return panel;
+    }
 
-        Paragraph accountHint = new Paragraph("Hinweis: Falls noch kein Konto existiert, wird bei der ersten Anmeldung automatisch eines erstellt.");
-        accountHint.getStyle()
-                .set("margin", "0 0 18px 0")
-                .set("padding", "10px 12px")
-                .set("font-size", "12px")
-                .set("line-height", "1.4")
-                .set("color", "#5f5a56")
-                .set("background", "#f7f3ec")
-                .set("border", "1px solid #eadfce")
-                .set("border-radius", "8px");
+    private VerticalLayout createLoginSection() {
+        VerticalLayout section = section();
+        H2 title = sectionTitle("Anmelden");
 
-        errorMessage = new Paragraph();
+        loginEmail = new EmailField("E-Mail");
+        loginEmail.setWidthFull();
+        loginPassword = new PasswordField("Passwort");
+        loginPassword.setWidthFull();
+
+        Button loginButton = primaryButton("Anmelden");
+        loginButton.addClickListener(event -> {
+            clearMessages();
+            UserAuthResult result = userService.login(new UserLoginRequest(
+                    loginEmail.getValue(),
+                    loginPassword.getValue()
+            ));
+            handleAuthResult(result);
+        });
+
+        section.add(title, loginEmail, loginPassword, loginButton);
+        return section;
+    }
+
+    private VerticalLayout createRegistrationSection() {
+        VerticalLayout section = section();
+        section.getStyle()
+                .set("border-top", "1px solid #eadfce")
+                .set("margin-top", "24px")
+                .set("padding-top", "24px");
+
+        registrationEmail = new EmailField("E-Mail");
+        registrationPassword = new PasswordField("Passwort");
+        registrationConfirmPassword = new PasswordField("Passwort wiederholen");
+        firstName = new TextField("Vorname");
+        lastName = new TextField("Nachname");
+        phone = new TextField("Telefon");
+        street = new TextField("Straße");
+        houseNumber = new TextField("Hausnummer");
+        postalCode = new TextField("PLZ");
+        city = new TextField("Stadt");
+        addressAddition = new TextField("Adresszusatz");
+        registrationCode = new TextField("Code");
+
+        List.<HasSize>of(
+                registrationEmail,
+                registrationPassword,
+                registrationConfirmPassword,
+                firstName,
+                lastName,
+                phone,
+                street,
+                houseNumber,
+                postalCode,
+                city,
+                addressAddition,
+                registrationCode
+        ).forEach(field -> field.setWidthFull());
+
+        Button registerButton = primaryButton("Registrieren");
+        registerButton.addClickListener(event -> startRegistration());
+
+        Button confirmButton = primaryButton("Code bestätigen");
+        confirmButton.addClickListener(event -> completeRegistration());
+
+        section.add(
+                sectionTitle("Registrieren"),
+                registrationEmail,
+                registrationPassword,
+                registrationConfirmPassword,
+                firstName,
+                lastName,
+                phone,
+                street,
+                houseNumber,
+                postalCode,
+                city,
+                addressAddition,
+                registerButton,
+                new Paragraph("Nach dem Registrieren kommt der Code per E-Mail."),
+                registrationCode,
+                confirmButton
+        );
+        return section;
+    }
+
+    private void startRegistration() {
+        clearMessages();
+        currentRegistrationEmail = registrationEmail.getValue();
+        UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
+                registrationEmail.getValue(),
+                registrationPassword.getValue(),
+                registrationConfirmPassword.getValue(),
+                firstName.getValue(),
+                lastName.getValue(),
+                phone.getValue(),
+                street.getValue(),
+                houseNumber.getValue(),
+                postalCode.getValue(),
+                city.getValue(),
+                addressAddition.getValue()
+        ), "127.0.0.1");
+        showResult(result);
+    }
+
+    private void completeRegistration() {
+        clearMessages();
+        String email = currentRegistrationEmail == null || currentRegistrationEmail.isBlank()
+                ? registrationEmail.getValue()
+                : currentRegistrationEmail;
+        UserAuthResult result = userService.completeRegistration(new UserRegistrationConfirmationRequest(
+                email,
+                registrationCode.getValue()
+        ));
+        handleAuthResult(result);
+    }
+
+    private void handleAuthResult(UserAuthResult result) {
+        showResult(result);
+        if (result.success() && result.userProfile() != null) {
+            setSecurityContext(result.userProfile());
+            getUI().ifPresent(ui -> ui.navigate(""));
+        }
+    }
+
+    private void setSecurityContext(UserProfileDto profile) {
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                profile.email(),
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_" + profile.accountRole().name()))
+        );
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+        getUI().ifPresent(ui -> ui.getSession().setAttribute(
+                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
+                SecurityContextHolder.getContext()
+        ));
+    }
+
+    private VerticalLayout section() {
+        VerticalLayout section = new VerticalLayout();
+        section.setPadding(false);
+        section.setSpacing(true);
+        return section;
+    }
+
+    private H2 sectionTitle(String text) {
+        H2 title = new H2(text);
+        title.getStyle()
+                .set("font-size", "18px")
+                .set("margin", "0 0 8px 0")
+                .set("color", COLOR_PRIMARY);
+        return title;
+    }
+
+    private Button primaryButton(String text) {
+        Button button = new Button(text);
+        button.setWidthFull();
+        button.getStyle()
+                .set("background", COLOR_PRIMARY)
+                .set("color", "white")
+                .set("font-weight", "700")
+                .set("border-radius", "6px")
+                .set("cursor", "pointer");
+        return button;
+    }
+
+    private void configureMessages() {
         errorMessage.getStyle()
                 .set("color", COLOR_DANGER)
-                .set("margin", "16px 0")
+                .set("margin", "0 0 16px 0")
                 .set("padding", "12px")
                 .set("background", "#fce8e0")
                 .set("border-radius", "6px")
                 .set("display", "none");
 
-        statusMessage = new Span();
         statusMessage.getStyle()
-                .set("color", "#71946e")
-                .set("margin", "16px 0")
+                .set("color", "#3f7d42")
+                .set("display", "none")
+                .set("margin", "0 0 16px 0")
                 .set("padding", "12px")
                 .set("background", "#e8f5e5")
-                .set("border-radius", "6px")
-                .set("display", "none");
-
-        // STEP 1: Email eingeben
-        VerticalLayout step1 = createEmailStep();
-
-        // STEP 2: Code eingeben
-        VerticalLayout step2 = createCodeStep();
-        step2.setVisible(false);
-
-        panel.add(
-                title,
-                subtitle,
-                accountHint,
-                errorMessage,
-                statusMessage,
-                step1,
-                step2
-        );
-
-        return panel;
+                .set("border-radius", "6px");
     }
 
-    private VerticalLayout createEmailStep() {
-        VerticalLayout step = new VerticalLayout();
-        step.setPadding(false);
-        step.setSpacing(true);
-
-        H2 stepTitle = new H2("Schritt 1: E-Mail eingeben");
-        stepTitle.getStyle()
-                .set("font-size", "16px")
-                .set("margin", "0 0 16px 0")
-                .set("color", COLOR_PRIMARY);
-
-        emailField = new EmailField("E-Mail-Adresse");
-        emailField.setWidthFull();
-        emailField.setPlaceholder("deine@email.de");
-        emailField.setRequired(true);
-        emailField.setErrorMessage("Bitte gib eine gültige E-Mail ein");
-
-        requestCodeButton = new Button("Code anfordern");
-        requestCodeButton.setWidthFull();
-        requestCodeButton.getStyle()
-                .set("background", COLOR_PRIMARY)
-                .set("color", "white")
-                .set("font-weight", "700")
-                .set("padding", "10px 16px")
-                .set("border-radius", "6px")
-                .set("cursor", "pointer");
-
-        requestCodeButton.addClickListener(e -> onRequestCodeClicked(step.getParent().get()));
-
-        step.add(stepTitle, emailField, requestCodeButton);
-        return step;
-    }
-
-    private VerticalLayout createCodeStep() {
-        VerticalLayout step = new VerticalLayout();
-        step.setPadding(false);
-        step.setSpacing(true);
-
-        H2 stepTitle = new H2("Schritt 2: Code eingeben");
-        stepTitle.getStyle()
-                .set("font-size", "16px")
-                .set("margin", "0 0 16px 0")
-                .set("color", COLOR_PRIMARY);
-
-        Paragraph instruction = new Paragraph("Der Code wurde an deine E-Mail versendet. Er ist 10 Minuten lang gültig.");
-        instruction.getStyle()
-                .set("font-size", "13px")
-                .set("color", "#7d746c")
-                .set("margin", "0 0 12px 0");
-
-        codeField = new TextField("Sicherheitscode");
-        codeField.setWidthFull();
-        codeField.setPlaceholder("123456");
-        codeField.setMaxLength(6);
-        codeField.setRequired(true);
-
-        verifyCodeButton = new Button("Anmelden");
-        verifyCodeButton.setWidthFull();
-        verifyCodeButton.getStyle()
-                .set("background", COLOR_PRIMARY)
-                .set("color", "white")
-                .set("font-weight", "700")
-                .set("padding", "10px 16px")
-                .set("border-radius", "6px")
-                .set("cursor", "pointer");
-
-        verifyCodeButton.addClickListener(e -> onVerifyCodeClicked(step.getParent().get()));
-
-        step.add(stepTitle, instruction, codeField, verifyCodeButton);
-        return step;
-    }
-
-    /**
-     * Handler: Code anfordern (Schritt 1 -> Schritt 2)
-     */
-    private void onRequestCodeClicked(com.vaadin.flow.component.Component parent) {
-        clearMessages();
-        String email = emailField.getValue().trim();
-
-        if (email.isEmpty()) {
-            showError("Bitte gib eine E-Mail-Adresse ein");
-            return;
+    private void showResult(UserAuthResult result) {
+        if (result.success()) {
+            showStatus(result.message());
+        } else {
+            showError(result.message());
         }
-
-        try {
-            // IP extrahieren (für Audit)
-            clientIp = getClientIp();
-            currentEmail = email;
-
-            authService.requestCodeForEmail(email, clientIp);
-            log.info("Code angefordert für {}", email);
-
-            showStatus("✓ Code versendet! Prüfe deine E-Mail (oder logs für Tests).");
-
-            // UI: Schritt 1 verstecken, Schritt 2 zeigen
-            if (parent instanceof Div) {
-                parent.getChildren()
-                        .filter(c -> c instanceof VerticalLayout)
-                        .forEach(c -> {
-                            if (((VerticalLayout) c).getComponentCount() > 0) {
-                                Object first = ((VerticalLayout) c).getComponentAt(0);
-                                if (first instanceof H2) {
-                                    H2 h2 = (H2) first;
-                                    if (h2.getText().contains("Schritt 1")) {
-                                        c.setVisible(false);
-                                    } else if (h2.getText().contains("Schritt 2")) {
-                                        c.setVisible(true);
-                                    }
-                                }
-                            }
-                        });
-            }
-
-
-        } catch (Exception ex) {
-            log.error("Fehler beim Anfordern des Codes: {}", ex.getMessage());
-            showError("Fehler beim Versenden. Bitte versuche es später erneut.");
-        }
-    }
-
-    /**
-     * Handler: Code validieren und anmelden (Schritt 2 -> Session -> StartView)
-     */
-    private void onVerifyCodeClicked(com.vaadin.flow.component.Component parent) {
-        clearMessages();
-        String code = codeField.getValue().trim();
-
-        if (code.isEmpty() || code.length() != 6) {
-            showError("Bitte gib einen gültigen 6-stelligen Code ein");
-            return;
-        }
-
-        try {
-            Optional<User> userOpt = authService.verifyCodeAndGetUser(currentEmail, code);
-
-            if (userOpt.isEmpty()) {
-                showError("Ungültiger oder abgelaufener Code. Bitte versuche es erneut.");
-                return;
-            }
-
-            User user = userOpt.get();
-            log.info("User {} erfolgreich authentifiziert", user.getEmail());
-
-            // Spring Security Session setzen
-            setSecurityContext(user);
-
-            showStatus("✓ Anmeldung erfolgreich! Leite weiter...");
-
-            // Navigiere zur StartView nach kurzer Verzögerung
-            getUI().ifPresent(ui -> {
-                ui.access(() -> {
-                    try {
-                        Thread.sleep(500);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                    ui.navigate("");
-                });
-            });
-
-        } catch (Exception ex) {
-            log.error("Fehler bei Code-Validierung: {}", ex.getMessage());
-            showError("Anmeldung fehlgeschlagen. Bitte versuche es später erneut.");
-        }
-    }
-
-    /**
-     * Setzt die Spring Security Context (Session).
-     */
-    private void setSecurityContext(User user) {
-        UserDetails userDetails = authService.toUserDetails(user);
-
-        // Authentication erstellen
-        var authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                userDetails,
-                null,
-                userDetails.getAuthorities()
-        );
-
-        // WebAuthenticationDetails setzen (falls nötig)
-        authentication.setDetails(new WebAuthenticationDetails(clientIp, null));
-
-        // In SecurityContext speichern
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-
-        // Für Session-Persistierung (wichtig!)
-        getUI().ifPresent(ui -> {
-            ui.getSession().setAttribute(
-                    HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                    SecurityContextHolder.getContext()
-            );
-        });
     }
 
     private void showError(String message) {
@@ -367,25 +300,4 @@ public class LoginView extends VerticalLayout {
         errorMessage.getStyle().set("display", "none");
         statusMessage.getStyle().set("display", "none");
     }
-
-    /**
-     * Extrahiert Client-IP (für Audit und Rate-Limiting).
-     * In lokalen Tests: 127.0.0.1, in Production mit X-Forwarded-For konfigurieren.
-     */
-    private String getClientIp() {
-        try {
-            // Für Production: würde man X-Forwarded-For o.ä. aus Request-Header ziehen
-            // Hier: einfach lokale IP für Tests
-            com.vaadin.flow.component.UI ui = getUI().orElse(null);
-            if (ui != null && ui.getSession() != null) {
-                // In lokaler Umgebung: immer 127.0.0.1 (korrekt für Tests)
-                // In Prod: würde man hier aus Servlet-Request extrahieren
-                return "127.0.0.1";
-            }
-        } catch (Exception e) {
-            log.debug("IP-Extraktion fehlgeschlagen: {}", e.getMessage());
-        }
-        return "127.0.0.1"; // Fallback
-    }
 }
-

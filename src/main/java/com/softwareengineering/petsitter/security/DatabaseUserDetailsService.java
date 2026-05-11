@@ -2,9 +2,11 @@ package com.softwareengineering.petsitter.security;
 
 import com.softwareengineering.petsitter.config.PetsitterSecurityProperties;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.Locale;
+import org.springframework.context.annotation.Primary;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,6 +19,7 @@ import org.springframework.stereotype.Service;
  * und optional auf einen Demo-User als Fallback zurueckfaellt.
  */
 @Service
+@Primary
 public class DatabaseUserDetailsService implements UserDetailsService {
 
     private static final Logger log = LoggerFactory.getLogger(DatabaseUserDetailsService.class);
@@ -51,7 +54,11 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         }
 
         if (user != null) {
-            // Unterstützung für passwortlose Auth: leerer/null passwordHash ist OK
+            if (user.getAccountStatus() != AccountStatus.VERIFIED) {
+                throw new UsernameNotFoundException("Benutzer ist nicht verifiziert: " + username);
+            }
+
+            // Spring Security braucht einen non-null Passwortwert.
             String password = user.getPasswordHash();
             if (password == null || password.isBlank()) {
                 password = ""; // Spring Security braucht einen non-null Wert
@@ -86,4 +93,3 @@ public class DatabaseUserDetailsService implements UserDetailsService {
         return normalizeRole(accountRole.name());
     }
 }
-

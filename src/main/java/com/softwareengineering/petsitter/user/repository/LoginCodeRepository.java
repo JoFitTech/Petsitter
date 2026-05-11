@@ -14,7 +14,7 @@ import java.util.List;
 public interface LoginCodeRepository extends JpaRepository<LoginCode, UUID> {
 
     /**
-     * Findet den aktuellsten, noch gültigen Login-Code für eine Email.
+     * Findet den aktuellsten, noch gültigen Registrierungs-Code für eine Email.
      * Nutzt findFirstBy + OrderBy für JPQL-Kompatibilität (kein LIMIT 1).
      */
     Optional<LoginCode> findFirstByEmailAndUsedAtIsNullAndExpiresAtAfterOrderByCreatedAtDesc(
@@ -35,4 +35,3 @@ public interface LoginCodeRepository extends JpaRepository<LoginCode, UUID> {
     @Query("DELETE FROM LoginCode lc WHERE lc.expiresAt < :threshold OR (lc.createdAt < :oneHourAgo AND lc.usedAt IS NOT NULL)")
     void deleteExpiredCodes(@Param("threshold") LocalDateTime threshold, @Param("oneHourAgo") LocalDateTime oneHourAgo);
 }
-

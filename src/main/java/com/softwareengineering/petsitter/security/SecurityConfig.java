@@ -126,7 +126,7 @@ public class SecurityConfig {
                 // Logout
                 .logout(logout -> logout
                         .logoutUrl("/logout")
-                        .logoutSuccessUrl("/login?logout")
+                        .logoutSuccessUrl("/?logout=true")
                         .invalidateHttpSession(true)
                         .deleteCookies("JSESSIONID", "REMEMBER_ME")
                 );

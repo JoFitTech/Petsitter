@@ -11,12 +11,16 @@ import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.AfterNavigationEvent;
+import com.vaadin.flow.router.AfterNavigationObserver;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Route(value = "", layout = MainLayout.class)
-public class StartView extends VerticalLayout {
+public class StartView extends VerticalLayout implements AfterNavigationObserver {
 
     private static final String DARK = "#4a3428";
     private static final String BROWN = "#7b5236";
@@ -703,6 +707,26 @@ public class StartView extends VerticalLayout {
         // TODO:
         // Externe Links öffnen, z. B.:
         // UI.getCurrent().getPage().open("https://...");
+    }
+
+    /**
+     * Zeigt ein einmaliges Logout-Popup, wenn die Startseite mit ?logout=true aufgerufen wird.
+     */
+    @Override
+    public void afterNavigation(AfterNavigationEvent event) {
+        boolean loggedOut = event.getLocation()
+                .getQueryParameters()
+                .getParameters()
+                .containsKey("logout");
+
+        if (loggedOut) {
+            Notification notification = Notification.show("Du wurdest erfolgreich ausgeloggt.", 2500,
+                    Notification.Position.TOP_CENTER);
+            notification.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+
+            // Query-Param entfernen, damit das Popup bei Refresh nicht erneut erscheint.
+            UI.getCurrent().getPage().getHistory().replaceState(null, "");
+        }
     }
 
     private record Offer(

@@ -18,6 +18,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinSession;
+import com.vaadin.flow.server.auth.AnonymousAllowed;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
  */
 @Route("/login")
 @PageTitle("Anmelden – Petsitter")
+@AnonymousAllowed
 public class LoginView extends VerticalLayout {
 
     private static final Logger log = LoggerFactory.getLogger(LoginView.class);
@@ -106,6 +108,17 @@ public class LoginView extends VerticalLayout {
                 .set("color", "#7d746c")
                 .set("font-size", "14px");
 
+        Paragraph accountHint = new Paragraph("Hinweis: Falls noch kein Konto existiert, wird bei der ersten Anmeldung automatisch eines erstellt.");
+        accountHint.getStyle()
+                .set("margin", "0 0 18px 0")
+                .set("padding", "10px 12px")
+                .set("font-size", "12px")
+                .set("line-height", "1.4")
+                .set("color", "#5f5a56")
+                .set("background", "#f7f3ec")
+                .set("border", "1px solid #eadfce")
+                .set("border-radius", "8px");
+
         errorMessage = new Paragraph();
         errorMessage.getStyle()
                 .set("color", COLOR_DANGER)
@@ -134,6 +147,7 @@ public class LoginView extends VerticalLayout {
         panel.add(
                 title,
                 subtitle,
+                accountHint,
                 errorMessage,
                 statusMessage,
                 step1,

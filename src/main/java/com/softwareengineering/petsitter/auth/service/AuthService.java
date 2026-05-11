@@ -2,9 +2,11 @@ package com.softwareengineering.petsitter.auth.service;
 
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
+import java.util.Locale;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.User.UserBuilder;
 import org.springframework.stereotype.Service;
@@ -97,16 +99,17 @@ public class AuthService {
      * @return existierender oder neu erstellter User
      */
     public User getOrCreateUser(String email) {
-        Optional<User> existingUser = userRepository.findByEmail(email);
+        String normalizedEmail = normalizeEmail(email);
+        Optional<User> existingUser = userRepository.findByEmail(normalizedEmail);
 
         if (existingUser.isPresent()) {
-            log.info("User existiert: {}", email);
+            log.info("User existiert: {}", normalizedEmail);
             return existingUser.get();
         }
 
-        log.info("Erstelle neuen User: {}", email);
+        log.info("Erstelle neuen User: {}", normalizedEmail);
         User newUser = new User();
-        newUser.setEmail(email);
+        newUser.setEmail(normalizedEmail);
         newUser.setFirstName(""); // Placeholder
         newUser.setLastName("");
         newUser.setStreet("");
@@ -116,7 +119,13 @@ public class AuthService {
         newUser.setAccountRole(com.softwareengineering.petsitter.user.domain.AccountRole.SIGNED_IN_USER);
         newUser.setPasswordHash(""); // Leerer Hash für passwortlose Auth
 
-        return userRepository.save(newUser);
+        try {
+            return userRepository.save(newUser);
+        } catch (DataIntegrityViolationException ex) {
+            // Parallel-Request hat denselben User ggf. gerade angelegt -> erneut lesen.
+            return userRepository.findByEmail(normalizedEmail)
+                    .orElseThrow(() -> ex);
+        }
     }
 
     /**
@@ -181,9 +190,10 @@ public class AuthService {
      * @param clientIp IP-Adresse für Audit
      */
     public void requestCodeForEmail(String email, String clientIp) {
+        String normalizedEmail = normalizeEmail(email);
         // Throttle (TODO Phase 2): Rate-Limit pro IP/Email
-        getOrCreateUser(email); // Stelle sicher, dass User existiert
-        loginCodeService.requestLoginCode(email, clientIp);
+        getOrCreateUser(normalizedEmail); // Stelle sicher, dass User existiert
+        loginCodeService.requestLoginCode(normalizedEmail, clientIp);
     }
 
     /**
@@ -221,9 +231,20 @@ public class AuthService {
      * @return Optional<User> – User falls gültig, empty() falls ungültig
      */
     public Optional<User> verifyCodeAndGetUser(String email, String code) {
-        if (loginCodeService.validateLoginCode(email, code)) {
-            return userRepository.findByEmail(email);
+        String normalizedEmail = normalizeEmail(email);
+        if (loginCodeService.validateLoginCode(normalizedEmail, code)) {
+            return userRepository.findByEmail(normalizedEmail);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Vereinheitlicht Email-Adressen für konsistente Lookups und eindeutige User-Erstellung.
+     */
+    private String normalizeEmail(String email) {
+        if (email == null) {
+            return "";
+        }
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

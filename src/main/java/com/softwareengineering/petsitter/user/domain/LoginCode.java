@@ -26,7 +26,7 @@ import java.util.UUID;
  * - Rate-Limit: max 3 Versuche pro Code
  */
 @Entity
-@Table(name = "login_codes")
+@Table(name = "login_code")
 public class LoginCode {
 
     @Id

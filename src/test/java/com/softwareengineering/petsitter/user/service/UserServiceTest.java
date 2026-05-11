@@ -2,6 +2,7 @@ package com.softwareengineering.petsitter.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
@@ -9,9 +10,11 @@ import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
+import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
+import java.time.LocalDate;
 import java.lang.reflect.Proxy;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -46,7 +49,12 @@ class UserServiceTest {
     void getCurrentUserProfileMapsAuthenticatedUserToDto() {
         UUID userId = UUID.randomUUID();
         User domainUser = user(userId);
-        UserService userService = service(repositoryReturning(domainUser), authenticatedUser(Optional.of(domainUser)), new LoginCodeServiceFake());
+        UserService userService = service(
+                repositoryReturning(domainUser),
+                authenticatedUser(Optional.of(domainUser)),
+                new LoginCodeServiceFake(),
+                petService("1 Hund, 1 Katze")
+        );
 
         Optional<UserProfileDto> result = userService.getCurrentUserProfile();
 
@@ -55,12 +63,21 @@ class UserServiceTest {
             assertThat(profile.email()).isEqualTo("anna.mueller@petsitter.local");
             assertThat(profile.firstName()).isEqualTo("Anna");
             assertThat(profile.lastName()).isEqualTo("Mueller");
+            assertThat(profile.displayName()).isEqualTo("Anna");
             assertThat(profile.phone()).isEqualTo("+49 221 111222");
+            assertThat(profile.birthDate()).isEqualTo(LocalDate.of(1995, 5, 2));
+            assertThat(profile.nationality()).isEqualTo("deutsch");
+            assertThat(profile.language()).isEqualTo("deutsch");
+            assertThat(profile.bio()).isEqualTo("Ich betreue gerne Hunde und Katzen.");
             assertThat(profile.street()).isEqualTo("Rosenweg");
             assertThat(profile.houseNumber()).isEqualTo("14");
             assertThat(profile.postalCode()).isEqualTo("50667");
             assertThat(profile.city()).isEqualTo("Koeln");
             assertThat(profile.addressAddition()).isEqualTo("2. OG links");
+            assertThat(profile.country()).isEqualTo("Deutschland");
+            assertThat(profile.pendingEmail()).isNull();
+            assertThat(profile.pendingEmailRequestedAt()).isNull();
+            assertThat(profile.petSummary()).isEqualTo("1 Hund, 1 Katze");
             assertThat(profile.accountRole()).isEqualTo(AccountRole.SIGNED_IN_USER);
             assertThat(profile.accountStatus()).isEqualTo(AccountStatus.VERIFIED);
         });
@@ -79,6 +96,146 @@ class UserServiceTest {
         UserService userService = service(repositoryReturning(null), authenticatedUser(Optional.empty()), new LoginCodeServiceFake());
 
         assertThat(userService.getCurrentUser()).isEqualTo("Gast");
+    }
+
+    @Test
+    void updateCurrentUserProfileSavesTrimmedProfileDataForAuthenticatedUser() {
+        User domainUser = user(UUID.randomUUID());
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser);
+        UserService userService = service(userRepository.repository(), authenticatedUser(Optional.of(domainUser)), new LoginCodeServiceFake());
+
+        UserAuthResult result = userService.updateCurrentUserProfile(new UserProfileUpdateRequest(
+                " Lisa ",
+                " Meier ",
+                " ",
+                " ",
+                LocalDate.of(1998, 4, 12),
+                " oesterreichisch ",
+                " englisch ",
+                " Ich betreue Kleintiere. ",
+                " Neue Strasse ",
+                " 9b ",
+                " 10999 ",
+                " Berlin ",
+                " ",
+                " Deutschland "
+        ));
+
+        assertThat(result.success()).isTrue();
+        assertThat(userRepository.savedUser).isSameAs(domainUser);
+        assertThat(domainUser.getFirstName()).isEqualTo("Lisa");
+        assertThat(domainUser.getLastName()).isEqualTo("Meier");
+        assertThat(domainUser.getDisplayName()).isEqualTo("Lisa");
+        assertThat(domainUser.getPhone()).isNull();
+        assertThat(domainUser.getBirthDate()).isEqualTo(LocalDate.of(1998, 4, 12));
+        assertThat(domainUser.getNationality()).isEqualTo("oesterreichisch");
+        assertThat(domainUser.getLanguage()).isEqualTo("englisch");
+        assertThat(domainUser.getBio()).isEqualTo("Ich betreue Kleintiere.");
+        assertThat(domainUser.getStreet()).isEqualTo("Neue Strasse");
+        assertThat(domainUser.getHouseNumber()).isEqualTo("9b");
+        assertThat(domainUser.getPostalCode()).isEqualTo("10999");
+        assertThat(domainUser.getCity()).isEqualTo("Berlin");
+        assertThat(domainUser.getAddressAddition()).isNull();
+        assertThat(domainUser.getCountry()).isEqualTo("Deutschland");
+    }
+
+    @Test
+    void updateCurrentUserProfileRejectsMissingRequiredFieldsAndMissingAuthentication() {
+        User domainUser = user(UUID.randomUUID());
+        UserService userService = service(new UserRepositoryFake(domainUser).repository(), authenticatedUser(Optional.of(domainUser)), new LoginCodeServiceFake());
+
+        UserAuthResult missingField = userService.updateCurrentUserProfile(new UserProfileUpdateRequest(
+                "",
+                "Meier",
+                "Lisa",
+                null,
+                null,
+                null,
+                "deutsch",
+                null,
+                "Neue Strasse",
+                "9b",
+                "10999",
+                "Berlin",
+                null,
+                "Deutschland"
+        ));
+        UserAuthResult missingAuth = service(repositoryReturning(domainUser), authenticatedUser(Optional.empty()), new LoginCodeServiceFake())
+                .updateCurrentUserProfile(profileUpdateRequest());
+
+        assertThat(missingField.success()).isFalse();
+        assertThat(missingAuth.success()).isFalse();
+    }
+
+    @Test
+    void requestCurrentUserEmailChangeStoresPendingEmailAndSendsCode() {
+        User domainUser = user(UUID.randomUUID());
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+        UserService userService = service(userRepository.repository(), authenticatedUser(Optional.of(domainUser)), loginCodeService);
+
+        UserAuthResult result = userService.requestCurrentUserEmailChange(" New.Email@Petsitter.Local ", "127.0.0.1");
+
+        assertThat(result.success()).isTrue();
+        assertThat(domainUser.getEmail()).isEqualTo("anna.mueller@petsitter.local");
+        assertThat(domainUser.getPendingEmail()).isEqualTo("new.email@petsitter.local");
+        assertThat(domainUser.getPendingEmailRequestedAt()).isNotNull();
+        assertThat(loginCodeService.requestedEmail).isEqualTo("new.email@petsitter.local");
+        assertThat(loginCodeService.requestedIp).isEqualTo("127.0.0.1");
+        assertThat(userRepository.savedUser).isSameAs(domainUser);
+    }
+
+    @Test
+    void requestCurrentUserEmailChangeRejectsDuplicateEmail() {
+        User domainUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        otherUser.setEmail("taken@petsitter.local");
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser, otherUser);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.of(domainUser)), loginCodeService)
+                .requestCurrentUserEmailChange("taken@petsitter.local", "127.0.0.1");
+
+        assertThat(result.success()).isFalse();
+        assertThat(domainUser.getPendingEmail()).isNull();
+        assertThat(loginCodeService.requestedEmail).isNull();
+    }
+
+    @Test
+    void confirmCurrentUserEmailChangeValidatesCodeAndUpdatesLoginEmail() {
+        User domainUser = user(UUID.randomUUID());
+        domainUser.setPendingEmail("new.email@petsitter.local");
+        domainUser.setPendingEmailRequestedAt(LocalDateTime.now());
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+        loginCodeService.validCode = true;
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.of(domainUser)), loginCodeService)
+                .confirmCurrentUserEmailChange("123456");
+
+        assertThat(result.success()).isTrue();
+        assertThat(domainUser.getEmail()).isEqualTo("new.email@petsitter.local");
+        assertThat(domainUser.getPendingEmail()).isNull();
+        assertThat(domainUser.getPendingEmailRequestedAt()).isNull();
+        assertThat(loginCodeService.validatedEmail).isEqualTo("new.email@petsitter.local");
+        assertThat(loginCodeService.validatedCode).isEqualTo("123456");
+    }
+
+    @Test
+    void confirmCurrentUserEmailChangeRejectsInvalidCode() {
+        User domainUser = user(UUID.randomUUID());
+        domainUser.setPendingEmail("new.email@petsitter.local");
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser);
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+        loginCodeService.validCode = false;
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.of(domainUser)), loginCodeService)
+                .confirmCurrentUserEmailChange("000000");
+
+        assertThat(result.success()).isFalse();
+        assertThat(domainUser.getEmail()).isEqualTo("anna.mueller@petsitter.local");
+        assertThat(domainUser.getPendingEmail()).isEqualTo("new.email@petsitter.local");
+        assertThat(userRepository.saveCount).isZero();
     }
 
     @Test
@@ -223,12 +380,18 @@ class UserServiceTest {
         user.setPasswordHash("$2y$10$uZHE15gXghc9i7PVWGhDOOJUt3vZgKg3oiknQQwv9D4lHzsIiBqP2");
         user.setFirstName("Anna");
         user.setLastName("Mueller");
+        user.setDisplayName("Anna");
         user.setPhone("+49 221 111222");
+        user.setBirthDate(LocalDate.of(1995, 5, 2));
+        user.setNationality("deutsch");
+        user.setLanguage("deutsch");
+        user.setBio("Ich betreue gerne Hunde und Katzen.");
         user.setStreet("Rosenweg");
         user.setHouseNumber("14");
         user.setPostalCode("50667");
         user.setCity("Koeln");
         user.setAddressAddition("2. OG links");
+        user.setCountry("Deutschland");
         user.setAccountRole(AccountRole.SIGNED_IN_USER);
         user.setAccountStatus(AccountStatus.VERIFIED);
         return user;
@@ -250,12 +413,49 @@ class UserServiceTest {
         );
     }
 
+    private UserProfileUpdateRequest profileUpdateRequest() {
+        return new UserProfileUpdateRequest(
+                "Anna",
+                "Mueller",
+                "Anna",
+                "+49 221 111222",
+                LocalDate.of(1995, 5, 2),
+                "deutsch",
+                "deutsch",
+                "Ich betreue gerne Hunde und Katzen.",
+                "Rosenweg",
+                "14",
+                "50667",
+                "Koeln",
+                "2. OG links",
+                "Deutschland"
+        );
+    }
+
     private UserService service(
             UserRepository userRepository,
             AuthenticatedUser authenticatedUser,
             LoginCodeService loginCodeService
     ) {
-        return new UserService(userRepository, authenticatedUser, passwordEncoder, loginCodeService);
+        return service(userRepository, authenticatedUser, loginCodeService, petService("Keine Haustiere"));
+    }
+
+    private UserService service(
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            LoginCodeService loginCodeService,
+            PetService petService
+    ) {
+        return new UserService(userRepository, authenticatedUser, passwordEncoder, loginCodeService, petService);
+    }
+
+    private PetService petService(String summary) {
+        return new PetService(null) {
+            @Override
+            public String getPetSummaryForOwner(UUID ownerId) {
+                return summary;
+            }
+        };
     }
 
     private AuthenticatedUser authenticatedUser(Optional<User> user) {
@@ -335,6 +535,8 @@ class UserServiceTest {
                         if ("save".equals(method.getName())) {
                             savedUser = (User) args[0];
                             saveCount++;
+                            usersByEmail.entrySet().removeIf(entry -> entry.getValue() == savedUser
+                                    && !entry.getKey().equals(savedUser.getEmail()));
                             usersByEmail.put(savedUser.getEmail(), savedUser);
                             return savedUser;
                         }

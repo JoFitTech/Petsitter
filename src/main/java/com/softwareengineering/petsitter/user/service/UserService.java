@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.user.service;
 
+import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
@@ -7,14 +8,17 @@ import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
+import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,22 +29,26 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private static final int MIN_PASSWORD_LENGTH = 8;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final UserRepository userRepository;
     private final AuthenticatedUser authenticatedUser;
     private final PasswordEncoder passwordEncoder;
     private final LoginCodeService loginCodeService;
+    private final PetService petService;
 
     public UserService(
             UserRepository userRepository,
             AuthenticatedUser authenticatedUser,
             PasswordEncoder passwordEncoder,
-            LoginCodeService loginCodeService
+            LoginCodeService loginCodeService,
+            PetService petService
     ) {
         this.userRepository = userRepository;
         this.authenticatedUser = authenticatedUser;
         this.passwordEncoder = passwordEncoder;
         this.loginCodeService = loginCodeService;
+        this.petService = petService;
     }
 
     public Optional<User> findUserById(UUID userId) {
@@ -153,8 +161,84 @@ public class UserService {
         return expiredUsers.size();
     }
 
+    @Transactional(readOnly = true)
     public Optional<UserProfileDto> getCurrentUserProfile() {
         return authenticatedUser.get().map(this::toProfileDto);
+    }
+
+    @Transactional
+    public UserAuthResult updateCurrentUserProfile(UserProfileUpdateRequest request) {
+        Optional<User> userOpt = authenticatedUser.get();
+        if (userOpt.isEmpty()) {
+            return UserAuthResult.failure("Bitte melde dich erneut an.");
+        }
+
+        Optional<String> validationError = validateProfileUpdateRequest(request);
+        if (validationError.isPresent()) {
+            return UserAuthResult.failure(validationError.get());
+        }
+
+        User user = userOpt.get();
+        applyProfileUpdate(user, request);
+        User savedUser = userRepository.save(user);
+        return UserAuthResult.success("Profil gespeichert.", toProfileDto(savedUser));
+    }
+
+    @Transactional
+    public UserAuthResult requestCurrentUserEmailChange(String newEmail, String clientIp) {
+        Optional<User> userOpt = authenticatedUser.get();
+        if (userOpt.isEmpty()) {
+            return UserAuthResult.failure("Bitte melde dich erneut an.");
+        }
+
+        User user = userOpt.get();
+        String normalizedEmail = normalizeEmail(newEmail);
+        if (!isValidEmail(normalizedEmail)) {
+            return UserAuthResult.failure("Bitte eine gültige E-Mail eingeben.");
+        }
+        if (normalizedEmail.equals(user.getEmail())) {
+            user.setPendingEmail(null);
+            user.setPendingEmailRequestedAt(null);
+            User savedUser = userRepository.save(user);
+            return UserAuthResult.success("E-Mail-Adresse ist unverändert.", toProfileDto(savedUser));
+        }
+        if (emailBelongsToAnotherUser(normalizedEmail, user.getId())) {
+            return UserAuthResult.failure("Für diese E-Mail existiert bereits ein Account.");
+        }
+
+        user.setPendingEmail(normalizedEmail);
+        user.setPendingEmailRequestedAt(LocalDateTime.now());
+        User savedUser = userRepository.save(user);
+        loginCodeService.requestLoginCode(normalizedEmail, clientIp);
+        return UserAuthResult.success("Bestätigungscode wurde an die neue E-Mail gesendet.", toProfileDto(savedUser));
+    }
+
+    @Transactional
+    public UserAuthResult confirmCurrentUserEmailChange(String code) {
+        Optional<User> userOpt = authenticatedUser.get();
+        if (userOpt.isEmpty()) {
+            return UserAuthResult.failure("Bitte melde dich erneut an.");
+        }
+
+        User user = userOpt.get();
+        if (isBlank(user.getPendingEmail())) {
+            return UserAuthResult.failure("Es gibt keine offene E-Mail-Änderung.");
+        }
+        if (isBlank(code)) {
+            return UserAuthResult.failure("Bitte den Bestätigungscode eingeben.");
+        }
+        if (emailBelongsToAnotherUser(user.getPendingEmail(), user.getId())) {
+            return UserAuthResult.failure("Für diese E-Mail existiert bereits ein Account.");
+        }
+        if (!loginCodeService.validateLoginCode(user.getPendingEmail(), code.trim())) {
+            return UserAuthResult.failure("Der Code ist ungültig oder abgelaufen.");
+        }
+
+        user.setEmail(user.getPendingEmail());
+        user.setPendingEmail(null);
+        user.setPendingEmailRequestedAt(null);
+        User savedUser = userRepository.save(user);
+        return UserAuthResult.success("E-Mail-Adresse wurde aktualisiert.", toProfileDto(savedUser));
     }
 
     public String getCurrentUser() {
@@ -169,22 +253,65 @@ public class UserService {
                 user.getEmail(),
                 user.getFirstName(),
                 user.getLastName(),
+                defaultIfBlank(user.getDisplayName(), user.getFirstName()),
                 user.getPhone(),
+                user.getBirthDate(),
+                user.getNationality(),
+                defaultIfBlank(user.getLanguage(), "deutsch"),
+                user.getBio(),
                 user.getStreet(),
                 user.getHouseNumber(),
                 user.getPostalCode(),
                 user.getCity(),
                 user.getAddressAddition(),
+                defaultIfBlank(user.getCountry(), "Deutschland"),
+                user.getPendingEmail(),
+                user.getPendingEmailRequestedAt(),
+                petService.getPetSummaryForOwner(user.getId()),
                 user.getAccountRole(),
                 user.getAccountStatus()
         );
+    }
+
+    private Optional<String> validateProfileUpdateRequest(UserProfileUpdateRequest request) {
+        if (request == null) {
+            return Optional.of("Profildaten fehlen.");
+        }
+        if (isBlank(request.firstName())
+                || isBlank(request.lastName())
+                || isBlank(request.street())
+                || isBlank(request.houseNumber())
+                || isBlank(request.postalCode())
+                || isBlank(request.city())
+                || isBlank(request.country())) {
+            return Optional.of("Bitte alle Pflichtfelder ausfüllen.");
+        }
+        return Optional.empty();
+    }
+
+    private void applyProfileUpdate(User user, UserProfileUpdateRequest request) {
+        String firstName = clean(request.firstName());
+        user.setFirstName(firstName);
+        user.setLastName(clean(request.lastName()));
+        user.setDisplayName(defaultIfBlank(cleanNullable(request.displayName()), firstName));
+        user.setPhone(cleanNullable(request.phone()));
+        user.setBirthDate(request.birthDate());
+        user.setNationality(cleanNullable(request.nationality()));
+        user.setLanguage(defaultIfBlank(cleanNullable(request.language()), "deutsch"));
+        user.setBio(cleanNullable(request.bio()));
+        user.setStreet(clean(request.street()));
+        user.setHouseNumber(clean(request.houseNumber()));
+        user.setPostalCode(clean(request.postalCode()));
+        user.setCity(clean(request.city()));
+        user.setAddressAddition(cleanNullable(request.addressAddition()));
+        user.setCountry(clean(request.country()));
     }
 
     private Optional<String> validateRegistrationRequest(UserRegistrationRequest request) {
         if (request == null) {
             return Optional.of("Registrierungsdaten fehlen.");
         }
-        if (normalizeEmail(request.email()).isBlank()) {
+        if (!isValidEmail(normalizeEmail(request.email()))) {
             return Optional.of("Bitte eine gültige E-Mail eingeben.");
         }
         if (isBlank(request.password()) || request.password().length() < MIN_PASSWORD_LENGTH) {
@@ -209,15 +336,28 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(request.password()));
         user.setFirstName(clean(request.firstName()));
         user.setLastName(clean(request.lastName()));
+        user.setDisplayName(clean(request.firstName()));
         user.setPhone(cleanNullable(request.phone()));
+        user.setLanguage("deutsch");
         user.setStreet(clean(request.street()));
         user.setHouseNumber(clean(request.houseNumber()));
         user.setPostalCode(clean(request.postalCode()));
         user.setCity(clean(request.city()));
         user.setAddressAddition(cleanNullable(request.addressAddition()));
+        user.setCountry("Deutschland");
         user.setAccountRole(AccountRole.SIGNED_IN_USER);
         user.setAccountStatus(AccountStatus.PENDING);
         user.setDeleteAfter(LocalDateTime.now().plusHours(24));
+    }
+
+    private boolean emailBelongsToAnotherUser(String email, UUID currentUserId) {
+        return userRepository.findByEmail(email)
+                .filter(existingUser -> !Objects.equals(existingUser.getId(), currentUserId))
+                .isPresent();
+    }
+
+    private boolean isValidEmail(String email) {
+        return !email.isBlank() && EMAIL_PATTERN.matcher(email).matches();
     }
 
     private String normalizeEmail(String email) {
@@ -234,6 +374,10 @@ public class UserService {
     private String cleanNullable(String value) {
         String cleaned = clean(value);
         return cleaned.isBlank() ? null : cleaned;
+    }
+
+    private String defaultIfBlank(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     private boolean isBlank(String value) {

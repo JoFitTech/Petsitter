@@ -9,6 +9,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -69,9 +70,39 @@ public class User {
     private String lastName;
 
     /**
+     * Öffentlicher Anzeigename im Profil.
+     */
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
+    /**
      * Telefonnummer – optional, für Kontaktaufnahme.
      */
     private String phone;
+
+    /**
+     * Geburtsdatum – optionaler Profilbestandteil.
+     */
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    /**
+     * Nationalität – optionaler Profilbestandteil.
+     */
+    @Column(length = 100)
+    private String nationality;
+
+    /**
+     * Gesprochene Sprache für das öffentliche Profil.
+     */
+    @Column(nullable = false, length = 80)
+    private String language = "deutsch";
+
+    /**
+     * Freitext für die Profilbeschreibung.
+     */
+    @Column(length = 1000)
+    private String bio;
 
     /**
      * Straße der Hauptadresse.
@@ -102,6 +133,24 @@ public class User {
      */
     @Column(name = "address_addition")
     private String addressAddition;
+
+    /**
+     * Land der Hauptadresse.
+     */
+    @Column(nullable = false, length = 100)
+    private String country = "Deutschland";
+
+    /**
+     * Noch nicht bestätigte neue E-Mail-Adresse.
+     */
+    @Column(name = "pending_email")
+    private String pendingEmail;
+
+    /**
+     * Zeitpunkt der letzten E-Mail-Änderungsanforderung.
+     */
+    @Column(name = "pending_email_requested_at")
+    private LocalDateTime pendingEmailRequestedAt;
 
     /**
      * Technische Account-Rolle für Login und Berechtigungen.
@@ -172,12 +221,52 @@ public class User {
         this.lastName = lastName;
     }
 
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
     public String getPhone() {
         return phone;
     }
 
     public void setPhone(String phone) {
         this.phone = phone;
+    }
+
+    public LocalDate getBirthDate() {
+        return birthDate;
+    }
+
+    public void setBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
+
+    public String getNationality() {
+        return nationality;
+    }
+
+    public void setNationality(String nationality) {
+        this.nationality = nationality;
+    }
+
+    public String getLanguage() {
+        return language;
+    }
+
+    public void setLanguage(String language) {
+        this.language = language;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(String bio) {
+        this.bio = bio;
     }
 
     public String getStreet() {
@@ -220,6 +309,30 @@ public class User {
         this.addressAddition = addressAddition;
     }
 
+    public String getCountry() {
+        return country;
+    }
+
+    public void setCountry(String country) {
+        this.country = country;
+    }
+
+    public String getPendingEmail() {
+        return pendingEmail;
+    }
+
+    public void setPendingEmail(String pendingEmail) {
+        this.pendingEmail = pendingEmail;
+    }
+
+    public LocalDateTime getPendingEmailRequestedAt() {
+        return pendingEmailRequestedAt;
+    }
+
+    public void setPendingEmailRequestedAt(LocalDateTime pendingEmailRequestedAt) {
+        this.pendingEmailRequestedAt = pendingEmailRequestedAt;
+    }
+
     public AccountRole getAccountRole() {
         return accountRole;
     }
@@ -259,6 +372,15 @@ public class User {
         }
         if (accountStatus == null) {
             accountStatus = AccountStatus.VERIFIED;
+        }
+        if (displayName == null || displayName.isBlank()) {
+            displayName = firstName;
+        }
+        if (language == null || language.isBlank()) {
+            language = "deutsch";
+        }
+        if (country == null || country.isBlank()) {
+            country = "Deutschland";
         }
     }
 }

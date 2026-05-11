@@ -3,50 +3,36 @@ package com.softwareengineering.petsitter.ui.shared;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.*;
-import com.vaadin.flow.component.textfield.IntegerField;
-import com.vaadin.flow.component.textfield.NumberField;
 import com.vaadin.flow.router.Route;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @Route(value = "", layout = MainLayout.class)
 public class StartView extends VerticalLayout {
 
-    private static final String DARK = "#4a3428";
-    private static final String BROWN = "#7b5236";
-    private static final String LIGHT_BG = "#fbf8f1";
+    private static final String DARK       = "#4a3428";
+    private static final String BROWN      = "#7b5236";
+    private static final String LIGHT_BG   = "#fbf8f1";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
-
-    private DatePicker startDateField;
-    private DatePicker endDateField;
-    private NumberField minPriceField;
-    private IntegerField maxDistanceField;
-    private Button searchButton;
-
-    private Div offerGrid;
 
     public StartView() {
         setWidthFull();
         setPadding(false);
         setSpacing(false);
         setDefaultHorizontalComponentAlignment(Alignment.CENTER);
-
-        getStyle()
-                .set("overflow-x", "hidden");
+        getStyle().set("overflow-x", "hidden");
 
         add(createPageWrapper());
     }
 
+    // ── Page wrapper ──────────────────────────────────────────────────────
     private Component createPageWrapper() {
         Div wrapper = new Div();
         wrapper.setWidthFull();
-
         wrapper.getStyle()
                 .set("position", "relative")
                 .set("overflow-x", "hidden")
@@ -55,13 +41,12 @@ public class StartView extends VerticalLayout {
         wrapper.add(
                 createBackgroundBlobs(),
                 createHeroSection(),
-                createOfferSection(),
-                createTrustBanner()
+                createOfferSection()
         );
-
         return wrapper;
     }
 
+    // ── Background decorative blobs ───────────────────────────────────────
     private Component createBackgroundBlobs() {
         Div container = new Div();
 
@@ -102,10 +87,9 @@ public class StartView extends VerticalLayout {
         return container;
     }
 
-
+    // ── Hero section ──────────────────────────────────────────────────────
     private Component createHeroSection() {
         Div hero = new Div();
-
         hero.getStyle()
                 .set("position", "relative")
                 .set("z-index", "1")
@@ -114,69 +98,64 @@ public class StartView extends VerticalLayout {
                 .set("padding", "0 32px")
                 .set("box-sizing", "border-box");
 
+        // Top row: copy text + stat box
         HorizontalLayout heroTop = new HorizontalLayout();
         heroTop.setWidthFull();
         heroTop.setAlignItems(FlexComponent.Alignment.START);
         heroTop.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
+        // Left: headline, subtitle, button
         VerticalLayout copy = new VerticalLayout();
         copy.setPadding(false);
         copy.setSpacing(false);
-        copy.setWidth("760px");
+        copy.setWidth("720px");
 
-        H1 title = new H1("Finde liebevolle Tiersitter in deiner Nähe");
+        H1 title = new H1("Finde liebevolle Tierhalter in deiner Nähe");
         title.getStyle()
                 .set("font-size", "42px")
                 .set("line-height", "1.12")
-                .set("letter-spacing", "1px")
-                .set("margin", "0 0 14px 0")
+                .set("letter-spacing", "0.5px")
+                .set("margin", "0 0 12px 0")
                 .set("color", DARK)
                 .set("font-weight", "800");
 
         Paragraph subtitle = new Paragraph("Vertrauenswürdige Betreuung für Hunde, Katzen und Kleintiere.");
         subtitle.getStyle()
-                .set("font-size", "18px")
-                .set("margin", "0 0 28px 0")
+                .set("font-size", "17px")
+                .set("margin", "0 0 32px 0")
                 .set("color", "#7b7069");
 
-        HorizontalLayout actions = new HorizontalLayout();
-        actions.setSpacing(true);
-
-        Button primaryButton = new Button("Jetzt Sitter finden");
-        primaryButton.getStyle()
-                .set("background", BROWN)
+        // Single "Auftrag anbieten" button (+ prefix icon)
+        Button createOfferBtn = new Button();
+        Span plusIcon = new Span("+ ");
+        plusIcon.getStyle().set("font-size", "18px").set("font-weight", "900");
+        Span btnLabel = new Span("Auftrag anbieten");
+        createOfferBtn.getElement().appendChild(plusIcon.getElement(), btnLabel.getElement());
+        createOfferBtn.getStyle()
+                .set("background", DARK)
                 .set("color", "white")
-                .set("border-radius", "26px")
-                .set("padding", "0 34px")
-                .set("height", "50px")
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        primaryButton.addClickListener(event -> onFindSitterClicked());
-
-        Button secondaryButton = new Button("Auftrag anbieten");
-        secondaryButton.getStyle()
-                .set("background", "white")
-                .set("color", BROWN)
-                .set("border", "1px solid #eadfce")
-                .set("border-radius", "26px")
+                .set("border-radius", "28px")
                 .set("padding", "0 30px")
-                .set("height", "50px")
+                .set("height", "52px")
+                .set("font-size", "16px")
                 .set("font-weight", "700")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        secondaryButton.addClickListener(event -> onCreateOfferClicked());
+                .set("cursor", "pointer")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("gap", "4px");
+        createOfferBtn.addClickListener(event -> onCreateOfferClicked());
 
-        actions.add(primaryButton, secondaryButton);
+        copy.add(title, subtitle, createOfferBtn);
 
-        copy.add(title, subtitle, actions);
-
+        // Right: stat box
         Div statBox = new Div();
         statBox.getStyle()
                 .set("background", "white")
                 .set("border-radius", "28px")
                 .set("padding", "26px 34px")
                 .set("width", "210px")
+                .set("min-width", "210px")
                 .set("margin-top", "10px")
                 .set("box-shadow", CARD_SHADOW);
 
@@ -189,7 +168,8 @@ public class StartView extends VerticalLayout {
                 .set("margin-bottom", "8px");
 
         H2 statHeadline = new H2();
-        statHeadline.getElement().setProperty("innerHTML", "128 neue<br>Betreuer<br>in deiner<br>Umgebung");
+        statHeadline.getElement().setProperty("innerHTML",
+                "128 neue<br>Halter<br>in deiner<br>Umgebung");
         statHeadline.getStyle()
                 .set("font-size", "26px")
                 .set("line-height", "1.12")
@@ -202,138 +182,168 @@ public class StartView extends VerticalLayout {
                 .set("color", "#6f6862");
 
         statBox.add(available, statHeadline, rating);
-
         heroTop.add(copy, statBox);
 
+        // Search / filter bar
+        Div searchBar = createSearchBar();
+
+        // Separator
         Hr line = new Hr();
         line.getStyle()
                 .set("margin", "44px 0 0 0")
                 .set("border", "none")
                 .set("border-top", "1px solid #eadfce");
 
-        hero.add(heroTop, createSearchBar(), line);
-
+        hero.add(heroTop, searchBar, line);
         return hero;
     }
 
-    private Component createSearchBar() {
-        HorizontalLayout search = new HorizontalLayout();
-        search.setAlignItems(FlexComponent.Alignment.END);
-        search.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        search.setSpacing(true);
-
-        search.getStyle()
-                .set("width", "100%")
-                .set("max-width", "920px")
-                .set("min-height", "82px")
+    // ── Compact filter / search bar ───────────────────────────────────────
+    private Div createSearchBar() {
+        Div bar = new Div();
+        bar.getStyle()
+                .set("display", "flex")
+                .set("align-items", "center")
                 .set("background", "white")
                 .set("border-radius", "32px")
                 .set("box-shadow", "0 12px 30px rgba(74, 52, 40, 0.08)")
-                .set("padding", "14px 18px")
+                .set("padding", "16px 24px")
                 .set("box-sizing", "border-box")
-                .set("margin", "36px auto 0 auto");
+                .set("margin", "36px auto 0 auto")
+                .set("max-width", "860px")
+                .set("gap", "0");
 
-        startDateField = new DatePicker("Von");
-        startDateField.setPlaceholder("Startdatum");
-        startDateField.setValue(LocalDate.now().plusDays(7));
-        styleSearchField(startDateField);
+        // Wann? field
+        Div wannField = filterPill(
+                "📅", "Wann?", "15.–18. Juni", true,
+                () -> onFilterWannClicked());
 
-        endDateField = new DatePicker("Bis");
-        endDateField.setPlaceholder("Enddatum");
-        endDateField.setValue(LocalDate.now().plusDays(10));
-        styleSearchField(endDateField);
+        // Divider
+        Div div1 = verticalDivider();
 
-        minPriceField = new NumberField("Verdienst ab");
-        minPriceField.setPlaceholder("80 €");
-        minPriceField.setValue(80.0);
-        minPriceField.setStep(5.0);
-        minPriceField.setSuffixComponent(new Span("€"));
-        styleSearchField(minPriceField);
+        // Verdienst field
+        Div verdienstField = filterPill(
+                "€", "Verdienst", "ab 80 €", false,
+                () -> onFilterVerdienstClicked());
 
-        maxDistanceField = new IntegerField("Umkreis");
-        maxDistanceField.setPlaceholder("5 km");
-        maxDistanceField.setValue(5);
-        maxDistanceField.setMin(1);
-        maxDistanceField.setMax(100);
-        maxDistanceField.setStepButtonsVisible(true);
-        maxDistanceField.setSuffixComponent(new Span("km"));
-        styleSearchField(maxDistanceField);
+        // Divider
+        Div div2 = verticalDivider();
 
-        searchButton = new Button(new Icon(VaadinIcon.SEARCH));
-        searchButton.setAriaLabel("Suche starten");
-        searchButton.getStyle()
-                .set("width", "52px")
-                .set("height", "52px")
-                .set("min-width", "52px")
+        // Entfernung field
+        Div entfernungField = filterPill(
+                "↕", "Entfernung", "bis 5 km", false,
+                () -> onFilterEntfernungClicked());
+
+        // Search icon button – navigates to PetsitterFilterView
+        Button searchBtn = new Button(new Icon(VaadinIcon.SEARCH));
+        searchBtn.setAriaLabel("Suche starten");
+        searchBtn.getStyle()
+                .set("width", "48px")
+                .set("height", "48px")
+                .set("min-width", "48px")
                 .set("border-radius", "50%")
                 .set("background", BROWN)
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
-                .set("margin-bottom", "2px");
-        searchButton.addClickListener(event -> onSearchClicked());
+                .set("margin-left", "16px")
+                .set("flex-shrink", "0");
+        searchBtn.addClickListener(e -> onSearchClicked());
 
-        search.add(
-                startDateField,
-                endDateField,
-                minPriceField,
-                maxDistanceField,
-                searchButton
-        );
-
-        return search;
+        bar.add(wannField, div1, verdienstField, div2, entfernungField, searchBtn);
+        return bar;
     }
 
-    private void styleSearchField(Component component) {
-        component.getStyle()
-                .set("min-width", "150px")
-                .set("flex", "1");
+    /** A single "pill" item inside the search bar (icon + label + value). */
+    private Div filterPill(String icon, String label, String value, boolean first,
+                           Runnable onClick) {
+        Div pill = new Div();
+        pill.getStyle()
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("gap", "10px")
+                .set("flex", "1")
+                .set("padding", first ? "0 20px 0 0" : "0 20px")
+                .set("cursor", "pointer");
+        pill.addClickListener(e -> onClick.run());
+
+        Span iconSpan = new Span(icon);
+        iconSpan.getStyle()
+                .set("font-size", "20px")
+                .set("color", BROWN)
+                .set("flex-shrink", "0");
+
+        VerticalLayout text = new VerticalLayout();
+        text.setPadding(false);
+        text.setSpacing(false);
+
+        Span labelSpan = new Span(label);
+        labelSpan.getStyle()
+                .set("font-size", "11px")
+                .set("color", "#9e8c7b")
+                .set("font-weight", "700")
+                .set("letter-spacing", "0.3px");
+
+        Span valueSpan = new Span(value);
+        valueSpan.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("color", DARK);
+
+        text.add(labelSpan, valueSpan);
+        pill.add(iconSpan, text);
+        return pill;
     }
 
+    private Div verticalDivider() {
+        Div d = new Div();
+        d.getStyle()
+                .set("width", "1px")
+                .set("height", "36px")
+                .set("background", "#e8ddd0")
+                .set("flex-shrink", "0");
+        return d;
+    }
+
+    // ── Offer cards section ───────────────────────────────────────────────
     private Component createOfferSection() {
         Div section = new Div();
-
         section.getStyle()
                 .set("position", "relative")
                 .set("z-index", "1")
                 .set("max-width", "1180px")
                 .set("margin", "34px auto 0 auto")
-                .set("padding", "0 32px 40px 32px")
+                .set("padding", "0 32px 60px 32px")
                 .set("box-sizing", "border-box");
 
-        H2 heading = new H2("Aktuelle Tiersitter-Angebote");
+        H2 heading = new H2("Aktuelle Tierhalter-Angebote");
         heading.getStyle()
-                .set("font-size", "30px")
+                .set("font-size", "28px")
                 .set("margin", "0 0 22px 0")
-                .set("color", DARK);
+                .set("color", DARK)
+                .set("font-weight", "800");
 
-        offerGrid = new Div();
-        offerGrid.getStyle()
+        Div grid = new Div();
+        grid.getStyle()
                 .set("display", "grid")
-                .set("grid-template-columns", "repeat(auto-fit, minmax(310px, 1fr))")
-                .set("gap", "38px");
+                .set("grid-template-columns", "repeat(auto-fit, minmax(300px, 1fr))")
+                .set("gap", "32px");
 
-        renderOffers(getDemoOffers());
+        getDemoOffers().forEach(offer -> grid.add(offerCard(offer)));
 
-        section.add(heading, offerGrid);
+        section.add(heading, grid);
         return section;
     }
 
-    private void renderOffers(List<Offer> offers) {
-        offerGrid.removeAll();
-
-        offers.forEach(offer -> offerGrid.add(offerCard(offer)));
-    }
-
+    // ── Single offer card ─────────────────────────────────────────────────
     private Component offerCard(Offer offer) {
         Div card = new Div();
-
         card.getStyle()
                 .set("background", "white")
-                .set("border-radius", "26px")
+                .set("border-radius", "24px")
                 .set("box-shadow", CARD_SHADOW)
                 .set("overflow", "hidden")
-                .set("min-height", "310px")
+                .set("cursor", "pointer")
                 .set("transition", "transform 0.2s ease, box-shadow 0.2s ease");
 
         card.getElement().executeJs("""
@@ -347,133 +357,118 @@ public class StartView extends VerticalLayout {
                 });
                 """);
 
+        // Image area (solid colour block)
         Div imageArea = new Div();
         imageArea.getStyle()
-                .set("height", "150px")
+                .set("height", "148px")
                 .set("background", offer.topColor())
                 .set("position", "relative")
-                .set("border-radius", "16px")
-                .set("margin", "14px 14px 0 14px")
+                .set("border-radius", "14px")
+                .set("margin", "12px 12px 0 12px")
                 .set("overflow", "hidden");
 
-        Span rating = new Span(stars(offer.stars()));
-        rating.getStyle()
+        // Stars badge (top-left)
+        Span starsBadge = new Span(stars(offer.stars()));
+        starsBadge.getStyle()
                 .set("position", "absolute")
-                .set("top", "12px")
-                .set("left", "14px")
-                .set("background", "rgba(69, 77, 62, 0.55)")
+                .set("top", "10px")
+                .set("left", "12px")
+                .set("background", "rgba(60, 60, 50, 0.50)")
                 .set("color", "#ffdf4a")
-                .set("font-size", "13px")
-                .set("letter-spacing", "2px")
-                .set("border-radius", "16px")
-                .set("padding", "6px 13px")
-                .set("z-index", "2");
-
-        Span verified = new Span("✓ Verifiziert");
-        verified.getStyle()
-                .set("position", "absolute")
-                .set("top", "12px")
-                .set("right", "12px")
-                .set("background", "white")
-                .set("color", "#6b9a75")
                 .set("font-size", "12px")
-                .set("font-weight", "700")
-                .set("border-radius", "16px")
-                .set("padding", "7px 14px")
-                .set("z-index", "2");
+                .set("letter-spacing", "1.5px")
+                .set("border-radius", "14px")
+                .set("padding", "5px 11px");
 
-        Span animalSpan = new Span(offer.animal());
-        animalSpan.getStyle()
-                .set("position", "absolute")
-                .set("top", "42px")
-                .set("left", "50%")
-                .set("transform", "translateX(-50%)")
-                .set("font-size", "56px")
-                .set("z-index", "2");
+        // Verified badge (top-right) – only when offer is verified
+        if (offer.verified()) {
+            Span verifiedBadge = new Span("✓ Verifiziert");
+            verifiedBadge.getStyle()
+                    .set("position", "absolute")
+                    .set("top", "10px")
+                    .set("right", "10px")
+                    .set("background", "white")
+                    .set("color", "#6b9a75")
+                    .set("font-size", "12px")
+                    .set("font-weight", "700")
+                    .set("border-radius", "14px")
+                    .set("padding", "5px 12px");
+            imageArea.add(starsBadge, verifiedBadge);
+        } else {
+            imageArea.add(starsBadge);
+        }
 
-        Div stripe = new Div();
-        stripe.getStyle()
-                .set("position", "absolute")
-                .set("left", "0")
-                .set("right", "0")
-                .set("bottom", "0")
-                .set("height", "54px")
-                .set("background", offer.stripeColor())
-                .set("border-radius", "18px 18px 0 0")
-                .set("z-index", "1");
-
-        imageArea.add(rating, verified, animalSpan, stripe);
-
+        // Card body
         Div body = new Div();
-        body.getStyle()
-                .set("padding", "18px 22px 20px 22px");
+        body.getStyle().set("padding", "16px 18px 18px 18px");
+
+        // Title row: title + heart icon
+        HorizontalLayout titleRow = new HorizontalLayout();
+        titleRow.setWidthFull();
+        titleRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        titleRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        titleRow.getStyle().set("margin-bottom", "10px");
 
         H3 cardTitle = new H3(offer.title());
         cardTitle.getStyle()
-                .set("font-size", "21px")
+                .set("font-size", "18px")
+                .set("font-weight", "800")
                 .set("line-height", "1.2")
-                .set("margin", "0 0 14px 0")
+                .set("margin", "0")
                 .set("color", DARK);
 
+        Button heartBtn = new Button(new Icon(VaadinIcon.HEART_O));
+        heartBtn.setAriaLabel("Als Favorit markieren");
+        heartBtn.getStyle()
+                .set("width", "34px")
+                .set("height", "34px")
+                .set("min-width", "34px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("color", "#b0a090")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("flex-shrink", "0");
+        heartBtn.addClickListener(e -> {
+            e.getSource(); // consumed – stop card click from firing
+            onFavoriteClicked(offer);
+        });
+        // prevent the heart click from bubbling up to the card click
+        heartBtn.getElement().addEventListener("click", ev -> {}).addEventData("event.stopPropagation()");
+
+        titleRow.add(cardTitle, heartBtn);
+
+        // Facts row: Zeitraum | Verdienst | Entfernung
         HorizontalLayout facts = new HorizontalLayout();
         facts.setWidthFull();
         facts.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         facts.setAlignItems(FlexComponent.Alignment.START);
+        facts.getStyle().set("gap", "4px");
 
         facts.add(
-                fact("Zeitraum", offer.date()),
-                fact("Verdienst", offer.price()),
-                fact("Entfernung", offer.distance())
+                factItem("Zeitraum",   offer.date()),
+                factItem("Verdienst",  offer.price()),
+                factItem("Entfernung", offer.distance())
         );
 
-        HorizontalLayout bottom = new HorizontalLayout();
-        bottom.setWidthFull();
-        bottom.setAlignItems(FlexComponent.Alignment.CENTER);
-        bottom.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        bottom.getStyle().set("margin-top", "18px");
-
-        Button detailsButton = new Button("Details ansehen");
-        detailsButton.getStyle()
-                .set("height", "32px")
-                .set("background", "#f5e3bf")
-                .set("color", DARK)
-                .set("border-radius", "18px")
-                .set("font-size", "12px")
-                .set("font-weight", "700")
-                .set("padding", "0 20px")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        detailsButton.addClickListener(event -> onOfferDetailsClicked(offer));
-
-        Button favoriteButton = new Button(new Icon(VaadinIcon.HEART_O));
-        favoriteButton.setAriaLabel("Als Favorit markieren");
-        favoriteButton.getStyle()
-                .set("width", "36px")
-                .set("height", "36px")
-                .set("border-radius", "50%")
-                .set("background", "transparent")
-                .set("color", BROWN)
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        favoriteButton.addClickListener(event -> onFavoriteClicked(offer));
-
-        bottom.add(detailsButton, favoriteButton);
-
-        body.add(cardTitle, facts, bottom);
+        body.add(titleRow, facts);
         card.add(imageArea, body);
+
+        // Open detail dialog when clicking anywhere on the card
+        card.addClickListener(e -> openOfferDialog(offer));
 
         return card;
     }
 
-    private Component fact(String label, String value) {
+    private Component factItem(String label, String value) {
         VerticalLayout box = new VerticalLayout();
         box.setPadding(false);
         box.setSpacing(false);
 
         Span labelSpan = new Span(label);
         labelSpan.getStyle()
-                .set("font-size", "12px")
-                .set("color", "#7d746c");
+                .set("font-size", "11px")
+                .set("color", "#9e8c7b");
 
         Span valueSpan = new Span(value);
         valueSpan.getStyle()
@@ -485,188 +480,53 @@ public class StartView extends VerticalLayout {
         return box;
     }
 
-    private Component createTrustBanner() {
-        HorizontalLayout banner = new HorizontalLayout();
-        banner.setAlignItems(FlexComponent.Alignment.CENTER);
-        banner.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-
-        banner.getStyle()
-                .set("position", "relative")
-                .set("z-index", "3")
-                .set("max-width", "1180px")
-                .set("width", "calc(100% - 64px)")
-                .set("margin", "40px auto 18px auto")
-                .set("background", "#fff1d8")
-                .set("border-radius", "28px")
-                .set("box-shadow", "0 14px 40px rgba(74, 52, 40, 0.10)")
-                .set("padding", "28px 36px")
-                .set("box-sizing", "border-box");
-
-        VerticalLayout text = new VerticalLayout();
-        text.setPadding(false);
-        text.setSpacing(false);
-
-        H2 title = new H2("Sicher betreut, transparent bezahlt");
-        title.getStyle()
-                .set("font-size", "28px")
-                .set("margin", "0 0 8px 0")
-                .set("color", DARK);
-
-        Paragraph desc = new Paragraph(
-                "Pawsitter kombiniert verifizierte Accounts, Bewertungsprofile und klare Auftragsdetails, damit Tierhalter und Tiersitter schnell Vertrauen aufbauen."
-        );
-        desc.getStyle()
-                .set("font-size", "16px")
-                .set("max-width", "680px")
-                .set("margin", "0")
-                .set("color", "#7b7069");
-
-        text.add(title, desc);
-
-        VerticalLayout checks = new VerticalLayout();
-        checks.setPadding(false);
-        checks.setSpacing(true);
-
-        checks.add(
-                checkItem("Verifizierte Profile", "#6f9b6e"),
-                checkItem("Sternebewertungen", "#5e8ca0"),
-                checkItem("Faire Vergütung", "#e5a36f")
-        );
-
-        Button closeButton = new Button(new Icon(VaadinIcon.CLOSE));
-        closeButton.setAriaLabel("Hinweis schließen");
-        closeButton.getStyle()
-                .set("background", "transparent")
-                .set("color", DARK)
-                .set("box-shadow", "none")
-                .set("font-size", "20px")
-                .set("cursor", "pointer");
-
-        closeButton.addClickListener(event -> banner.setVisible(false));
-
-        banner.add(text, checks, closeButton);
-        return banner;
-    }
-
-    private Component checkItem(String text, String color) {
-        HorizontalLayout item = new HorizontalLayout();
-        item.setAlignItems(FlexComponent.Alignment.CENTER);
-        item.setSpacing(true);
-
-        Span dot = new Span("✓");
-        dot.getStyle()
-                .set("width", "24px")
-                .set("height", "24px")
-                .set("border-radius", "50%")
-                .set("background", color)
-                .set("color", "white")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("font-size", "13px")
-                .set("font-weight", "800");
-
-        Span label = new Span(text);
-        label.getStyle()
-                .set("font-size", "15px")
-                .set("font-weight", "800")
-                .set("color", DARK);
-
-        item.add(dot, label);
-        return item;
-    }
-
-
-    private Button pillButton(String text, String background, String color) {
-        Button button = new Button(text);
-
-        button.getStyle()
-                .set("height", "46px")
-                .set("padding", "0 42px")
-                .set("border-radius", "28px")
-                .set("background", background)
-                .set("color", color)
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-
-        return button;
-    }
-
+    // ── Star helper ───────────────────────────────────────────────────────
     private String stars(int filled) {
-        StringBuilder builder = new StringBuilder();
-
+        StringBuilder sb = new StringBuilder();
         for (int i = 0; i < 5; i++) {
-            builder.append(i < filled ? "★" : "☆");
+            sb.append(i < filled ? "★" : "☆");
         }
-
-        return builder.toString();
+        return sb.toString();
     }
 
+    // ── Demo data ─────────────────────────────────────────────────────────
     private List<Offer> getDemoOffers() {
         return List.of(
-                new Offer(1L, "🐕", "Hundesitting für Bruno", "15.–18. Juni", "145 €", "2,4 km entfernt", "#dec18d", "#b69d70", 4),
-                new Offer(2L, "🐈", "Katzenbetreuung Mia", "20.–22. Juni", "90 €", "1,8 km entfernt", "#f1b47a", "#c49368", 3),
-                new Offer(3L, "🦮", "Gassi-Service vormittags", "Mo–Fr, 8–10 Uhr", "120 €", "3,1 km entfernt", "#93b8c9", "#7595a5", 4),
-                new Offer(4L, "🐕‍🦺", "Hundebetreuung am Wochenende", "22.–23. Juni", "110 €", "4,0 km entfernt", "#94b883", "#6f9164", 4),
-                new Offer(5L, "🐰", "Kleintierpflege gesucht", "24.–27. Juni", "75 €", "2,9 km entfernt", "#f1dfb9", "#c1b399", 2),
-                new Offer(6L, "🐱", "Katzenbesuch abends", "18.–21. Juni", "85 €", "1,2 km entfernt", "#bad6df", "#91aab3", 3),
-                new Offer(7L, "🐹", "Kleintierbetreuung am Abend", "28.–30. Juni", "65 €", "3,7 km entfernt", "#f4d6a7", "#c9a77b", 4),
-                new Offer(8L, "🐶", "Urlaubsbetreuung für Hund", "01.–07. Juli", "260 €", "5,0 km entfernt", "#d7c59a", "#aa9367", 5),
-                new Offer(9L, "🐈‍⬛", "Katzenfütterung morgens", "03.–06. Juli", "70 €", "0,9 km entfernt", "#a9c6bd", "#7f9f94", 4)
+                new Offer(1L, "Hundesitting für Bruno",      "15.–18. Juni",     "145 €", "2,4 km",     "#dec18d", 4, true),
+                new Offer(2L, "Katzenbetreuung Mia",         "20.–22. Juni",     "90 €",  "1,8 km",     "#f1b47a", 3, true),
+                new Offer(3L, "Gassi-Service vormittags",    "Mo–Fr, 8–10 Uhr",  "120 €", "3,1 km",     "#93b8c9", 4, true),
+                new Offer(4L, "Wochenende mit Nala",         "28.–30. Juni",     "160 €", "4,2 km entfernt", "#94b883", 4, true),
+                new Offer(5L, "Kleintierpflege zuhause",     "12.–16. Juli",     "110 €", "2,9 km entfernt", "#f1dfb9", 3, false),
+                new Offer(6L, "Urlaubsbetreuung Katze",      "01.–07. Juli",     "210 €", "5,0 km entfernt", "#bad6df", 3, true)
         );
     }
 
+    // ── Backend-Interface hooks ───────────────────────────────────────────
     /*
-     * Backend-/Service-Hooks:
      * Diese Methoden sind bewusst vorbereitet.
-     * Hier kann dein Team später Navigation, Service-Calls, Repository-Zugriffe
-     * oder State-Updates ergänzen.
+     * Hier kann das Backend-Team später Service-Calls, Repository-Zugriffe
+     * oder Navigation ergänzen.
      */
 
     private void onSearchClicked() {
-        LocalDate startDate = startDateField.getValue();
-        LocalDate endDate = endDateField.getValue();
-        Double minPrice = minPriceField.getValue();
-        Integer maxDistance = maxDistanceField.getValue();
-
-        System.out.println("Suche gestartet:");
-        System.out.println("Von: " + startDate);
-        System.out.println("Bis: " + endDate);
-        System.out.println("Verdienst ab: " + minPrice);
-        System.out.println("Umkreis: " + maxDistance);
-
-        // TODO: Filter-Parameter an Backend übergeben, z. B.:
-        // offerService.searchOffers(startDate, endDate, minPrice, maxDistance);
+        System.out.println("Suche (Lupe) geklickt – navigiere zu Tierhalter-Suche");
+        // TODO: aktuelle Filter-Werte an PetsitterFilterView übergeben
         UI.getCurrent().navigate("petsitter-suche");
     }
 
-    private void onOfferDetailsClicked(Offer offer) {
-        System.out.println("Details geöffnet für Offer-ID: " + offer.id());
-
-        // TODO:
-        // UI.getCurrent().navigate("angebote/" + offer.id());
+    private void onFilterWannClicked() {
+        System.out.println("Filter 'Wann?' geklickt");
+        // TODO: Datepicker-Dialog öffnen oder direkt Feld aktivieren
     }
 
-    private void onFavoriteClicked(Offer offer) {
-        System.out.println("Favorit geklickt für Offer-ID: " + offer.id());
-
-        // TODO:
-        // favoriteService.toggleFavorite(offer.id());
+    private void onFilterVerdienstClicked() {
+        System.out.println("Filter 'Verdienst' geklickt");
+        // TODO: Verdienst-Eingabefeld öffnen / fokussieren
     }
 
-    private void onFindSitterClicked() {
-        System.out.println("Tiersitter finden geklickt");
-
-        // TODO:
-        // UI.getCurrent().navigate("tiersitter-finden");
-    }
-
-    private void onFindOwnerClicked() {
-        System.out.println("Tierhalter finden geklickt");
-
-        // TODO:
-        // UI.getCurrent().navigate("tierhalter-finden");
+    private void onFilterEntfernungClicked() {
+        System.out.println("Filter 'Entfernung' geklickt");
+        // TODO: Entfernungs-Eingabefeld öffnen / fokussieren
     }
 
     private void onCreateOfferClicked() {
@@ -674,45 +534,34 @@ public class StartView extends VerticalLayout {
         UI.getCurrent().navigate("auftrag-erstellen");
     }
 
-    private void onProfileClicked() {
-        System.out.println("Profil geklickt");
-
-        // TODO:
-        // UI.getCurrent().navigate("profil");
+    private void openOfferDialog(Offer offer) {
+        System.out.println("Kachel angeklickt – öffne Details für Offer-ID: " + offer.id());
+        new PetsitterDetailPopUp(
+                offer.id(), offer.title(), offer.date(),
+                offer.price(), offer.distance(),
+                offer.topColor(), offer.stars()
+        ).open();
     }
 
-    private void onLogoClicked() {
-        System.out.println("Logo geklickt");
-
-        // TODO:
-        // UI.getCurrent().navigate("");
+    private void onFavoriteClicked(Offer offer) {
+        System.out.println("Favorit geklickt für Offer-ID: " + offer.id());
+        // TODO: favoriteService.toggleFavorite(offer.id());
     }
 
-    private void onFooterLinkClicked(String route) {
-        System.out.println("Footer-Link geklickt: " + route);
-
-        // TODO:
-        // UI.getCurrent().navigate(route);
+    private void onFindOwnerClicked() {
+        System.out.println("Tierhalter finden geklickt");
+        // TODO: UI.getCurrent().navigate("tierhalter-finden");
     }
 
-    private void onSocialClicked(String platform) {
-        System.out.println("Social-Link geklickt: " + platform);
-
-        // TODO:
-        // Externe Links öffnen, z. B.:
-        // UI.getCurrent().getPage().open("https://...");
-    }
-
+    // ── Data record ───────────────────────────────────────────────────────
     private record Offer(
-            Long id,
-            String animal,
+            Long   id,
             String title,
             String date,
             String price,
             String distance,
             String topColor,
-            String stripeColor,
-            int stars
-    ) {
-    }
+            int    stars,
+            boolean verified
+    ) {}
 }

@@ -8,6 +8,8 @@ import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -25,8 +27,8 @@ import com.vaadin.flow.server.VaadinService;
 import jakarta.annotation.security.PermitAll;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -41,6 +43,19 @@ public class UserView extends VerticalLayout {
     private static final String CREAM    = "#fbf8f1";
     private static final String CARD_BG  = "#ffffff";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+    private static final List<String> NATIONALITIES = List.of(
+            "deutsch",
+            "österreichisch",
+            "schweizerisch",
+            "französisch",
+            "italienisch",
+            "spanisch",
+            "polnisch",
+            "niederländisch",
+            "türkisch",
+            "ukrainisch",
+            "andere"
+    );
 
     private final UserService userService;
     private UserProfileDto currentProfile;
@@ -591,8 +606,8 @@ public class UserView extends VerticalLayout {
             TextField displayNameField = styledTextField("Anzeigename", displayName());
             TextField mailField = styledTextField("Email", currentProfile.email());
             TextField phoneField = styledTextField("Telefonnummer", valueOrEmpty(currentProfile.phone()));
-            TextField dateField = styledTextField("Geburtsdatum", formatDateValue(currentProfile.birthDate()));
-            TextField natField = styledTextField("Nationalität", valueOrEmpty(currentProfile.nationality()));
+            DatePicker birthDatePicker = styledDatePicker("Geburtsdatum", currentProfile.birthDate());
+            ComboBox<String> nationalityField = styledComboBox("Nationalität", valueOrEmpty(currentProfile.nationality()));
             TextField streetField = styledTextField("Straße", currentProfile.street());
             TextField houseNumberField = styledTextField("Hausnummer", currentProfile.houseNumber());
             TextField postalCodeField = styledTextField("PLZ", currentProfile.postalCode());
@@ -604,22 +619,14 @@ public class UserView extends VerticalLayout {
             Button cancel = cancelBtn("Abbrechen");
 
             save.addClickListener(e -> {
-                LocalDate birthDate;
-                try {
-                    birthDate = parseBirthDate(dateField.getValue());
-                } catch (IllegalArgumentException ex) {
-                    showError(ex.getMessage());
-                    return;
-                }
-
                 String oldEmail = currentProfile.email();
                 UserAuthResult profileResult = userService.updateCurrentUserProfile(profileUpdateRequest(
                         firstNameField.getValue(),
                         lastNameField.getValue(),
                         displayNameField.getValue(),
                         phoneField.getValue(),
-                        birthDate,
-                        natField.getValue(),
+                        birthDatePicker.getValue(),
+                        nationalityField.getValue(),
                         currentProfile.language(),
                         currentProfile.bio(),
                         streetField.getValue(),
@@ -656,8 +663,8 @@ public class UserView extends VerticalLayout {
             panel.add(buildDataRow("Anzeigename", null, true, displayNameField));
             panel.add(buildDataRow("Email", null, true, mailField));
             panel.add(buildDataRow("Telefonnummer", null, true, phoneField));
-            panel.add(buildDataRow("Geburtsdatum", null, true, dateField));
-            panel.add(buildDataRow("Nationalität", null, true, natField));
+            panel.add(buildDataRow("Geburtsdatum", null, true, birthDatePicker));
+            panel.add(buildDataRow("Nationalität", null, true, nationalityField));
             panel.add(buildDataRow("Straße", null, true, streetField));
             panel.add(buildDataRow("Hausnummer", null, true, houseNumberField));
             panel.add(buildDataRow("PLZ", null, true, postalCodeField));
@@ -851,17 +858,6 @@ public class UserView extends VerticalLayout {
         );
     }
 
-    private LocalDate parseBirthDate(String value) {
-        if (isBlank(value)) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(value.trim(), DATE_FORMATTER);
-        } catch (DateTimeParseException ex) {
-            throw new IllegalArgumentException("Geburtsdatum bitte im Format TT.MM.JJJJ eingeben.");
-        }
-    }
-
     private String currentRequestIp() {
         if (VaadinService.getCurrentRequest() == null) {
             return "unknown";
@@ -947,6 +943,40 @@ public class UserView extends VerticalLayout {
         tf.setValue(valueOrEmpty(placeholder));
         tf.setWidthFull();
         return tf;
+    }
+
+    private DatePicker styledDatePicker(String label, LocalDate value) {
+        DatePicker picker = new DatePicker(label);
+        picker.setValue(value);
+        picker.setLocale(Locale.GERMANY);
+        picker.setPlaceholder("TT.MM.JJJJ");
+        picker.setWidthFull();
+        picker.setI18n(new DatePicker.DatePickerI18n()
+                .setMonthNames(List.of(
+                        "Januar", "Februar", "März", "April", "Mai", "Juni",
+                        "Juli", "August", "September", "Oktober", "November", "Dezember"
+                ))
+                .setWeekdays(List.of(
+                        "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"
+                ))
+                .setWeekdaysShort(List.of("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"))
+                .setToday("Heute")
+                .setCancel("Abbrechen")
+                .setFirstDayOfWeek(1));
+        return picker;
+    }
+
+    private ComboBox<String> styledComboBox(String label, String value) {
+        ComboBox<String> comboBox = new ComboBox<>(label);
+        comboBox.setItems(NATIONALITIES);
+        comboBox.setAllowCustomValue(true);
+        comboBox.addCustomValueSetListener(event -> comboBox.setValue(event.getDetail()));
+        comboBox.setPlaceholder("Nationalität auswählen");
+        if (!isBlank(value)) {
+            comboBox.setValue(value);
+        }
+        comboBox.setWidthFull();
+        return comboBox;
     }
 
     private TextArea styledTextArea(String label) {

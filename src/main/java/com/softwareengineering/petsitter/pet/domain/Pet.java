@@ -32,7 +32,7 @@ import java.util.UUID;
  * @see com.softwareengineering.petsitter.offer.domain.Offer
  */
 @Entity
-@Table(name = "pets")
+@Table(name = "pet")
 public class Pet {
 
     /**
@@ -141,4 +141,3 @@ public class Pet {
         this.notes = notes;
     }
 }
-

@@ -31,7 +31,7 @@ import java.util.UUID;
  * - createdAt wird automatisch beim ersten Speichern gesetzt
  */
 @Entity
-@Table(name = "users")
+@Table(name = "`user`")
 public class User {
 
     /**

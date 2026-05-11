@@ -50,7 +50,7 @@ import java.util.UUID;
  * @see com.softwareengineering.petsitter.offerrequest.domain.OfferRequest
  */
 @Entity
-@Table(name = "bookings")
+@Table(name = "booking")
 public class Booking {
 
     /**
@@ -240,4 +240,3 @@ public class Booking {
         }
     }
 }
-

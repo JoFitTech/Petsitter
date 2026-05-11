@@ -52,7 +52,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(
-        name = "requests",
+        name = "request",
         uniqueConstraints = @UniqueConstraint(name = "uk_offer_requester", columnNames = {"offer_id", "requester_id"})
 )
 public class OfferRequest {
@@ -187,4 +187,3 @@ public class OfferRequest {
         updatedAt = LocalDateTime.now();
     }
 }
-

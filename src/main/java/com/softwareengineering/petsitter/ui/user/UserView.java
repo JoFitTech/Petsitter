@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.user;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
@@ -31,8 +32,10 @@ public class UserView extends VerticalLayout {
 
     private Button btnUeberMich;
     private Button btnMeineTiere;
+    private Button btnMeineAuftraege;
+    private Button btnMeineFavoriten;
     private Button btnPersAngaben;
-    private Button btnLogin;
+    private Button btnLogout;
     private Div contentPanel;
 
     public UserView(UserService userService) {
@@ -127,17 +130,21 @@ public class UserView extends VerticalLayout {
             .set("padding", "8px 0")
             .set("background", "transparent");
 
-        btnUeberMich   = sidebarBtn("Über mich");
-        btnMeineTiere  = sidebarBtn("Meine Tiere");
-        btnPersAngaben = sidebarBtn("Persönliche Angaben");
-        btnLogin       = sidebarBtn("Log in");
+        btnUeberMich      = sidebarBtn("Über mich");
+        btnMeineTiere     = sidebarBtn("Meine Tiere");
+        btnMeineAuftraege = sidebarBtn("Meine Aufträge");
+        btnMeineFavoriten = sidebarBtn("Meine Favoriten");
+        btnPersAngaben    = sidebarBtn("Persönliche Angaben");
+        btnLogout         = sidebarBtn("Log out");
 
-        btnUeberMich.addClickListener(e   -> { setActiveStyle(btnUeberMich);   showUeberMich(); });
-        btnMeineTiere.addClickListener(e  -> { setActiveStyle(btnMeineTiere);  showMeineTiere(); });
-        btnPersAngaben.addClickListener(e -> { setActiveStyle(btnPersAngaben); showPersAngaben(false); });
-        btnLogin.addClickListener(e       -> { setActiveStyle(btnLogin);       showLogin(); });
+        btnUeberMich.addClickListener(e      -> { setActiveStyle(btnUeberMich);      showUeberMich(); });
+        btnMeineTiere.addClickListener(e     -> { setActiveStyle(btnMeineTiere);     showMeineTiere(); });
+        btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
+        btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
+        btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(false); });
+        btnLogout.addClickListener(e         -> { setActiveStyle(btnLogout);         handleLogout(); });
 
-        sidebar.add(btnUeberMich, btnMeineTiere, btnPersAngaben, btnLogin);
+        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineFavoriten, btnPersAngaben, btnLogout);
         return sidebar;
     }
 
@@ -159,7 +166,7 @@ public class UserView extends VerticalLayout {
     }
 
     private void setActiveStyle(Button active) {
-        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnPersAngaben, btnLogin}) {
+        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineFavoriten, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
         active.getStyle().set("background", DARK).set("color", "white");
@@ -510,6 +517,32 @@ public class UserView extends VerticalLayout {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
+    // TAB 3 – MEINE AUFTRÄGE (Placeholder)
+    // ══════════════════════════════════════════════════════════════════════════
+    private void showMeineAuftraege() {
+        contentPanel.removeAll();
+        Div panel = cardPanel();
+        panel.add(panelHeader("Meine Aufträge"));
+        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
+        // TODO: Backend – userService.getMyOrders() laden und anzeigen
+        System.out.println("TODO: userService.getMyOrders()");
+        contentPanel.add(panel);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // TAB 4 – MEINE FAVORITEN (Placeholder)
+    // ══════════════════════════════════════════════════════════════════════════
+    private void showMeineFavoriten() {
+        contentPanel.removeAll();
+        Div panel = cardPanel();
+        panel.add(panelHeader("Meine Favoriten"));
+        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
+        // TODO: Backend – userService.getMyFavorites() laden und anzeigen
+        System.out.println("TODO: userService.getMyFavorites()");
+        contentPanel.add(panel);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
     // TAB 3 – PERSÖNLICHE ANGABEN (View mode)
     // ══════════════════════════════════════════════════════════════════════════
     private void showPersAngaben(boolean editMode) {
@@ -609,14 +642,12 @@ public class UserView extends VerticalLayout {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 4 – LOG IN (Placeholder)
+    // TAB 6 – LOG OUT
     // ══════════════════════════════════════════════════════════════════════════
-    private void showLogin() {
-        contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Log in"));
-        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
-        contentPanel.add(panel);
+    private void handleLogout() {
+        // TODO: Backend – AuthService.logout() / SecurityContextHolder.clearContext() aufrufen
+        System.out.println("TODO: AuthService.logout()");
+        UI.getCurrent().navigate("login");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

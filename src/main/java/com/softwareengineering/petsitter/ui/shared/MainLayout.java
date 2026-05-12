@@ -91,14 +91,14 @@ public class MainLayout extends AppLayout {
         nav.setSpacing(true);
         nav.setAlignItems(FlexComponent.Alignment.CENTER);
 
-        Button findSitterBtn = pillButton("Tiersitter finden", "#f6e3bd", DARK);
-        findSitterBtn.addClickListener(e -> UI.getCurrent().navigate("tierhalter-finden"));
-
-        Button findOwnerBtn = pillButton("Tierhalter finden", "#fff6e6", DARK);
-        findOwnerBtn.getStyle().set("border", "1px solid #ead5ae");
+        Button findOwnerBtn = pillButton("Tierhalter finden", "#f6e3bd", DARK);
         findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
 
-        nav.add(findSitterBtn, findOwnerBtn);
+        Button findSitterBtn = pillButton("Tiersitter finden", "#fff6e6", DARK);
+        findSitterBtn.getStyle().set("border", "1px solid #ead5ae");
+        findSitterBtn.addClickListener(e -> UI.getCurrent().navigate("tierhalter-finden"));
+
+        nav.add(findOwnerBtn, findSitterBtn);
 
         // Right: Icon buttons (Nachrichten, Favoriten, Profil)
         HorizontalLayout rightIcons = new HorizontalLayout();

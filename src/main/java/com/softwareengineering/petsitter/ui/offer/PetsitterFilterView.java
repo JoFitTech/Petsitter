@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.offer;
 
+import com.softwareengineering.petsitter.ui.shared.FilterPopUp;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
@@ -179,8 +180,10 @@ public class PetsitterFilterView extends VerticalLayout {
             .set("box-shadow", "0 6px 18px rgba(74,52,40,0.25)")
             .set("cursor", "pointer")
             .set("gap", "8px");
-        filterBtn.addClickListener(e ->
-            System.out.println("TODO: filterService.openFilterDialog()"));
+        filterBtn.addClickListener(e -> {
+            System.out.println("Filter-Button geklickt – öffne FilterPopUp");
+            new FilterPopUp().open();
+        });
 
         row.add(pill, filterBtn);
         return row;

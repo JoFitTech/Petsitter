@@ -169,11 +169,10 @@ public class MainLayout extends AppLayout {
         links.getStyle().set("gap", "28px");
 
         links.add(
-                footerLink("Über uns",    "ueber-uns"),
-                footerLink("Kontakt",     "kontakt"),
-                footerLink("Datenschutz", "datenschutz"),
-                footerLink("Impressum",   "impressum"),
-                footerLink("Hilfe",       "hilfe")
+                footerLink("Über uns",    "info"),
+                footerLink("Kontakt",     "info"),
+                footerLink("Datenschutz", "info"),
+                footerLink("Impressum",   "info")
         );
 
         // Social buttons
@@ -236,8 +235,8 @@ public class MainLayout extends AppLayout {
                 .set("padding", "0")
                 .set("cursor", "pointer");
         btn.addClickListener(e -> {
-            // TODO: UI.getCurrent().navigate(route);
-            System.out.println("Footer-Link: " + route);
+            System.out.println("Footer-Link geklickt: " + text + " -> navigiert zu: " + route);
+            UI.getCurrent().navigate(route);
         });
         return btn;
     }

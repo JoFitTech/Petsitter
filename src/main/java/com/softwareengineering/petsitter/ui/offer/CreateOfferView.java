@@ -20,13 +20,15 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.Route;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
-public class CreateOfferView extends VerticalLayout {
+public class CreateOfferView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK       = "#4a3428";
     private static final String BROWN      = "#7b5236";
@@ -61,24 +63,34 @@ public class CreateOfferView extends VerticalLayout {
         getStyle()
                 .set("background", LIGHT_BG)
                 .set("overflow-x", "hidden");
+    }
 
-        add(createPageWrapper());
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        removeAll();
+        java.util.List<String> modes = event.getLocation().getQueryParameters().getParameters().get("mode");
+        String mode = (modes != null && !modes.isEmpty()) ? modes.get(0) : "offer";
+        
+        String pageBg = "request".equals(mode) ? "#ebf6f0" : LIGHT_BG;
+        getStyle().set("background", pageBg);
+        
+        add(createPageWrapper(mode, pageBg));
     }
 
     // ── Page wrapper with background blobs ────────────────────────────────
-    private Component createPageWrapper() {
+    private Component createPageWrapper(String mode, String pageBg) {
         Div wrapper = new Div();
         wrapper.setWidthFull();
         wrapper.getStyle()
                 .set("position", "relative")
                 .set("overflow-x", "hidden")
-                .set("background", LIGHT_BG);
+                .set("background", pageBg);
 
-        wrapper.add(createBackgroundBlobs(), createContentSection());
+        wrapper.add(createBackgroundBlobs(mode), createContentSection(mode));
         return wrapper;
     }
 
-    private Component createBackgroundBlobs() {
+    private Component createBackgroundBlobs(String mode) {
         Div container = new Div();
 
         Div leftBlob = new Div();
@@ -88,7 +100,7 @@ public class CreateOfferView extends VerticalLayout {
                 .set("top", "60px")
                 .set("width", "400px")
                 .set("height", "400px")
-                .set("background", "#f6ead5")
+                .set("background", "request".equals(mode) ? "#e2f5ec" : "#f6ead5")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -99,7 +111,7 @@ public class CreateOfferView extends VerticalLayout {
                 .set("top", "100px")
                 .set("width", "440px")
                 .set("height", "440px")
-                .set("background", "#e7f0f0")
+                .set("background", "request".equals(mode) ? "#eef0fa" : "#e7f0f0")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -108,7 +120,7 @@ public class CreateOfferView extends VerticalLayout {
     }
 
     // ── Main content ──────────────────────────────────────────────────────
-    private Component createContentSection() {
+    private Component createContentSection(String mode) {
         Div section = new Div();
         section.getStyle()
                 .set("position", "relative")
@@ -130,13 +142,15 @@ public class CreateOfferView extends VerticalLayout {
         titleLayout.setPadding(false);
         titleLayout.setSpacing(false);
 
-        H1 headline = new H1("Neuen Auftrag erstellen");
+        String headlineText = "request".equals(mode) ? "Neuen Auftrag erstellen" : "Neues Angebot erstellen";
+        H1 headline = new H1(headlineText);
         headline.getStyle()
                 .set("font-size", "28px")
                 .set("color", DARK)
                 .set("margin", "0 0 4px 0");
 
-        Paragraph subtitle = new Paragraph("Details für deine Haustierbetreung angeben");
+        String subtitleText = "request".equals(mode) ? "Details für deine Haustierbetreuung angeben" : "Details für dein Betreuungsangebot angeben";
+        Paragraph subtitle = new Paragraph(subtitleText);
         subtitle.getStyle()
                 .set("font-size", "15px")
                 .set("color", "#7b7069")
@@ -170,8 +184,8 @@ public class CreateOfferView extends VerticalLayout {
                 .set("width", "100%");
 
         card.add(
-                createImageUploadSection(),
-                createImagePreviewSection(),
+                createImageUploadSection(mode),
+                createImagePreviewSection(mode),
                 createSpacer("16px"),
                 createTitleSection(),
                 createSpacer("16px"),
@@ -181,7 +195,7 @@ public class CreateOfferView extends VerticalLayout {
                 createSpacer("16px"),
                 createCareTypeSection(),
                 createSpacer("16px"),
-                createAdditionalInfoSection(),
+                createAdditionalInfoSection(mode),
                 createSpacer("24px"),
                 createActionButtons()
         );
@@ -198,7 +212,7 @@ public class CreateOfferView extends VerticalLayout {
     }
 
     // ── 1. Image upload button ────────────────────────────────────────────
-    private Component createImageUploadSection() {
+    private Component createImageUploadSection(String mode) {
         uploadBuffer = new MultiFileMemoryBuffer();
         imageUpload = new Upload(uploadBuffer);
         imageUpload.setAcceptedFileTypes("image/jpeg", "image/png", "image/webp", "image/gif");
@@ -206,7 +220,10 @@ public class CreateOfferView extends VerticalLayout {
         imageUpload.setMaxFileSize(10 * 1024 * 1024); // 10 MB
 
         // Style the upload button itself
-        Button uploadBtn = new Button("📷  Lade hier Bilder deiner Haustiere hoch");
+        // The mockup uses "von dir" for both, but logically request should be "deiner Haustiere". 
+        // We will stick to the exact mockup wording as requested by the user:
+        String btnText = "request".equals(mode) ? "📷  Lade hier Bilder von dir hoch" : "📷  Lade hier Bilder von dir hoch";
+        Button uploadBtn = new Button(btnText);
         uploadBtn.getStyle()
                 .set("width", "100%")
                 .set("height", "56px")
@@ -239,7 +256,7 @@ public class CreateOfferView extends VerticalLayout {
     }
 
     // ── 2. Image preview area ─────────────────────────────────────────────
-    private Component createImagePreviewSection() {
+    private Component createImagePreviewSection(String mode) {
         imagePreviewArea = new Div();
         imagePreviewArea.getStyle()
                 .set("width", "100%")
@@ -255,7 +272,8 @@ public class CreateOfferView extends VerticalLayout {
                 .set("padding", "16px")
                 .set("box-sizing", "border-box");
 
-        Span placeholder = new Span("Vorschau deiner Haustiere");
+        String previewText = "request".equals(mode) ? "Vorschau deiner Bilder" : "Vorschau deiner Bilder";
+        Span placeholder = new Span(previewText);
         placeholder.setId("preview-placeholder");
         placeholder.getStyle()
                 .set("color", BROWN)
@@ -382,12 +400,13 @@ public class CreateOfferView extends VerticalLayout {
     }
 
     // ── 7. Additional info ────────────────────────────────────────────────
-    private Component createAdditionalInfoSection() {
+    private Component createAdditionalInfoSection(String mode) {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
         section.setSpacing(false);
 
-        NativeLabel label = new NativeLabel("Zusätzliche Informationen und Bedürfnisse deiner Haustiere");
+        String infoText = "request".equals(mode) ? "Zusätzliche Informationen über dich" : "Zusätzliche Informationen über dich";
+        NativeLabel label = new NativeLabel(infoText);
         label.getStyle()
                 .set("font-size", "15px")
                 .set("font-weight", "700")

@@ -530,8 +530,8 @@ public class StartView extends VerticalLayout {
     }
 
     private void onCreateOfferClicked() {
-        System.out.println("Auftrag anbieten geklickt");
-        UI.getCurrent().navigate("auftrag-erstellen");
+        System.out.println("Auftrag anbieten geklickt (StartView)");
+        UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "offer"));
     }
 
     private void openOfferDialog(Offer offer) {

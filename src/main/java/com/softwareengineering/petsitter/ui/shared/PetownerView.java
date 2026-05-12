@@ -526,7 +526,7 @@ public class PetownerView extends VerticalLayout {
 
     private void onCreateOfferClicked() {
         System.out.println("Auftrag anbieten geklickt (PetownerView)");
-        UI.getCurrent().navigate("auftrag-erstellen");
+        UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "request"));
     }
 
     private void openOfferDialog(PetsitterOffer offer) {

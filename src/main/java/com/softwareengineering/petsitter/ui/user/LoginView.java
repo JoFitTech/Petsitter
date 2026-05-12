@@ -200,8 +200,8 @@ public class LoginView extends VerticalLayout {
             .set("align-self", "flex-end")
             .set("margin-top", "-4px");
         forgotBtn.addClickListener(e -> {
-            // TODO: Backend – AuthService.sendPasswordResetMail(emailField.getValue())
-            System.out.println("TODO: AuthService.sendPasswordResetMail(" + emailField.getValue() + ")");
+            System.out.println("Navigiere zu: Passwort vergessen");
+            UI.getCurrent().navigate("forgot-password");
         });
 
         // Login button
@@ -243,8 +243,8 @@ public class LoginView extends VerticalLayout {
             .set("cursor", "pointer")
             .set("text-decoration", "underline");
         registerBtn.addClickListener(e -> {
-            // TODO: Backend – UI.getCurrent().navigate("register")
-            System.out.println("TODO: Navigate to register page");
+            System.out.println("Navigiere zu: Registrierung");
+            UI.getCurrent().navigate("register");
         });
 
         form.add(emailField, passwordField, forgotBtn, loginBtn, registerBtn);

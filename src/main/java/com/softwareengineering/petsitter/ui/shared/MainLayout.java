@@ -1,6 +1,5 @@
 package com.softwareengineering.petsitter.ui.shared;
 
-import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.user.UserView;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
@@ -14,7 +13,6 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import org.springframework.beans.factory.annotation.Autowired;
 
 public class MainLayout extends AppLayout {
 
@@ -23,11 +21,7 @@ public class MainLayout extends AppLayout {
     private static final String LIGHT_BG  = "#fbf8f1";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
 
-    private final AuthenticatedUser authenticatedUser;
-
-    public MainLayout(@Autowired AuthenticatedUser authenticatedUser) {
-        this.authenticatedUser = authenticatedUser;
-
+    public MainLayout() {
         // ── Global page background & font ─────────────────────────────────
         getElement().getStyle()
                 .set("background", LIGHT_BG)
@@ -97,14 +91,14 @@ public class MainLayout extends AppLayout {
         nav.setSpacing(true);
         nav.setAlignItems(FlexComponent.Alignment.CENTER);
 
-        Button findSitterBtn = pillButton("Tiersitter finden", "#f6e3bd", DARK);
-        findSitterBtn.addClickListener(e -> UI.getCurrent().navigate(""));
-
-        Button findOwnerBtn = pillButton("Tierhalter finden", "#fff6e6", DARK);
-        findOwnerBtn.getStyle().set("border", "1px solid #ead5ae");
+        Button findOwnerBtn = pillButton("Tierhalter finden", "#f6e3bd", DARK);
         findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
 
-        nav.add(findSitterBtn, findOwnerBtn);
+        Button findSitterBtn = pillButton("Tiersitter finden", "#fff6e6", DARK);
+        findSitterBtn.getStyle().set("border", "1px solid #ead5ae");
+        findSitterBtn.addClickListener(e -> UI.getCurrent().navigate("tierhalter-finden"));
+
+        nav.add(findOwnerBtn, findSitterBtn);
 
         // Right: Icon buttons (Nachrichten, Favoriten, Profil)
         HorizontalLayout rightIcons = new HorizontalLayout();
@@ -113,30 +107,15 @@ public class MainLayout extends AppLayout {
         rightIcons.getStyle().set("gap", "8px");
 
         Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
-        mailBtn.addClickListener(e -> navigateIfLoggedIn("messages"));
+        mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
 
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
-        heartBtn.addClickListener(e -> navigateIfLoggedIn("favorites"));
+        heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
 
-        // Profil-Button oder Login/Logout je nach Auth-Status
-        boolean isLoggedIn = authenticatedUser.get().isPresent();
+        Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
+        profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
-        if (isLoggedIn) {
-            // Eingeloggt: Profil-Icon + Logout
-            Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
-            profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
-
-            Button logoutBtn = pillButton("Abmelden", "#f6e3bd", DARK);
-            logoutBtn.addClickListener(e -> UI.getCurrent().getPage().setLocation("/logout"));
-
-            rightIcons.add(mailBtn, heartBtn, profileBtn, logoutBtn);
-        } else {
-            // Nicht eingeloggt: nur "Anmelden"-Button
-            Button loginBtn = pillButton("Anmelden", BROWN, "white");
-            loginBtn.addClickListener(e -> UI.getCurrent().navigate("login"));
-
-            rightIcons.add(loginBtn);
-        }
+        rightIcons.add(mailBtn, heartBtn, profileBtn);
         header.add(logoWrapper, nav, rightIcons);
         return header;
     }
@@ -187,11 +166,11 @@ public class MainLayout extends AppLayout {
         links.getStyle().set("gap", "28px");
 
         links.add(
-                footerLink("Über uns",    "ueber-uns"),
-                footerLink("Kontakt",     "kontakt"),
-                footerLink("Datenschutz", "datenschutz"),
-                footerLink("Impressum",   "impressum"),
-                footerLink("Hilfe",       "hilfe")
+                footerLink("Über uns",    "info"),
+                footerLink("Kontakt",     "info"),
+                footerLink("Datenschutz", "info"),
+                footerLink("Impressum",   "info"),
+                footerActionLink("Cookie-Einstellungen", () -> new CookiePopUp().open())
         );
 
         // Social buttons
@@ -254,8 +233,25 @@ public class MainLayout extends AppLayout {
                 .set("padding", "0")
                 .set("cursor", "pointer");
         btn.addClickListener(e -> {
-            // TODO: UI.getCurrent().navigate(route);
-            System.out.println("Footer-Link: " + route);
+            System.out.println("Footer-Link geklickt: " + text + " -> navigiert zu: " + route);
+            UI.getCurrent().navigate(route);
+        });
+        return btn;
+    }
+
+    private Component footerActionLink(String text, Runnable action) {
+        Button btn = new Button(text);
+        btn.getStyle()
+                .set("background", "transparent")
+                .set("color", "white")
+                .set("font-size", "14px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("cursor", "pointer");
+        btn.addClickListener(e -> {
+            System.out.println("Footer-Aktion geklickt: " + text);
+            action.run();
         });
         return btn;
     }
@@ -272,19 +268,5 @@ public class MainLayout extends AppLayout {
                 .set("box-shadow", "none")
                 .set("cursor", "pointer");
         return btn;
-    }
-
-    /**
-     * Navigiert zur Ziel-Route, wenn eingeloggt – sonst zur LoginView.
-     *
-     * <p>Wird für Buttons wie "Nachrichten" und "Favoriten" genutzt,
-     * die einen Login erfordern, aber im MainLayout sichtbar bleiben.
-     */
-    private void navigateIfLoggedIn(String route) {
-        if (authenticatedUser.get().isPresent()) {
-            UI.getCurrent().navigate(route);
-        } else {
-            UI.getCurrent().navigate("login");
-        }
     }
 }

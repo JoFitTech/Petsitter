@@ -1,19 +1,13 @@
 package com.softwareengineering.petsitter.ui.user;
 
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
-import com.softwareengineering.petsitter.user.dto.UserAuthResult;
-import com.softwareengineering.petsitter.user.dto.UserProfileDto;
-import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
-import com.vaadin.flow.component.AttachEvent;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -23,53 +17,44 @@ import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-import com.vaadin.flow.server.VaadinService;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import jakarta.annotation.security.PermitAll;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Locale;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
 @Route(value = "profile", layout = MainLayout.class)
 @PageTitle("Mein Profil | Pawsitter")
 @PermitAll
-public class UserView extends VerticalLayout {
+public class UserView extends VerticalLayout implements BeforeEnterObserver {
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        java.util.List<String> tabs = event.getLocation().getQueryParameters().getParameters().get("tab");
+        String tab = (tabs != null && !tabs.isEmpty()) ? tabs.get(0) : null;
+        if ("favorites".equals(tab)) {
+            setActiveStyle(btnMeineFavoriten);
+            showMeineFavoriten();
+        } else {
+            setActiveStyle(btnUeberMich);
+            showUeberMich();
+        }
+    }
 
     private static final String DARK     = "#4a3428";
     private static final String CREAM    = "#fbf8f1";
     private static final String CARD_BG  = "#ffffff";
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-    private static final List<String> NATIONALITIES = List.of(
-            "deutsch",
-            "österreichisch",
-            "schweizerisch",
-            "französisch",
-            "italienisch",
-            "spanisch",
-            "polnisch",
-            "niederländisch",
-            "türkisch",
-            "ukrainisch",
-            "andere"
-    );
 
     private final UserService userService;
-    private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
     private Button btnMeineTiere;
+    private Button btnMeineAuftraege;
+    private Button btnMeineFavoriten;
     private Button btnPersAngaben;
-    private Button btnLogin;
+    private Button btnLogout;
     private Div contentPanel;
 
     public UserView(UserService userService) {
         this.userService = userService;
-        reloadProfile();
-
         setSizeFull();
         setPadding(false);
         setSpacing(false);
@@ -80,21 +65,6 @@ public class UserView extends VerticalLayout {
 
         add(buildPageHeader());
         add(buildMainArea());
-        if (currentProfile == null) {
-            showMissingProfile();
-        } else {
-            showUeberMich();
-            setActiveStyle(btnUeberMich);
-        }
-    }
-
-    @Override
-    protected void onAttach(AttachEvent attachEvent) {
-        super.onAttach(attachEvent);
-        if (currentProfile == null && ensureProfileLoaded()) {
-            showUeberMich();
-            setActiveStyle(btnUeberMich);
-        }
     }
 
     // ── Page header ──────────────────────────────────────────────────────────
@@ -173,17 +143,21 @@ public class UserView extends VerticalLayout {
             .set("padding", "8px 0")
             .set("background", "transparent");
 
-        btnUeberMich   = sidebarBtn("Über mich");
-        btnMeineTiere  = sidebarBtn("Meine Tiere");
-        btnPersAngaben = sidebarBtn("Persönliche Angaben");
-        btnLogin       = sidebarBtn("Log in");
+        btnUeberMich      = sidebarBtn("Über mich");
+        btnMeineTiere     = sidebarBtn("Meine Tiere");
+        btnMeineAuftraege = sidebarBtn("Meine Aufträge");
+        btnMeineFavoriten = sidebarBtn("Meine Favoriten");
+        btnPersAngaben    = sidebarBtn("Persönliche Angaben");
+        btnLogout         = sidebarBtn("Log out");
 
-        btnUeberMich.addClickListener(e   -> { setActiveStyle(btnUeberMich);   showUeberMich(); });
-        btnMeineTiere.addClickListener(e  -> { setActiveStyle(btnMeineTiere);  showMeineTiere(); });
-        btnPersAngaben.addClickListener(e -> { setActiveStyle(btnPersAngaben); showPersAngaben(false); });
-        btnLogin.addClickListener(e       -> { setActiveStyle(btnLogin);       showLogin(); });
+        btnUeberMich.addClickListener(e      -> { setActiveStyle(btnUeberMich);      showUeberMich(); });
+        btnMeineTiere.addClickListener(e     -> { setActiveStyle(btnMeineTiere);     showMeineTiere(); });
+        btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
+        btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
+        btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(); });
+        btnLogout.addClickListener(e         -> { setActiveStyle(btnLogout);         handleLogout(); });
 
-        sidebar.add(btnUeberMich, btnMeineTiere, btnPersAngaben, btnLogin);
+        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineFavoriten, btnPersAngaben, btnLogout);
         return sidebar;
     }
 
@@ -205,7 +179,7 @@ public class UserView extends VerticalLayout {
     }
 
     private void setActiveStyle(Button active) {
-        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnPersAngaben, btnLogin}) {
+        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineFavoriten, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
         active.getStyle().set("background", DARK).set("color", "white");
@@ -294,9 +268,6 @@ public class UserView extends VerticalLayout {
     // TAB 1 – ÜBER MICH (View mode)
     // ══════════════════════════════════════════════════════════════════════════
     private void showUeberMich() {
-        if (!ensureProfileLoaded()) {
-            return;
-        }
         contentPanel.removeAll();
         Div panel = cardPanel();
 
@@ -315,41 +286,25 @@ public class UserView extends VerticalLayout {
 
     // TAB 1 – ÜBER MICH (Edit mode)
     private void showUeberMichEdit() {
-        if (!ensureProfileLoaded()) {
-            return;
-        }
         contentPanel.removeAll();
         Div panel = cardPanel();
 
-        TextField displayNameField = styledTextField("Anzeigename", displayName());
-        TextField langField = styledTextField("Sprache", valueOrDefault(currentProfile.language(), "deutsch"));
+        // Edit-mode fields
+        TextField nameField   = styledTextField("Name", "Max Mustermann");
+        TextField petsField   = styledTextField("Meine Haustiere", "2 Hunde");
+        TextField locationField = styledTextField("Ort", "76689 Neuthard");
+        TextField langField   = styledTextField("Sprache", "deutsch");
         TextArea  bioArea     = styledTextArea("Über mich");
-        bioArea.setValue(valueOrEmpty(currentProfile.bio()));
+        bioArea.setValue("Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.\n" +
+                         "Mir sind Vertrauen, klare Absprachen und ein liebevoller Umgang besonders wichtig.");
 
         Button save = saveBtn("Speichern");
         Button cancel = cancelBtn("Abbrechen");
 
+        // TODO: Backend – save listener
         save.addClickListener(e -> {
-            UserAuthResult result = userService.updateCurrentUserProfile(profileUpdateRequest(
-                    currentProfile.firstName(),
-                    currentProfile.lastName(),
-                    displayNameField.getValue(),
-                    currentProfile.phone(),
-                    currentProfile.birthDate(),
-                    currentProfile.nationality(),
-                    langField.getValue(),
-                    bioArea.getValue(),
-                    currentProfile.street(),
-                    currentProfile.houseNumber(),
-                    currentProfile.postalCode(),
-                    currentProfile.city(),
-                    currentProfile.addressAddition(),
-                    currentProfile.country()
-            ));
-            handleProfileResult(result, () -> {
-                showStatus(result.message());
-                showUeberMich();
-            });
+            System.out.println("TODO: userService.updateProfile(name=" + nameField.getValue() + ")");
+            showUeberMich();
         });
         cancel.addClickListener(e -> showUeberMich());
 
@@ -366,7 +321,7 @@ public class UserView extends VerticalLayout {
         fields.setPadding(false);
         fields.setSpacing(false);
         fields.getStyle().set("gap", "12px").set("margin-top", "16px");
-        fields.add(displayNameField, langField);
+        fields.add(nameField, petsField, locationField, langField);
         panel.add(fields);
 
         panel.add(divider());
@@ -469,15 +424,15 @@ public class UserView extends VerticalLayout {
         topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         topRow.add(stars, verified);
 
-        H3 name = new H3(displayName());
+        H3 name = new H3("Max Mustermann");
         name.getStyle()
             .set("margin", "4px 0 8px 0")
             .set("font-size", "20px")
             .set("font-weight", "800");
 
-        Span pets = styledInfoLine("🐾 Meine Haustiere: " + valueOrDefault(currentProfile.petSummary(), "Keine Haustiere"));
-        Span loc  = styledInfoLine("📍 " + locationLine());
-        Span lang = styledInfoLine("🌐 " + valueOrDefault(currentProfile.language(), "deutsch"));
+        Span pets = styledInfoLine("🐾 Meine Haustiere: 2 Hunde");
+        Span loc  = styledInfoLine("📍 76689 Neuthard");
+        Span lang = styledInfoLine("🌐 deutsch");
 
         info.add(topRow, name, pets, loc, lang);
         card.add(avatarWrap, info);
@@ -517,12 +472,11 @@ public class UserView extends VerticalLayout {
                 .set("color", "#5a4030")
                 .set("min-height", "100px");
 
-            String bio = valueOrDefault(currentProfile.bio(), "Noch keine Beschreibung hinterlegt.");
-            for (String line : bio.split("\\R", -1)) {
-                Paragraph paragraph = new Paragraph(line);
-                paragraph.getStyle().set("margin", "0 0 6px 0");
-                bioBox.add(paragraph);
-            }
+            Paragraph line1 = new Paragraph("Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.");
+            Paragraph line2 = new Paragraph("Mir sind Vertrauen, klare Absprachen und ein liebevoller Umgang besonders wichtig.");
+            line1.getStyle().set("margin", "0 0 6px 0");
+            line2.getStyle().set("margin", "0");
+            bioBox.add(line1, line2);
             section.add(bioBox);
         }
         return section;
@@ -565,367 +519,51 @@ public class UserView extends VerticalLayout {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 2 – MEINE TIERE (Placeholder)
+    // TAB 2 – MEINE TIERE
     // ══════════════════════════════════════════════════════════════════════════
     private void showMeineTiere() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Meine Tiere"));
-        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
-        contentPanel.add(panel);
+        contentPanel.add(new MyPetView());
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 3 – PERSÖNLICHE ANGABEN (View mode)
+    // TAB 3 – MEINE AUFTRÄGE
     // ══════════════════════════════════════════════════════════════════════════
-    private void showPersAngaben(boolean editMode) {
-        if (!ensureProfileLoaded()) {
-            return;
-        }
+    private void showMeineAuftraege() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-
-        if (!editMode) {
-            Button bearbeiten = editBtn();
-            bearbeiten.addClickListener(e -> showPersAngaben(true));
-            panel.add(panelHeader("Persönliche Angaben", bearbeiten));
-
-            panel.add(buildDataRow("Name", fullName(), false, null));
-            panel.add(buildDataRow("Anzeigename", displayName(), false, null));
-            panel.add(buildDataRow("Email", currentProfile.email(), false, null));
-            if (!isBlank(currentProfile.pendingEmail())) {
-                panel.add(buildDataRow("Neue Email", currentProfile.pendingEmail() + "\nwartet auf Bestätigung", false, null));
-            }
-            panel.add(buildDataRow("Telefonnummer", displayValue(currentProfile.phone()), false, null));
-            panel.add(buildDataRow("Geburtsdatum", formatDate(currentProfile.birthDate()), false, null));
-            panel.add(buildDataRow("Nationalität", displayValue(currentProfile.nationality()), false, null));
-            panel.add(buildDataRow("Adresse", addressLines(), false, null));
-        } else {
-            TextField firstNameField = styledTextField("Vorname", currentProfile.firstName());
-            TextField lastNameField = styledTextField("Nachname", currentProfile.lastName());
-            TextField displayNameField = styledTextField("Anzeigename", displayName());
-            TextField mailField = styledTextField("Email", currentProfile.email());
-            TextField phoneField = styledTextField("Telefonnummer", valueOrEmpty(currentProfile.phone()));
-            DatePicker birthDatePicker = styledDatePicker("Geburtsdatum", currentProfile.birthDate());
-            ComboBox<String> nationalityField = styledComboBox("Nationalität", valueOrEmpty(currentProfile.nationality()));
-            TextField streetField = styledTextField("Straße", currentProfile.street());
-            TextField houseNumberField = styledTextField("Hausnummer", currentProfile.houseNumber());
-            TextField postalCodeField = styledTextField("PLZ", currentProfile.postalCode());
-            TextField cityField = styledTextField("Stadt", currentProfile.city());
-            TextField addressAdditionField = styledTextField("Adresszusatz", valueOrEmpty(currentProfile.addressAddition()));
-            TextField countryField = styledTextField("Land", valueOrDefault(currentProfile.country(), "Deutschland"));
-
-            Button save   = saveBtn("Speichern");
-            Button cancel = cancelBtn("Abbrechen");
-
-            save.addClickListener(e -> {
-                String oldEmail = currentProfile.email();
-                UserAuthResult profileResult = userService.updateCurrentUserProfile(profileUpdateRequest(
-                        firstNameField.getValue(),
-                        lastNameField.getValue(),
-                        displayNameField.getValue(),
-                        phoneField.getValue(),
-                        birthDatePicker.getValue(),
-                        nationalityField.getValue(),
-                        currentProfile.language(),
-                        currentProfile.bio(),
-                        streetField.getValue(),
-                        houseNumberField.getValue(),
-                        postalCodeField.getValue(),
-                        cityField.getValue(),
-                        addressAdditionField.getValue(),
-                        countryField.getValue()
-                ));
-                if (!profileResult.success()) {
-                    showError(profileResult.message());
-                    return;
-                }
-                currentProfile = profileResult.userProfile();
-
-                String requestedEmail = normalizeEmail(mailField.getValue());
-                if (!requestedEmail.equals(normalizeEmail(oldEmail))) {
-                    UserAuthResult emailResult = userService.requestCurrentUserEmailChange(requestedEmail, currentRequestIp());
-                    handleProfileResult(emailResult, () -> {
-                        showStatus(emailResult.message());
-                        showPersAngaben(true);
-                    });
-                    return;
-                }
-
-                showStatus(profileResult.message());
-                showPersAngaben(false);
-            });
-            cancel.addClickListener(e -> showPersAngaben(false));
-
-            panel.add(panelHeader("Persönliche Angaben", cancel, save));
-            panel.add(buildDataRow("Vorname", null, true, firstNameField));
-            panel.add(buildDataRow("Nachname", null, true, lastNameField));
-            panel.add(buildDataRow("Anzeigename", null, true, displayNameField));
-            panel.add(buildDataRow("Email", null, true, mailField));
-            panel.add(buildDataRow("Telefonnummer", null, true, phoneField));
-            panel.add(buildDataRow("Geburtsdatum", null, true, birthDatePicker));
-            panel.add(buildDataRow("Nationalität", null, true, nationalityField));
-            panel.add(buildDataRow("Straße", null, true, streetField));
-            panel.add(buildDataRow("Hausnummer", null, true, houseNumberField));
-            panel.add(buildDataRow("PLZ", null, true, postalCodeField));
-            panel.add(buildDataRow("Stadt", null, true, cityField));
-            panel.add(buildDataRow("Adresszusatz", null, true, addressAdditionField));
-            panel.add(buildDataRow("Land", null, true, countryField));
-
-            if (!isBlank(currentProfile.pendingEmail())) {
-                panel.add(buildEmailConfirmationBox());
-            }
-        }
-
-        contentPanel.add(panel);
-    }
-
-    private Component buildDataRow(String label, String value, boolean editMode, Component editField) {
-        VerticalLayout wrapper = new VerticalLayout();
-        wrapper.setPadding(false);
-        wrapper.setSpacing(false);
-
-        HorizontalLayout row = new HorizontalLayout();
-        row.setWidthFull();
-        row.setAlignItems(FlexComponent.Alignment.START);
-        row.getStyle().set("padding", "14px 0").set("gap", "16px");
-
-        Span labelSpan = new Span(label);
-        labelSpan.getStyle()
-            .set("font-weight", "700")
-            .set("font-size", "14px")
-            .set("color", DARK)
-            .set("min-width", "150px")
-            .set("flex-shrink", "0");
-
-        if (editMode && editField != null) {
-            editField.getElement().getStyle().set("flex", "1");
-            row.add(labelSpan, editField);
-        } else {
-            // Support multi-line values
-            VerticalLayout valLayout = new VerticalLayout();
-            valLayout.setPadding(false);
-            valLayout.setSpacing(false);
-            valLayout.getStyle().set("gap", "2px").set("flex", "1");
-            if (value != null) {
-                for (String line : value.split("\n")) {
-                    Span v = new Span(line);
-                    v.getStyle().set("font-size", "14px").set("color", "#5a4030");
-                    valLayout.add(v);
-                }
-            }
-            row.add(labelSpan, valLayout);
-        }
-
-        Hr hr = new Hr();
-        hr.getStyle().set("margin", "0").set("border-color", "#e8ddd4");
-
-        wrapper.add(row, hr);
-        return wrapper;
+        contentPanel.add(new MyOffers());
+        // TODO: Backend – userService.getMyOrders() laden und anzeigen
+        System.out.println("TODO: userService.getMyOrders()");
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 4 – LOG IN (Placeholder)
+    // TAB 4 – MEINE FAVORITEN
     // ══════════════════════════════════════════════════════════════════════════
-    private void showLogin() {
+    private void showMeineFavoriten() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Log in"));
-        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
-        contentPanel.add(panel);
+        contentPanel.add(new MyFavoritesView());
+        // TODO: Backend – userService.getMyFavorites() laden und anzeigen
+        System.out.println("TODO: userService.getMyFavorites()");
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // TAB 5 – PERSÖNLICHE ANGABEN
+    // ══════════════════════════════════════════════════════════════════════════
+    private void showPersAngaben() {
+        contentPanel.removeAll();
+        contentPanel.add(new PersonalDetailView());
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // TAB 6 – LOG OUT
+    // ══════════════════════════════════════════════════════════════════════════
+    private void handleLogout() {
+        // TODO: Backend – AuthService.logout() / SecurityContextHolder.clearContext() aufrufen
+        System.out.println("TODO: AuthService.logout()");
+        UI.getCurrent().navigate("login");
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
-    private void reloadProfile() {
-        currentProfile = userService.getCurrentUserProfile().orElse(null);
-    }
-
-    private boolean ensureProfileLoaded() {
-        if (currentProfile != null) {
-            return true;
-        }
-        reloadProfile();
-        if (currentProfile == null) {
-            showMissingProfile();
-            return false;
-        }
-        return true;
-    }
-
-    private void showMissingProfile() {
-        contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Profil"));
-        panel.add(placeholder("Bitte melde dich an, um dein Profil zu verwalten."));
-        contentPanel.add(panel);
-    }
-
-    private Component buildEmailConfirmationBox() {
-        Div box = new Div();
-        box.getStyle()
-            .set("margin-top", "18px")
-            .set("background", "#fffdf8")
-            .set("border", "1px solid #ead5ae")
-            .set("border-radius", "12px")
-            .set("padding", "18px 20px");
-
-        Span label = new Span("Code für neue Email bestätigen: " + currentProfile.pendingEmail());
-        label.getStyle().set("display", "block").set("font-weight", "700").set("font-size", "14px").set("color", DARK);
-
-        TextField codeField = new TextField("Bestätigungscode");
-        codeField.setWidthFull();
-        codeField.setPlaceholder("6-stelliger Code");
-
-        Button confirm = saveBtn("Code bestätigen");
-        confirm.addClickListener(event -> {
-            UserAuthResult result = userService.confirmCurrentUserEmailChange(codeField.getValue());
-            handleProfileResult(result, () -> {
-                updateSecurityContext(result.userProfile());
-                showStatus(result.message());
-                showPersAngaben(false);
-            });
-        });
-
-        VerticalLayout layout = new VerticalLayout(label, codeField, confirm);
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle().set("gap", "12px");
-        box.add(layout);
-        return box;
-    }
-
-    private void handleProfileResult(UserAuthResult result, Runnable onSuccess) {
-        if (!result.success()) {
-            showError(result.message());
-            return;
-        }
-        if (result.userProfile() != null) {
-            currentProfile = result.userProfile();
-        }
-        onSuccess.run();
-    }
-
-    private void updateSecurityContext(UserProfileDto profile) {
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                profile.email(),
-                null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + profile.accountRole().name()))
-        );
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        getUI().ifPresent(ui -> ui.getSession().setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                SecurityContextHolder.getContext()
-        ));
-        if (VaadinService.getCurrentRequest() != null) {
-            VaadinService.getCurrentRequest().getWrappedSession().setAttribute(
-                    HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                    SecurityContextHolder.getContext()
-            );
-        }
-    }
-
-    private UserProfileUpdateRequest profileUpdateRequest(
-            String firstName,
-            String lastName,
-            String displayName,
-            String phone,
-            LocalDate birthDate,
-            String nationality,
-            String language,
-            String bio,
-            String street,
-            String houseNumber,
-            String postalCode,
-            String city,
-            String addressAddition,
-            String country
-    ) {
-        return new UserProfileUpdateRequest(
-                firstName,
-                lastName,
-                displayName,
-                phone,
-                birthDate,
-                nationality,
-                language,
-                bio,
-                street,
-                houseNumber,
-                postalCode,
-                city,
-                addressAddition,
-                country
-        );
-    }
-
-    private String currentRequestIp() {
-        if (VaadinService.getCurrentRequest() == null) {
-            return "unknown";
-        }
-        String remoteAddr = VaadinService.getCurrentRequest().getRemoteAddr();
-        return isBlank(remoteAddr) ? "unknown" : remoteAddr;
-    }
-
-    private String normalizeEmail(String email) {
-        return valueOrEmpty(email).trim().toLowerCase();
-    }
-
-    private String fullName() {
-        return (valueOrEmpty(currentProfile.firstName()) + " " + valueOrEmpty(currentProfile.lastName())).trim();
-    }
-
-    private String displayName() {
-        return valueOrDefault(currentProfile.displayName(), fullName());
-    }
-
-    private String locationLine() {
-        String location = (valueOrEmpty(currentProfile.postalCode()) + " " + valueOrEmpty(currentProfile.city())).trim();
-        return valueOrDefault(location, "-");
-    }
-
-    private String addressLines() {
-        StringBuilder address = new StringBuilder();
-        address.append(valueOrEmpty(currentProfile.street())).append(" ").append(valueOrEmpty(currentProfile.houseNumber()).trim());
-        if (!isBlank(currentProfile.addressAddition())) {
-            address.append("\n").append(currentProfile.addressAddition());
-        }
-        address.append("\n").append(locationLine());
-        address.append("\n").append(valueOrDefault(currentProfile.country(), "Deutschland"));
-        return address.toString().trim();
-    }
-
-    private String formatDate(LocalDate date) {
-        return displayValue(formatDateValue(date));
-    }
-
-    private String formatDateValue(LocalDate date) {
-        return date == null ? "" : DATE_FORMATTER.format(date);
-    }
-
-    private String displayValue(String value) {
-        return valueOrDefault(value, "-");
-    }
-
-    private String valueOrEmpty(String value) {
-        return value == null ? "" : value;
-    }
-
-    private String valueOrDefault(String value, String fallback) {
-        return isBlank(value) ? fallback : value;
-    }
-
-    private boolean isBlank(String value) {
-        return value == null || value.isBlank();
-    }
-
-    private void showError(String message) {
-        Notification.show(message, 3500, Notification.Position.TOP_CENTER);
-    }
-
-    private void showStatus(String message) {
-        Notification.show(message, 2500, Notification.Position.TOP_CENTER);
-    }
-
     private Div placeholder(String msg) {
         Div d = new Div();
         d.getStyle()
@@ -939,44 +577,10 @@ public class UserView extends VerticalLayout {
 
     private TextField styledTextField(String label, String placeholder) {
         TextField tf = new TextField(label);
-        tf.setPlaceholder(valueOrEmpty(placeholder));
-        tf.setValue(valueOrEmpty(placeholder));
+        tf.setPlaceholder(placeholder);
+        tf.setValue(placeholder);
         tf.setWidthFull();
         return tf;
-    }
-
-    private DatePicker styledDatePicker(String label, LocalDate value) {
-        DatePicker picker = new DatePicker(label);
-        picker.setValue(value);
-        picker.setLocale(Locale.GERMANY);
-        picker.setPlaceholder("TT.MM.JJJJ");
-        picker.setWidthFull();
-        picker.setI18n(new DatePicker.DatePickerI18n()
-                .setMonthNames(List.of(
-                        "Januar", "Februar", "März", "April", "Mai", "Juni",
-                        "Juli", "August", "September", "Oktober", "November", "Dezember"
-                ))
-                .setWeekdays(List.of(
-                        "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"
-                ))
-                .setWeekdaysShort(List.of("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"))
-                .setToday("Heute")
-                .setCancel("Abbrechen")
-                .setFirstDayOfWeek(1));
-        return picker;
-    }
-
-    private ComboBox<String> styledComboBox(String label, String value) {
-        ComboBox<String> comboBox = new ComboBox<>(label);
-        comboBox.setItems(NATIONALITIES);
-        comboBox.setAllowCustomValue(true);
-        comboBox.addCustomValueSetListener(event -> comboBox.setValue(event.getDetail()));
-        comboBox.setPlaceholder("Nationalität auswählen");
-        if (!isBlank(value)) {
-            comboBox.setValue(value);
-        }
-        comboBox.setWidthFull();
-        return comboBox;
     }
 
     private TextArea styledTextArea(String label) {

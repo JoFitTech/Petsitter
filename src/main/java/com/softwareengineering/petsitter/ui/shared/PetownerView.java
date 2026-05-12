@@ -11,15 +11,15 @@ import com.vaadin.flow.router.Route;
 
 import java.util.List;
 
-@Route(value = "", layout = MainLayout.class)
-public class StartView extends VerticalLayout {
+@Route(value = "tierhalter-finden", layout = MainLayout.class)
+public class PetownerView extends VerticalLayout {
 
-    private static final String DARK       = "#4a3428";
-    private static final String BROWN      = "#7b5236";
-    private static final String LIGHT_BG   = "#fbf8f1";
+    private static final String DARK        = "#4a3428";
+    private static final String BROWN       = "#7b5236";
+    private static final String LIGHT_BG    = "#fbf8f1";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
 
-    public StartView() {
+    public PetownerView() {
         setWidthFull();
         setPadding(false);
         setSpacing(false);
@@ -57,7 +57,7 @@ public class StartView extends VerticalLayout {
                 .set("top", "80px")
                 .set("width", "460px")
                 .set("height", "460px")
-                .set("background", "#f6ead5")
+                .set("background", "#d8ecd8")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -110,7 +110,7 @@ public class StartView extends VerticalLayout {
         copy.setSpacing(false);
         copy.setWidth("720px");
 
-        H1 title = new H1("Finde liebevolle Tierhalter in deiner Nähe");
+        H1 title = new H1("Finde liebevolle Tiersitter in deiner Nähe");
         title.getStyle()
                 .set("font-size", "42px")
                 .set("line-height", "1.12")
@@ -125,7 +125,7 @@ public class StartView extends VerticalLayout {
                 .set("margin", "0 0 32px 0")
                 .set("color", "#7b7069");
 
-        // Single "Auftrag anbieten" button (+ prefix icon)
+        // "Auftrag anbieten" button
         Button createOfferBtn = new Button();
         Span plusIcon = new Span("+ ");
         plusIcon.getStyle().set("font-size", "18px").set("font-weight", "900");
@@ -169,7 +169,7 @@ public class StartView extends VerticalLayout {
 
         H2 statHeadline = new H2();
         statHeadline.getElement().setProperty("innerHTML",
-                "128 neue<br>Halter<br>in deiner<br>Umgebung");
+                "12 neue<br>Sitter<br>in deiner<br>Umgebung");
         statHeadline.getStyle()
                 .set("font-size", "26px")
                 .set("line-height", "1.12")
@@ -234,7 +234,7 @@ public class StartView extends VerticalLayout {
                 "↕", "Entfernung", "bis 5 km", false,
                 () -> onFilterEntfernungClicked());
 
-        // Search icon button – navigates to PetsitterFilterView
+        // Search icon button
         Button searchBtn = new Button(new Icon(VaadinIcon.SEARCH));
         searchBtn.setAriaLabel("Suche starten");
         searchBtn.getStyle()
@@ -316,7 +316,7 @@ public class StartView extends VerticalLayout {
                 .set("padding", "0 32px 60px 32px")
                 .set("box-sizing", "border-box");
 
-        H2 heading = new H2("Aktuelle Tierhalter-Angebote");
+        H2 heading = new H2("Aktuelle Tiersitter-Angebote");
         heading.getStyle()
                 .set("font-size", "28px")
                 .set("margin", "0 0 22px 0")
@@ -336,7 +336,7 @@ public class StartView extends VerticalLayout {
     }
 
     // ── Single offer card ─────────────────────────────────────────────────
-    private Component offerCard(Offer offer) {
+    private Component offerCard(PetsitterOffer offer) {
         Div card = new Div();
         card.getStyle()
                 .set("background", "white")
@@ -380,7 +380,7 @@ public class StartView extends VerticalLayout {
                 .set("border-radius", "14px")
                 .set("padding", "5px 11px");
 
-        // Verified badge (top-right) – only when offer is verified
+        // Verified badge (top-right) – only when verified
         if (offer.verified()) {
             Span verifiedBadge = new Span("✓ Verifiziert");
             verifiedBadge.getStyle()
@@ -429,11 +429,8 @@ public class StartView extends VerticalLayout {
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
                 .set("flex-shrink", "0");
-        heartBtn.addClickListener(e -> {
-            e.getSource(); // consumed – stop card click from firing
-            onFavoriteClicked(offer);
-        });
-        // prevent the heart click from bubbling up to the card click
+        heartBtn.addClickListener(e -> onFavoriteClicked(offer));
+        // Prevent heart click from bubbling up to the card click
         heartBtn.getElement().addEventListener("click", ev -> {}).addEventData("event.stopPropagation()");
 
         titleRow.add(cardTitle, heartBtn);
@@ -490,51 +487,51 @@ public class StartView extends VerticalLayout {
     }
 
     // ── Demo data ─────────────────────────────────────────────────────────
-    private List<Offer> getDemoOffers() {
+    private List<PetsitterOffer> getDemoOffers() {
         return List.of(
-                new Offer(1L, "Hundesitting für Bruno",      "15.–18. Juni",     "145 €", "2,4 km",     "#dec18d", 4, true),
-                new Offer(2L, "Katzenbetreuung Mia",         "20.–22. Juni",     "90 €",  "1,8 km",     "#f1b47a", 3, true),
-                new Offer(3L, "Gassi-Service vormittags",    "Mo–Fr, 8–10 Uhr",  "120 €", "3,1 km",     "#93b8c9", 4, true),
-                new Offer(4L, "Wochenende mit Nala",         "28.–30. Juni",     "160 €", "4,2 km entfernt", "#94b883", 4, true),
-                new Offer(5L, "Kleintierpflege zuhause",     "12.–16. Juli",     "110 €", "2,9 km entfernt", "#f1dfb9", 3, false),
-                new Offer(6L, "Urlaubsbetreuung Katze",      "01.–07. Juli",     "210 €", "5,0 km entfernt", "#bad6df", 3, true)
+                new PetsitterOffer(1L, "Marie, 31, zeitlich flexibel",   "15.–18. Juni",    "145 €", "2,4 km", "#dec18d", 5, true),
+                new PetsitterOffer(2L, "Katzenbetreuung Mia, sonntags",  "20.–22. Juni",    "90 €",  "1,8 km", "#f1b47a", 4, true),
+                new PetsitterOffer(3L, "Gassi-Service vormittags",        "Mo–Fr, 8–10 Uhr", "120 €", "3,1 km", "#93b8c9", 5, true),
+                new PetsitterOffer(4L, "Wochenende mit Nala",             "28.–30. Juni",    "160 €", "4,2 km", "#94b883", 5, true),
+                new PetsitterOffer(5L, "Kleintierpflege zuhause",         "12.–16. Juli",    "110 €", "2,9 km", "#f1dfb9", 3, false),
+                new PetsitterOffer(6L, "Urlaubsbetreuung Katze",          "01.–07. Juli",    "210 €", "5,0 km", "#bad6df", 3, true)
         );
     }
 
     // ── Backend-Interface hooks ───────────────────────────────────────────
     /*
-     * Diese Methoden sind bewusst vorbereitet.
-     * Hier kann das Backend-Team später Service-Calls, Repository-Zugriffe
-     * oder Navigation ergänzen.
+     * Diese Methoden sind bewusst als Schnittstellen vorbereitet.
+     * Das Backend-Team kann hier später Service-Calls oder Repository-Zugriffe ergänzen.
      */
 
     private void onSearchClicked() {
-        System.out.println("Suche (Lupe) geklickt – navigiere zu Tierhalter-Suche");
-        UI.getCurrent().navigate("petsitter-suche", com.vaadin.flow.router.QueryParameters.of("mode", "tierhalter"));
+        System.out.println("Suche (Lupe) geklickt – navigiere zu petsitter-suche (Tiersitter)");
+        UI.getCurrent().navigate("petsitter-suche", com.vaadin.flow.router.QueryParameters.of("mode", "tiersitter"));
     }
 
     private void onFilterWannClicked() {
         System.out.println("Filter 'Wann?' geklickt");
-        // TODO: Datepicker-Dialog öffnen oder direkt Feld aktivieren
+        // TODO: Datepicker-Dialog öffnen
     }
 
     private void onFilterVerdienstClicked() {
         System.out.println("Filter 'Verdienst' geklickt");
-        // TODO: Verdienst-Eingabefeld öffnen / fokussieren
+        // TODO: Verdienst-Range-Eingabe öffnen
     }
 
     private void onFilterEntfernungClicked() {
         System.out.println("Filter 'Entfernung' geklickt");
-        // TODO: Entfernungs-Eingabefeld öffnen / fokussieren
+        // TODO: Entfernungs-Slider öffnen
     }
 
     private void onCreateOfferClicked() {
-        System.out.println("Auftrag anbieten geklickt (StartView)");
-        UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "offer"));
+        System.out.println("Auftrag anbieten geklickt (PetownerView)");
+        UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "request"));
     }
 
-    private void openOfferDialog(Offer offer) {
-        System.out.println("Kachel angeklickt – öffne Details für Offer-ID: " + offer.id());
+    private void openOfferDialog(PetsitterOffer offer) {
+        System.out.println("Kachel angeklickt – öffne Details für Tiersitter-ID: " + offer.id());
+        // TODO: PetsitterDetailPopUp (oder einen spezifischen Tierhalter-Detail-Dialog) öffnen
         new PetsitterDetailPopUp(
                 offer.id(), offer.title(), offer.date(),
                 offer.price(), offer.distance(),
@@ -542,25 +539,20 @@ public class StartView extends VerticalLayout {
         ).open();
     }
 
-    private void onFavoriteClicked(Offer offer) {
-        System.out.println("Favorit geklickt für Offer-ID: " + offer.id());
+    private void onFavoriteClicked(PetsitterOffer offer) {
+        System.out.println("Favorit geklickt für Tiersitter-ID: " + offer.id());
         // TODO: favoriteService.toggleFavorite(offer.id());
     }
 
-    private void onFindOwnerClicked() {
-        System.out.println("Tierhalter finden geklickt");
-        // TODO: UI.getCurrent().navigate("tierhalter-finden");
-    }
-
     // ── Data record ───────────────────────────────────────────────────────
-    private record Offer(
-            Long   id,
-            String title,
-            String date,
-            String price,
-            String distance,
-            String topColor,
-            int    stars,
+    private record PetsitterOffer(
+            Long    id,
+            String  title,
+            String  date,
+            String  price,
+            String  distance,
+            String  topColor,
+            int     stars,
             boolean verified
     ) {}
 }

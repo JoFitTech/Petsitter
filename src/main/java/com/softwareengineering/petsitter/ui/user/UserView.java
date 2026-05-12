@@ -17,12 +17,27 @@ import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import jakarta.annotation.security.PermitAll;
 
 @Route(value = "profile", layout = MainLayout.class)
 @PageTitle("Mein Profil | Pawsitter")
 @PermitAll
-public class UserView extends VerticalLayout {
+public class UserView extends VerticalLayout implements BeforeEnterObserver {
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        java.util.List<String> tabs = event.getLocation().getQueryParameters().getParameters().get("tab");
+        String tab = (tabs != null && !tabs.isEmpty()) ? tabs.get(0) : null;
+        if ("favorites".equals(tab)) {
+            setActiveStyle(btnMeineFavoriten);
+            showMeineFavoriten();
+        } else {
+            setActiveStyle(btnUeberMich);
+            showUeberMich();
+        }
+    }
 
     private static final String DARK     = "#4a3428";
     private static final String CREAM    = "#fbf8f1";
@@ -50,8 +65,6 @@ public class UserView extends VerticalLayout {
 
         add(buildPageHeader());
         add(buildMainArea());
-        showUeberMich();
-        setActiveStyle(btnUeberMich);
     }
 
     // ── Page header ──────────────────────────────────────────────────────────
@@ -141,7 +154,7 @@ public class UserView extends VerticalLayout {
         btnMeineTiere.addClickListener(e     -> { setActiveStyle(btnMeineTiere);     showMeineTiere(); });
         btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
         btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
-        btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(false); });
+        btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(); });
         btnLogout.addClickListener(e         -> { setActiveStyle(btnLogout);         handleLogout(); });
 
         sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineFavoriten, btnPersAngaben, btnLogout);
@@ -506,139 +519,39 @@ public class UserView extends VerticalLayout {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 2 – MEINE TIERE (Placeholder)
+    // TAB 2 – MEINE TIERE
     // ══════════════════════════════════════════════════════════════════════════
     private void showMeineTiere() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Meine Tiere"));
-        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
-        contentPanel.add(panel);
+        contentPanel.add(new MyPetView());
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 3 – MEINE AUFTRÄGE (Placeholder)
+    // TAB 3 – MEINE AUFTRÄGE
     // ══════════════════════════════════════════════════════════════════════════
     private void showMeineAuftraege() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Meine Aufträge"));
-        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
+        contentPanel.add(new MyOffers());
         // TODO: Backend – userService.getMyOrders() laden und anzeigen
         System.out.println("TODO: userService.getMyOrders()");
-        contentPanel.add(panel);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 4 – MEINE FAVORITEN (Placeholder)
+    // TAB 4 – MEINE FAVORITEN
     // ══════════════════════════════════════════════════════════════════════════
     private void showMeineFavoriten() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-        panel.add(panelHeader("Meine Favoriten"));
-        panel.add(placeholder("Dieser Bereich wird noch implementiert."));
+        contentPanel.add(new MyFavoritesView());
         // TODO: Backend – userService.getMyFavorites() laden und anzeigen
         System.out.println("TODO: userService.getMyFavorites()");
-        contentPanel.add(panel);
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // TAB 3 – PERSÖNLICHE ANGABEN (View mode)
+    // TAB 5 – PERSÖNLICHE ANGABEN
     // ══════════════════════════════════════════════════════════════════════════
-    private void showPersAngaben(boolean editMode) {
+    private void showPersAngaben() {
         contentPanel.removeAll();
-        Div panel = cardPanel();
-
-        if (!editMode) {
-            Button bearbeiten = editBtn();
-            bearbeiten.addClickListener(e -> showPersAngaben(true));
-            panel.add(panelHeader("Persönliche Angaben", bearbeiten));
-
-            // View rows
-            panel.add(buildDataRow("Name",          "Max Mustermann",        false, null));
-            panel.add(buildDataRow("Anzeigename",   "Max",                   false, null));
-            panel.add(buildDataRow("Email",         "Max@gmail.com",         false, null));
-            panel.add(buildDataRow("Telefonnummer", "0151 8765456783",       false, null));
-            panel.add(buildDataRow("Geburtsdatum",  "02.05.2004",            false, null));
-            panel.add(buildDataRow("Nationalität",  "deutsch",               false, null));
-            panel.add(buildDataRow("Adresse",
-                "Mustermann Straße 7\n76689 Neuthard\nDeutschland",          false, null));
-        } else {
-            // Edit fields
-            TextField nameField  = styledTextField("Name",          "Max Mustermann");
-            TextField nickField  = styledTextField("Anzeigename",   "Max");
-            TextField mailField  = styledTextField("Email",         "Max@gmail.com");
-            TextField phoneField = styledTextField("Telefonnummer", "0151 8765456783");
-            TextField dateField  = styledTextField("Geburtsdatum",  "02.05.2004");
-            TextField natField   = styledTextField("Nationalität",  "deutsch");
-            TextArea  adrField   = styledTextArea("Adresse");
-            adrField.setValue("Mustermann Straße 7\n76689 Neuthard\nDeutschland");
-
-            Button save   = saveBtn("Speichern");
-            Button cancel = cancelBtn("Abbrechen");
-
-            // TODO: Backend – save listener
-            save.addClickListener(e -> {
-                System.out.println("TODO: userService.updatePersonalData(name=" + nameField.getValue() + ", email=" + mailField.getValue() + ")");
-                showPersAngaben(false);
-            });
-            cancel.addClickListener(e -> showPersAngaben(false));
-
-            panel.add(panelHeader("Persönliche Angaben", cancel, save));
-            panel.add(buildDataRow("Name",          null, true, nameField));
-            panel.add(buildDataRow("Anzeigename",   null, true, nickField));
-            panel.add(buildDataRow("Email",         null, true, mailField));
-            panel.add(buildDataRow("Telefonnummer", null, true, phoneField));
-            panel.add(buildDataRow("Geburtsdatum",  null, true, dateField));
-            panel.add(buildDataRow("Nationalität",  null, true, natField));
-            panel.add(buildDataRow("Adresse",       null, true, adrField));
-        }
-
-        contentPanel.add(panel);
-    }
-
-    private Component buildDataRow(String label, String value, boolean editMode, Component editField) {
-        VerticalLayout wrapper = new VerticalLayout();
-        wrapper.setPadding(false);
-        wrapper.setSpacing(false);
-
-        HorizontalLayout row = new HorizontalLayout();
-        row.setWidthFull();
-        row.setAlignItems(FlexComponent.Alignment.START);
-        row.getStyle().set("padding", "14px 0").set("gap", "16px");
-
-        Span labelSpan = new Span(label);
-        labelSpan.getStyle()
-            .set("font-weight", "700")
-            .set("font-size", "14px")
-            .set("color", DARK)
-            .set("min-width", "150px")
-            .set("flex-shrink", "0");
-
-        if (editMode && editField != null) {
-            editField.getElement().getStyle().set("flex", "1");
-            row.add(labelSpan, editField);
-        } else {
-            // Support multi-line values
-            VerticalLayout valLayout = new VerticalLayout();
-            valLayout.setPadding(false);
-            valLayout.setSpacing(false);
-            valLayout.getStyle().set("gap", "2px").set("flex", "1");
-            if (value != null) {
-                for (String line : value.split("\n")) {
-                    Span v = new Span(line);
-                    v.getStyle().set("font-size", "14px").set("color", "#5a4030");
-                    valLayout.add(v);
-                }
-            }
-            row.add(labelSpan, valLayout);
-        }
-
-        Hr hr = new Hr();
-        hr.getStyle().set("margin", "0").set("border-color", "#e8ddd4");
-
-        wrapper.add(row, hr);
-        return wrapper;
+        contentPanel.add(new PersonalDetailView());
     }
 
     // ══════════════════════════════════════════════════════════════════════════

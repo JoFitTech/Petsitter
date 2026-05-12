@@ -110,10 +110,7 @@ public class MainLayout extends AppLayout {
         mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
 
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
-        heartBtn.addClickListener(e -> {
-            // TODO: UI.getCurrent().navigate("favorites");
-            System.out.println("TODO: Favoriten-Seite");
-        });
+        heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
 
         Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));

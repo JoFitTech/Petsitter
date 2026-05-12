@@ -17,7 +17,11 @@ import jakarta.annotation.security.PermitAll;
 @Route(value = "petsitter-suche", layout = MainLayout.class)
 @PageTitle("Tierhalter finden | Pawsitter")
 @PermitAll
-public class PetsitterFilterView extends VerticalLayout {
+public class PetsitterFilterView extends VerticalLayout implements com.vaadin.flow.router.BeforeEnterObserver {
+
+    private H1 pageTitle;
+    private Div leftBlob;
+    private H2 resultsLabel;
 
     // ── Design tokens ──────────────────────────────────────────────────────────
     private static final String DARK        = "#4a3428";
@@ -58,28 +62,64 @@ public class PetsitterFilterView extends VerticalLayout {
             .set("color", DARK)
             .set("position", "relative");
 
-        add(buildDecoCircle());
+        add(buildDecoBlobs());
         add(buildPageTitle());
         add(buildFilterBar());
         add(buildResultsLabel());
         add(buildContentArea());
     }
 
-    // ── Decorative background circle ──────────────────────────────────────────
-    private Component buildDecoCircle() {
-        Div circle = new Div();
-        circle.getStyle()
+    @Override
+    public void beforeEnter(com.vaadin.flow.router.BeforeEnterEvent event) {
+        java.util.Map<String, java.util.List<String>> parameters = event.getLocation().getQueryParameters().getParameters();
+        if (parameters.containsKey("mode") && parameters.get("mode").contains("tierhalter")) {
+            // Mode from StartView (Petsitter looking for Tierhalter)
+            pageTitle.setText("Finde liebevolle Tierhalter in deiner Nähe");
+            resultsLabel.setText("Über 40 Tierhalter in deiner nähe");
+            leftBlob.getStyle().set("background", "#f6ead5"); // warm sand color
+        } else {
+            // Default / Mode from PetownerView (Tierhalter looking for Tiersitter)
+            pageTitle.setText("Finde liebevolle Tiersitter in deiner Nähe");
+            resultsLabel.setText("Über 40 Tiersitter in deiner nähe");
+            leftBlob.getStyle().set("background", "#e2f2eb"); // mint green
+        }
+    }
+
+    // ── Decorative background blobs ──────────────────────────────────────────
+    private Component buildDecoBlobs() {
+        Div container = new Div();
+        container.getStyle()
             .set("position", "absolute")
-            .set("width", "320px")
-            .set("height", "320px")
+            .set("top", "0")
+            .set("left", "0")
+            .set("width", "100%")
+            .set("height", "100%")
+            .set("overflow", "hidden")
+            .set("z-index", "0")
+            .set("pointer-events", "none");
+
+        leftBlob = new Div();
+        leftBlob.getStyle()
+            .set("position", "absolute")
+            .set("width", "700px")
+            .set("height", "700px")
             .set("border-radius", "50%")
-            .set("background", "#c8dde6")
-            .set("opacity", "0.45")
-            .set("top", "40px")
-            .set("right", "0")
-            .set("pointer-events", "none")
-            .set("z-index", "0");
-        return circle;
+            .set("background", "#e2f2eb") // mint green
+            .set("top", "-150px")
+            .set("left", "-200px");
+
+        Div rightBlob = new Div();
+        rightBlob.getStyle()
+            .set("position", "absolute")
+            .set("width", "800px")
+            .set("height", "800px")
+            .set("border-radius", "50%")
+            .set("background", "#edf1f9") // light blue/lavender
+            .set("top", "50px")
+            .set("right", "-150px");
+
+        container.add(leftBlob, rightBlob);
+        return container;
     }
 
     // ── Page title ────────────────────────────────────────────────────────────
@@ -90,15 +130,15 @@ public class PetsitterFilterView extends VerticalLayout {
             .set("position", "relative")
             .set("z-index", "1");
 
-        H1 title = new H1("Finde liebevolle Tierhalter in deiner Nähe");
-        title.getStyle()
+        pageTitle = new H1("Finde liebevolle Tiersitter in deiner Nähe");
+        pageTitle.getStyle()
             .set("margin", "0")
             .set("font-size", "32px")
             .set("font-weight", "800")
             .set("color", DARK)
             .set("line-height", "1.25");
 
-        wrapper.add(title);
+        wrapper.add(pageTitle);
         return wrapper;
     }
 
@@ -173,7 +213,7 @@ public class PetsitterFilterView extends VerticalLayout {
             .set("height", "52px")
             .set("padding", "0 32px")
             .set("border-radius", "50px")
-            .set("background", DARK)
+            .set("background", ACCENT)
             .set("color", "white")
             .set("font-weight", "700")
             .set("font-size", "15px")
@@ -242,13 +282,13 @@ public class PetsitterFilterView extends VerticalLayout {
             .set("position", "relative")
             .set("z-index", "1");
 
-        H2 label = new H2("Über 40 Tierhalter in deiner nähe");
-        label.getStyle()
+        resultsLabel = new H2("Über 40 Tiersitter in deiner nähe");
+        resultsLabel.getStyle()
             .set("margin", "0")
             .set("font-size", "20px")
             .set("font-weight", "800")
             .set("color", DARK);
-        wrapper.add(label);
+        wrapper.add(resultsLabel);
         return wrapper;
     }
 

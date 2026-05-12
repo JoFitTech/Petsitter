@@ -505,8 +505,8 @@ public class PetownerView extends VerticalLayout {
      */
 
     private void onSearchClicked() {
-        System.out.println("Suche (Lupe) geklickt – Filter anwenden");
-        // TODO: Filterwerte auslesen und Tiersitter-Liste vom Backend laden
+        System.out.println("Suche (Lupe) geklickt – navigiere zu petsitter-suche (Tiersitter)");
+        UI.getCurrent().navigate("petsitter-suche", com.vaadin.flow.router.QueryParameters.of("mode", "tiersitter"));
     }
 
     private void onFilterWannClicked() {

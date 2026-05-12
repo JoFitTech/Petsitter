@@ -510,8 +510,7 @@ public class StartView extends VerticalLayout {
 
     private void onSearchClicked() {
         System.out.println("Suche (Lupe) geklickt – navigiere zu Tierhalter-Suche");
-        // TODO: aktuelle Filter-Werte an PetsitterFilterView übergeben
-        UI.getCurrent().navigate("petsitter-suche");
+        UI.getCurrent().navigate("petsitter-suche", com.vaadin.flow.router.QueryParameters.of("mode", "tierhalter"));
     }
 
     private void onFilterWannClicked() {

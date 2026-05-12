@@ -1,5 +1,8 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.user.dto.UserAuthResult;
+import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
@@ -14,14 +17,6 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
-/**
- * Login-Seite – kein MainLayout, eigenständige Seite.
- *
- * Backend-Schnittstellen (alle als TODO markiert):
- *  - Login-Button: AuthService.login(email, password)
- *  - "Passwort vergessen?": AuthService.sendPasswordResetMail(email)
- *  - "Noch kein Mitglied?": Navigation zur Registrierungs-Route
- */
 @Route("login")
 @PageTitle("Login | Pawsitter")
 @AnonymousAllowed
@@ -32,8 +27,15 @@ public class LoginView extends VerticalLayout {
     private static final String CARD_BG    = "#ffffff";
     private static final String INPUT_BG   = "#f5e9d6";    // warm beige for focused input
     private static final String BROWN_BTN  = "#5c3d1e";    // dark brown login button
+    private static final String DANGER     = "#c73e1d";
 
-    public LoginView() {
+    private final UserService userService;
+    private final Paragraph errorMessage = new Paragraph();
+    private final Paragraph statusMessage = new Paragraph();
+
+    public LoginView(UserService userService) {
+        this.userService = userService;
+
         setSizeFull();
         setPadding(false);
         setSpacing(false);
@@ -99,6 +101,8 @@ public class LoginView extends VerticalLayout {
         card.add(buildLogo());
         card.add(buildTitle());
         card.add(buildSubtitle());
+        configureMessages();
+        card.add(errorMessage, statusMessage);
         card.add(buildForm());
 
         return card;
@@ -200,7 +204,6 @@ public class LoginView extends VerticalLayout {
             .set("align-self", "flex-end")
             .set("margin-top", "-4px");
         forgotBtn.addClickListener(e -> {
-            System.out.println("Navigiere zu: Passwort vergessen");
             UI.getCurrent().navigate("forgot-password");
         });
 
@@ -219,8 +222,11 @@ public class LoginView extends VerticalLayout {
             .set("margin-top", "6px")
             .set("letter-spacing", "0.3px");
         loginBtn.addClickListener(e -> {
-            // TODO: Backend – AuthService.login(emailField.getValue(), passwordField.getValue())
-            System.out.println("TODO: AuthService.login(email=" + emailField.getValue() + ")");
+            clearMessages();
+            UserAuthResult result = userService.login(new UserLoginRequest(
+                    emailField.getValue(),
+                    passwordField.getValue()));
+            handleAuthResult(result);
         });
 
         // "Noch kein Mitglied?" link
@@ -243,7 +249,6 @@ public class LoginView extends VerticalLayout {
             .set("cursor", "pointer")
             .set("text-decoration", "underline");
         registerBtn.addClickListener(e -> {
-            System.out.println("Navigiere zu: Registrierung");
             UI.getCurrent().navigate("register");
         });
 
@@ -258,5 +263,58 @@ public class LoginView extends VerticalLayout {
             .set("--lumo-border-radius-m", "28px")
             .set("--lumo-contrast-10pct", INPUT_BG)
             .set("text-align", "center");
+    }
+
+    private void handleAuthResult(UserAuthResult result) {
+        if (result.success()) {
+            showStatus(result.message());
+            if (result.userProfile() != null) {
+                UserSessionSupport.authenticate(result.userProfile());
+                UI.getCurrent().navigate("");
+            }
+            return;
+        }
+        showError(result.message());
+    }
+
+    private void configureMessages() {
+        errorMessage.setWidthFull();
+        errorMessage.getStyle()
+            .set("box-sizing", "border-box")
+            .set("color", DANGER)
+            .set("margin", "0 0 16px 0")
+            .set("padding", "12px 16px")
+            .set("background", "#fce8e0")
+            .set("border-radius", "14px")
+            .set("font-size", "14px")
+            .set("display", "none");
+
+        statusMessage.setWidthFull();
+        statusMessage.getStyle()
+            .set("box-sizing", "border-box")
+            .set("color", "#3f7d42")
+            .set("margin", "0 0 16px 0")
+            .set("padding", "12px 16px")
+            .set("background", "#e8f5e5")
+            .set("border-radius", "14px")
+            .set("font-size", "14px")
+            .set("display", "none");
+    }
+
+    private void showError(String message) {
+        errorMessage.setText(message);
+        errorMessage.getStyle().set("display", "block");
+        statusMessage.getStyle().set("display", "none");
+    }
+
+    private void showStatus(String message) {
+        statusMessage.setText(message);
+        statusMessage.getStyle().set("display", "block");
+        errorMessage.getStyle().set("display", "none");
+    }
+
+    private void clearMessages() {
+        errorMessage.getStyle().set("display", "none");
+        statusMessage.getStyle().set("display", "none");
     }
 }

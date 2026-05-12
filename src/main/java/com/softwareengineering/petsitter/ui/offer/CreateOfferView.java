@@ -1,20 +1,24 @@
 package com.softwareengineering.petsitter.ui.offer;
 
-// TODO: Diese Seite muss noch für den Tierhalter angepasst werden.
-//       Derzeit zeigt sie das Formular zum Erstellen eines Auftrags aus der
-//       Perspektive des Tierhalters, aber Felder, Validierungen und Backend-Hooks
-//       müssen im Kontext des eingeloggten Nutzers (Tierhalter) ergänzt werden.
-
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
+import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.textfield.BigDecimalField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.datepicker.DatePicker;
@@ -22,12 +26,14 @@ import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
+import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
-
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
+@PageTitle("Auftrag erstellen | Pawsitter")
 public class CreateOfferView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK       = "#4a3428";
@@ -38,23 +44,30 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private static final String BEIGE      = "#f6e8d0";
     private static final String BORDER     = "#eadfce";
 
-    // ── Form fields (accessible for backend wiring later) ─────────────────
+    private final OfferService offerService;
+
     private Upload imageUpload;
     private MultiFileMemoryBuffer uploadBuffer;
     private Div imagePreviewArea;
     private final List<String> uploadedFileNames = new ArrayList<>();
 
+    private CreateOfferFormData formData;
+    private OfferType currentOfferType;
     private TextField titleField;
     private Select<String> animalTypeSelect;
+    private ComboBox<OfferPetOptionDto> petSelect;
     private RadioButtonGroup<String> frequencyGroup;
     private DatePicker fromDatePicker;
     private DatePicker toDatePicker;
+    private Span dateSummary;
     private RadioButtonGroup<String> careTypeGroup;
+    private BigDecimalField priceField;
+    private Span priceSummary;
     private TextArea additionalInfoArea;
 
-    // ──────────────────────────────────────────────────────────────────────
+    public CreateOfferView(OfferService offerService) {
+        this.offerService = offerService;
 
-    public CreateOfferView() {
         setWidthFull();
         setPadding(false);
         setSpacing(false);
@@ -70,11 +83,19 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         removeAll();
         java.util.List<String> modes = event.getLocation().getQueryParameters().getParameters().get("mode");
         String mode = (modes != null && !modes.isEmpty()) ? modes.get(0) : "offer";
+        currentOfferType = "request".equals(mode) ? OfferType.OWNER_OFFER : OfferType.SITTER_OFFER;
+        formData = offerService.getCreateOfferFormData();
+        animalTypeSelect = null;
+        petSelect = null;
+        uploadedFileNames.clear();
         
         String pageBg = "request".equals(mode) ? "#ebf6f0" : LIGHT_BG;
         getStyle().set("background", pageBg);
         
         add(createPageWrapper(mode, pageBg));
+        if (!offerService.hasAuthenticatedUser()) {
+            showError("Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden.");
+        }
     }
 
     // ── Page wrapper with background blobs ────────────────────────────────
@@ -188,12 +209,22 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 createImagePreviewSection(mode),
                 createSpacer("16px"),
                 createTitleSection(),
-                createSpacer("16px"),
-                createAnimalTypeSection(),
-                createSpacer("16px"),
+                createSpacer("16px")
+        );
+
+        if (isSitterOffer()) {
+            card.add(createAnimalTypeSection(), createSpacer("16px"));
+        }
+        if (isOwnerOffer()) {
+            card.add(createPetSection(), createSpacer("16px"));
+        }
+
+        card.add(
                 createZeitraumSection(),
                 createSpacer("16px"),
                 createCareTypeSection(),
+                createSpacer("16px"),
+                createPriceSection(),
                 createSpacer("16px"),
                 createAdditionalInfoSection(mode),
                 createSpacer("24px"),
@@ -219,10 +250,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         imageUpload.setMaxFiles(10);
         imageUpload.setMaxFileSize(10 * 1024 * 1024); // 10 MB
 
-        // Style the upload button itself
-        // The mockup uses "von dir" for both, but logically request should be "deiner Haustiere". 
-        // We will stick to the exact mockup wording as requested by the user:
-        String btnText = "request".equals(mode) ? "📷  Lade hier Bilder von dir hoch" : "📷  Lade hier Bilder von dir hoch";
+        String btnText = isOwnerOffer()
+                ? "📷  Lade hier Bilder deiner Haustiere hoch"
+                : "📷  Lade hier Bilder von dir hoch";
         Button uploadBtn = new Button(btnText);
         uploadBtn.getStyle()
                 .set("width", "100%")
@@ -272,7 +302,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("padding", "16px")
                 .set("box-sizing", "border-box");
 
-        String previewText = "request".equals(mode) ? "Vorschau deiner Bilder" : "Vorschau deiner Bilder";
+        String previewText = imagePreviewPlaceholderText();
         Span placeholder = new Span(previewText);
         placeholder.setId("preview-placeholder");
         placeholder.getStyle()
@@ -290,7 +320,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         section.setPadding(false);
         section.setSpacing(false);
 
-        NativeLabel label = new NativeLabel("Titel des Auftrags");
+        NativeLabel label = new NativeLabel(isOwnerOffer() ? "Titel des Auftrags" : "Titel des Angebots");
         label.getStyle()
                 .set("font-size", "15px")
                 .set("font-weight", "700")
@@ -314,7 +344,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         section.setPadding(false);
         section.setSpacing(false);
 
-        NativeLabel label = new NativeLabel("Tierarten auswählen");
+        NativeLabel label = new NativeLabel("Tierart auswählen (optional)");
         label.getStyle()
                 .set("font-size", "15px")
                 .set("font-weight", "700")
@@ -324,11 +354,37 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         animalTypeSelect = new Select<>();
         animalTypeSelect.setItems("Hund", "Katze", "Kleintier", "Vogel", "Reptil", "Fisch", "Sonstiges");
+        animalTypeSelect.setEmptySelectionAllowed(true);
+        animalTypeSelect.setEmptySelectionCaption("Egal / keine Präferenz");
         animalTypeSelect.setWidthFull();
         animalTypeSelect.getStyle()
                 .set("border-radius", "12px");
 
         section.add(label, animalTypeSelect);
+        return section;
+    }
+
+    private Component createPetSection() {
+        VerticalLayout section = new VerticalLayout();
+        section.setPadding(false);
+        section.setSpacing(false);
+
+        NativeLabel label = new NativeLabel("Haustier auswählen");
+        label.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("color", BROWN)
+                .set("margin-bottom", "8px")
+                .set("display", "block");
+
+        petSelect = new ComboBox<>();
+        petSelect.setItems(formData.pets());
+        petSelect.setItemLabelGenerator(OfferPetOptionDto::label);
+        petSelect.setPlaceholder("Wähle ein Haustier");
+        petSelect.setClearButtonVisible(true);
+        petSelect.setWidthFull();
+
+        section.add(label, petSelect);
         return section;
     }
 
@@ -360,15 +416,29 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         fromDatePicker = new DatePicker("von");
         fromDatePicker.setWidthFull();
+        fromDatePicker.setMin(formData.minimumStartDate());
         fromDatePicker.getStyle().set("border-radius", "12px");
+        fromDatePicker.addValueChangeListener(event -> applyDateSelection(
+                offerService.updateCreateOfferDateSelection(event.getValue(), toDatePicker.getValue())));
 
         toDatePicker = new DatePicker("bis");
         toDatePicker.setWidthFull();
         toDatePicker.getStyle().set("border-radius", "12px");
+        toDatePicker.addValueChangeListener(event -> applyDateSelection(
+                offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), event.getValue())));
+
+        dateSummary = new Span();
+        dateSummary.getStyle()
+                .set("display", "block")
+                .set("margin-top", "8px")
+                .set("color", "#7a6050")
+                .set("font-size", "13px")
+                .set("font-weight", "600");
 
         dateRow.add(fromDatePicker, toDatePicker);
+        applyDateSelection(formData.dateSelection());
 
-        section.add(label, frequencyGroup, dateRow);
+        section.add(label, frequencyGroup, dateRow, dateSummary);
         return section;
     }
 
@@ -399,13 +469,47 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         return section;
     }
 
+    private Component createPriceSection() {
+        VerticalLayout section = new VerticalLayout();
+        section.setPadding(false);
+        section.setSpacing(false);
+
+        NativeLabel label = new NativeLabel("Preis pro Tag");
+        label.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("color", BROWN)
+                .set("margin-bottom", "8px")
+                .set("display", "block");
+
+        priceField = new BigDecimalField();
+        priceField.setPrefixComponent(new Span("EUR"));
+        priceField.setClearButtonVisible(true);
+        priceField.setWidthFull();
+        priceField.addValueChangeListener(event -> updatePriceSummary());
+
+        priceSummary = new Span();
+        priceSummary.getStyle()
+                .set("display", "block")
+                .set("margin-top", "8px")
+                .set("color", "#7a6050")
+                .set("font-size", "13px")
+                .set("font-weight", "600");
+        updatePriceSummary();
+
+        section.add(label, priceField, priceSummary);
+        return section;
+    }
+
     // ── 7. Additional info ────────────────────────────────────────────────
     private Component createAdditionalInfoSection(String mode) {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
         section.setSpacing(false);
 
-        String infoText = "request".equals(mode) ? "Zusätzliche Informationen über dich" : "Zusätzliche Informationen über dich";
+        String infoText = isOwnerOffer()
+                ? "Zusätzliche Informationen zu deinem Auftrag"
+                : "Zusätzliche Informationen über dich";
         NativeLabel label = new NativeLabel(infoText);
         label.getStyle()
                 .set("font-size", "15px")
@@ -417,6 +521,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         additionalInfoArea = new TextArea();
         additionalInfoArea.setWidthFull();
         additionalInfoArea.setMinHeight("120px");
+        additionalInfoArea.setMaxLength(formData.descriptionMaxLength());
         additionalInfoArea.getStyle()
                 .set("border-radius", "12px")
                 .set("border", "1px solid " + BORDER);
@@ -463,10 +568,6 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         return row;
     }
 
-    // ── Backend / Navigation stubs ────────────────────────────────────────
-    // All methods below are intentionally left as print-only placeholders.
-    // Connect them to backend services once the API layer is ready.
-
     private void onDraftsClicked() {
         System.out.println("Entwürfe anzeigen geklickt");
         // TODO: UI.getCurrent().navigate("entwuerfe");
@@ -501,7 +602,12 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private void onSaveDraftClicked() {
         System.out.println("Entwurf speichern geklickt");
         System.out.println("  Titel:       " + titleField.getValue());
-        System.out.println("  Tierart:     " + animalTypeSelect.getValue());
+        if (isSitterOffer() && animalTypeSelect != null) {
+            System.out.println("  Tierart:     " + animalTypeSelect.getValue());
+        }
+        if (isOwnerOffer() && petSelect != null) {
+            System.out.println("  Haustier:    " + petSelect.getValue());
+        }
         System.out.println("  Häufigkeit:  " + frequencyGroup.getValue());
         System.out.println("  Von:         " + fromDatePicker.getValue());
         System.out.println("  Bis:         " + toDatePicker.getValue());
@@ -513,17 +619,122 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private void onPublishClicked() {
-        System.out.println("Auftrag hochladen (veröffentlichen) geklickt");
-        System.out.println("  Titel:       " + titleField.getValue());
-        System.out.println("  Tierart:     " + animalTypeSelect.getValue());
-        System.out.println("  Häufigkeit:  " + frequencyGroup.getValue());
-        System.out.println("  Von:         " + fromDatePicker.getValue());
-        System.out.println("  Bis:         " + toDatePicker.getValue());
-        System.out.println("  Betreuung:   " + careTypeGroup.getValue());
-        System.out.println("  Zusatzinfo:  " + additionalInfoArea.getValue());
-        System.out.println("  Bilder:      " + uploadedFileNames);
+        try {
+            OfferPetOptionDto selectedPet = isOwnerOffer() ? petSelect.getValue() : null;
+            if (isOwnerOffer() && selectedPet == null) {
+                showError("Bitte wähle ein Haustier für deinen Auftrag aus.");
+                return;
+            }
 
-        // TODO: offerService.publish(buildOfferDto());
-        //       UI.getCurrent().navigate("meine-auftraege");
+            CreateOfferResult result = offerService.createOffer(
+                    currentOfferType,
+                    fromDatePicker.getValue(),
+                    toDatePicker.getValue(),
+                    selectedPet,
+                    priceField.getValue(),
+                    buildDescription());
+            showSuccess("Eintrag wurde gespeichert: " + result.offerId());
+            clearForm();
+        } catch (RuntimeException exception) {
+            showError("Eintrag konnte nicht gespeichert werden: " + exception.getMessage());
+        }
+    }
+
+    private void applyDateSelection(CreateOfferDateSelection dateSelection) {
+        toDatePicker.setMin(dateSelection.minimumEndDate());
+        if (dateSelection.clearEndDate()) {
+            toDatePicker.clear();
+        }
+        dateSummary.setText(dateSelection.summary());
+        updatePriceSummary();
+    }
+
+    private void updatePriceSummary() {
+        if (priceSummary == null) {
+            return;
+        }
+        BigDecimal price = priceField == null ? null : priceField.getValue();
+        priceSummary.setText(offerService.summarizeCreateOfferTotalPrice(
+                fromDatePicker == null ? null : fromDatePicker.getValue(),
+                toDatePicker == null ? null : toDatePicker.getValue(),
+                price));
+    }
+
+    private String buildDescription() {
+        StringBuilder description = new StringBuilder();
+        appendLine(description, "Titel", titleField.getValue());
+        if (isSitterOffer() && animalTypeSelect != null) {
+            appendLine(description, "Tierart", animalTypeSelect.getValue());
+        }
+        appendLine(description, "Häufigkeit", frequencyGroup.getValue());
+        appendLine(description, "Betreuung", careTypeGroup.getValue());
+        appendLine(description, "Zusatzinfo", additionalInfoArea.getValue());
+
+        String value = description.toString().trim();
+        int maxLength = formData.descriptionMaxLength();
+        if (value.length() > maxLength) {
+            return value.substring(0, maxLength);
+        }
+        return value;
+    }
+
+    private void appendLine(StringBuilder target, String label, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        if (!target.isEmpty()) {
+            target.append('\n');
+        }
+        target.append(label).append(": ").append(value.trim());
+    }
+
+    private void clearForm() {
+        titleField.clear();
+        if (animalTypeSelect != null) {
+            animalTypeSelect.clear();
+        }
+        if (petSelect != null) {
+            petSelect.clear();
+        }
+        frequencyGroup.setValue("einmalig");
+        fromDatePicker.clear();
+        toDatePicker.clear();
+        applyDateSelection(offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
+        careTypeGroup.setValue("Tiersitting");
+        priceField.clear();
+        additionalInfoArea.clear();
+        uploadedFileNames.clear();
+        if (imagePreviewArea != null) {
+            imagePreviewArea.removeAll();
+            Span placeholder = new Span(imagePreviewPlaceholderText());
+            placeholder.setId("preview-placeholder");
+            placeholder.getStyle()
+                    .set("color", BROWN)
+                    .set("font-size", "16px")
+                    .set("font-weight", "600");
+            imagePreviewArea.add(placeholder);
+        }
+    }
+
+    private boolean isOwnerOffer() {
+        return currentOfferType == OfferType.OWNER_OFFER;
+    }
+
+    private boolean isSitterOffer() {
+        return currentOfferType == OfferType.SITTER_OFFER;
+    }
+
+    private String imagePreviewPlaceholderText() {
+        return isOwnerOffer() ? "Vorschau deiner Haustierbilder" : "Vorschau deiner Bilder";
+    }
+
+    private void showError(String message) {
+        Notification.show(message, 5000, Notification.Position.TOP_CENTER)
+                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+    }
+
+    private void showSuccess(String message) {
+        Notification.show(message, 4000, Notification.Position.TOP_CENTER)
+                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
     }
 }

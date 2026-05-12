@@ -1,5 +1,9 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.user.dto.UserAuthResult;
+import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
+import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.datepicker.DatePicker;
@@ -12,15 +16,9 @@ import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.VaadinService;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 
-/**
- * Registrierungs-Seite – kein MainLayout, eigenständige Seite.
- *
- * Backend-Schnittstellen (alle als TODO markiert):
- *  - "Registrieren & Starten"-Button: UserService.register(vorname, nachname, email, ...)
- *  - "Bereits registriert? Hier einloggen"-Link: Navigation zur Login-Route
- */
 @Route("register")
 @PageTitle("Registrierung | Pawsitter")
 @AnonymousAllowed
@@ -32,8 +30,19 @@ public class RegistrateView extends VerticalLayout {
     private static final String INPUT_BG  = "#f5e9d6";
     private static final String BROWN_BTN = "#5c3d1e";
     private static final String LINK_CLR  = "#7b5236";
+    private static final String DANGER    = "#c73e1d";
 
-    public RegistrateView() {
+    private final UserService userService;
+    private final Paragraph errorMessage = new Paragraph();
+    private final Paragraph statusMessage = new Paragraph();
+
+    private TextField postalCodeField;
+    private TextField cityField;
+    private String currentRegistrationEmail = "";
+
+    public RegistrateView(UserService userService) {
+        this.userService = userService;
+
         setSizeFull();
         setPadding(false);
         setSpacing(false);
@@ -99,6 +108,8 @@ public class RegistrateView extends VerticalLayout {
 
         card.add(buildLogo());
         card.add(buildTitle());
+        configureMessages();
+        card.add(errorMessage, statusMessage);
         card.add(buildForm());
 
         return card;
@@ -222,13 +233,51 @@ public class RegistrateView extends VerticalLayout {
                 .set("margin-top", "10px")
                 .set("letter-spacing", "0.3px");
         registerBtn.addClickListener(e -> {
-            // TODO: Backend – UserService.register(vornameField.getValue(), nachnameField.getValue(),
-            //                                      emailField.getValue(), telefonField.getValue(),
-            //                                      passwortField.getValue(), geburtstagsField.getValue(),
-            //                                      nationalitaetField.getValue(), strasseField.getValue(),
-            //                                      hausnummerField.getValue(), landField.getValue())
-            System.out.println("TODO: UserService.register() – Registrierung wird verarbeitet");
+            clearMessages();
+            currentRegistrationEmail = emailField.getValue();
+            UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
+                    emailField.getValue(),
+                    passwortField.getValue(),
+                    passwortConfirmField.getValue(),
+                    vornameField.getValue(),
+                    nachnameField.getValue(),
+                    telefonField.getValue(),
+                    strasseField.getValue(),
+                    hausnummerField.getValue(),
+                    postalCodeField.getValue(),
+                    cityField.getValue(),
+                    null), currentRequestIp());
+            showResult(result);
         });
+
+        TextField codeField = pillTextField("Bestätigungscode");
+        Button confirmBtn = new Button("Code bestätigen");
+        confirmBtn.setWidthFull();
+        confirmBtn.getStyle()
+                .set("background", BROWN_BTN)
+                .set("color", "white")
+                .set("border-radius", "28px")
+                .set("height", "48px")
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        confirmBtn.addClickListener(e -> {
+            clearMessages();
+            String email = currentRegistrationEmail == null || currentRegistrationEmail.isBlank()
+                    ? emailField.getValue()
+                    : currentRegistrationEmail;
+            UserAuthResult result = userService.completeRegistration(new UserRegistrationConfirmationRequest(
+                    email,
+                    codeField.getValue()));
+            handleAuthResult(result);
+        });
+
+        Paragraph codeHint = new Paragraph("Nach der Registrierung kommt der Code per E-Mail.");
+        codeHint.getStyle()
+                .set("margin", "0")
+                .set("font-size", "13px")
+                .set("color", "#8a7060");
 
         // ── "Bereits registriert?" link ────────────────────────────────────
         Button loginBtn = new Button("Bereits registriert? Hier einloggen");
@@ -244,7 +293,6 @@ public class RegistrateView extends VerticalLayout {
                 .set("text-decoration", "underline")
                 .set("margin-top", "4px");
         loginBtn.addClickListener(e -> {
-            System.out.println("TODO: Navigate to login");
             UI.getCurrent().navigate("login");
         });
 
@@ -253,22 +301,22 @@ public class RegistrateView extends VerticalLayout {
                 row1, row2, row3, row4,
                 standortHeading,
                 row5, row6, row7,
-                registerBtn, loginBtn
+                registerBtn, codeHint, codeField, confirmBtn, loginBtn
         );
         return form;
     }
 
     // ── Postleitzahl | Ort – single rounded container with divider ────────────
     private HorizontalLayout buildPlzOrtRow() {
-        TextField plzField = new TextField();
-        plzField.setPlaceholder("Postleitzahl");
-        plzField.getStyle()
+        postalCodeField = new TextField();
+        postalCodeField.setPlaceholder("Postleitzahl");
+        postalCodeField.getStyle()
                 .set("flex", "1")
                 .set("--vaadin-input-field-background", INPUT_BG)
                 .set("--vaadin-input-field-border-radius", "0")
                 .set("border", "none")
                 .set("box-shadow", "none");
-        plzField.getElement().getStyle()
+        postalCodeField.getElement().getStyle()
                 .set("--lumo-contrast-10pct", INPUT_BG)
                 .set("--lumo-border-radius-m", "0");
 
@@ -281,19 +329,19 @@ public class RegistrateView extends VerticalLayout {
                 .set("line-height", "1")
                 .set("padding", "0 4px");
 
-        TextField ortField = new TextField();
-        ortField.setPlaceholder("Ort");
-        ortField.getStyle()
+        cityField = new TextField();
+        cityField.setPlaceholder("Ort");
+        cityField.getStyle()
                 .set("flex", "1")
                 .set("--vaadin-input-field-background", INPUT_BG)
                 .set("--vaadin-input-field-border-radius", "0")
                 .set("border", "none")
                 .set("box-shadow", "none");
-        ortField.getElement().getStyle()
+        cityField.getElement().getStyle()
                 .set("--lumo-contrast-10pct", INPUT_BG)
                 .set("--lumo-border-radius-m", "0");
 
-        HorizontalLayout combined = new HorizontalLayout(plzField, divider, ortField);
+        HorizontalLayout combined = new HorizontalLayout(postalCodeField, divider, cityField);
         combined.setWidthFull();
         combined.setAlignItems(FlexComponent.Alignment.CENTER);
         combined.setSpacing(false);
@@ -376,5 +424,74 @@ public class RegistrateView extends VerticalLayout {
                 .set("--lumo-contrast-10pct", INPUT_BG)
                 .set("--vaadin-input-field-background", INPUT_BG)
                 .set("--vaadin-input-field-border-radius", "28px");
+    }
+
+    private void handleAuthResult(UserAuthResult result) {
+        if (result.success()) {
+            showStatus(result.message());
+            if (result.userProfile() != null) {
+                UserSessionSupport.authenticate(result.userProfile());
+                UI.getCurrent().navigate("");
+            }
+            return;
+        }
+        showError(result.message());
+    }
+
+    private void showResult(UserAuthResult result) {
+        if (result.success()) {
+            showStatus(result.message());
+        } else {
+            showError(result.message());
+        }
+    }
+
+    private String currentRequestIp() {
+        if (VaadinService.getCurrentRequest() == null) {
+            return "unknown";
+        }
+        String remoteAddr = VaadinService.getCurrentRequest().getRemoteAddr();
+        return remoteAddr == null || remoteAddr.isBlank() ? "unknown" : remoteAddr;
+    }
+
+    private void configureMessages() {
+        errorMessage.setWidthFull();
+        errorMessage.getStyle()
+                .set("box-sizing", "border-box")
+                .set("color", DANGER)
+                .set("margin", "0 0 16px 0")
+                .set("padding", "12px 16px")
+                .set("background", "#fce8e0")
+                .set("border-radius", "14px")
+                .set("font-size", "14px")
+                .set("display", "none");
+
+        statusMessage.setWidthFull();
+        statusMessage.getStyle()
+                .set("box-sizing", "border-box")
+                .set("color", "#3f7d42")
+                .set("margin", "0 0 16px 0")
+                .set("padding", "12px 16px")
+                .set("background", "#e8f5e5")
+                .set("border-radius", "14px")
+                .set("font-size", "14px")
+                .set("display", "none");
+    }
+
+    private void showError(String message) {
+        errorMessage.setText(message);
+        errorMessage.getStyle().set("display", "block");
+        statusMessage.getStyle().set("display", "none");
+    }
+
+    private void showStatus(String message) {
+        statusMessage.setText(message);
+        statusMessage.getStyle().set("display", "block");
+        errorMessage.getStyle().set("display", "none");
+    }
+
+    private void clearMessages() {
+        errorMessage.getStyle().set("display", "none");
+        statusMessage.getStyle().set("display", "none");
     }
 }

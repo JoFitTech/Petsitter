@@ -1,13 +1,23 @@
 package com.softwareengineering.petsitter.ui.user;
 
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
+import com.softwareengineering.petsitter.user.dto.UserAuthResult;
+import com.softwareengineering.petsitter.user.dto.UserProfileDto;
+import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.H1;
+import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -15,35 +25,24 @@ import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
+import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
+import java.time.LocalDate;
 
 @Route(value = "profile", layout = MainLayout.class)
 @PageTitle("Mein Profil | Pawsitter")
 @PermitAll
 public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
-    @Override
-    public void beforeEnter(BeforeEnterEvent event) {
-        java.util.List<String> tabs = event.getLocation().getQueryParameters().getParameters().get("tab");
-        String tab = (tabs != null && !tabs.isEmpty()) ? tabs.get(0) : null;
-        if ("favorites".equals(tab)) {
-            setActiveStyle(btnMeineFavoriten);
-            showMeineFavoriten();
-        } else {
-            setActiveStyle(btnUeberMich);
-            showUeberMich();
-        }
-    }
-
     private static final String DARK     = "#4a3428";
     private static final String CREAM    = "#fbf8f1";
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
+    private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
     private Button btnMeineTiere;
@@ -55,6 +54,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     public UserView(UserService userService) {
         this.userService = userService;
+        reloadProfile();
+
         setSizeFull();
         setPadding(false);
         setSpacing(false);
@@ -67,7 +68,19 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         add(buildMainArea());
     }
 
-    // ── Page header ──────────────────────────────────────────────────────────
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        java.util.List<String> tabs = event.getLocation().getQueryParameters().getParameters().get("tab");
+        String tab = (tabs != null && !tabs.isEmpty()) ? tabs.get(0) : null;
+        if ("favorites".equals(tab)) {
+            setActiveStyle(btnMeineFavoriten);
+            showMeineFavoriten();
+            return;
+        }
+        setActiveStyle(btnUeberMich);
+        showUeberMich();
+    }
+
     private Component buildPageHeader() {
         Div wrapper = new Div();
         wrapper.getStyle()
@@ -92,9 +105,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return wrapper;
     }
 
-    // ── Main area (sidebar + content) ────────────────────────────────────────
     private Component buildMainArea() {
-        // Outer wrapper with decorative circle
         Div outer = new Div();
         outer.setWidthFull();
         outer.getStyle()
@@ -102,7 +113,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             .set("padding", "0 48px 64px 48px")
             .set("box-sizing", "border-box");
 
-        // Decorative circle top-right
         Div deco = new Div();
         deco.getStyle()
             .set("position", "absolute")
@@ -121,7 +131,11 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         main.setWidthFull();
         main.setPadding(false);
         main.setSpacing(false);
-        main.getStyle().set("gap", "24px").set("align-items", "flex-start").set("position", "relative").set("z-index", "1");
+        main.getStyle()
+            .set("gap", "24px")
+            .set("align-items", "flex-start")
+            .set("position", "relative")
+            .set("z-index", "1");
 
         contentPanel = new Div();
         contentPanel.setWidthFull();
@@ -131,7 +145,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return outer;
     }
 
-    // ── Sidebar ──────────────────────────────────────────────────────────────
     private Component buildSidebar() {
         VerticalLayout sidebar = new VerticalLayout();
         sidebar.setPadding(false);
@@ -155,7 +168,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
         btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
         btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(); });
-        btnLogout.addClickListener(e         -> { setActiveStyle(btnLogout);         handleLogout(); });
+        btnLogout.addClickListener(e         -> handleLogout());
 
         sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineFavoriten, btnPersAngaben, btnLogout);
         return sidebar;
@@ -185,7 +198,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         active.getStyle().set("background", DARK).set("color", "white");
     }
 
-    // ── Shared panel wrapper ─────────────────────────────────────────────────
     private Div cardPanel() {
         Div panel = new Div();
         panel.setWidthFull();
@@ -211,7 +223,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         HorizontalLayout actionRow = new HorizontalLayout();
         actionRow.setSpacing(false);
         actionRow.getStyle().set("gap", "10px");
-        for (Component a : actions) actionRow.add(a);
+        for (Component a : actions) {
+            actionRow.add(a);
+        }
 
         row.add(title, actionRow);
         return row;
@@ -264,10 +278,10 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return hr;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // TAB 1 – ÜBER MICH (View mode)
-    // ══════════════════════════════════════════════════════════════════════════
     private void showUeberMich() {
+        if (!ensureProfileLoaded()) {
+            return;
+        }
         contentPanel.removeAll();
         Div panel = cardPanel();
 
@@ -275,7 +289,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         bearbeiten.addClickListener(e -> showUeberMichEdit());
         panel.add(panelHeader("Über mich", bearbeiten));
 
-        panel.add(buildAvatarCard(false, null));
+        panel.add(buildAvatarCard(false));
         panel.add(divider());
         panel.add(buildBioSection(false, null));
         panel.add(divider());
@@ -284,44 +298,56 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         contentPanel.add(panel);
     }
 
-    // TAB 1 – ÜBER MICH (Edit mode)
     private void showUeberMichEdit() {
+        if (!ensureProfileLoaded()) {
+            return;
+        }
         contentPanel.removeAll();
         Div panel = cardPanel();
 
-        // Edit-mode fields
-        TextField nameField   = styledTextField("Name", "Max Mustermann");
-        TextField petsField   = styledTextField("Meine Haustiere", "2 Hunde");
-        TextField locationField = styledTextField("Ort", "76689 Neuthard");
-        TextField langField   = styledTextField("Sprache", "deutsch");
-        TextArea  bioArea     = styledTextArea("Über mich");
-        bioArea.setValue("Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.\n" +
-                         "Mir sind Vertrauen, klare Absprachen und ein liebevoller Umgang besonders wichtig.");
+        TextField displayNameField = styledTextField("Anzeigename", displayName());
+        TextField langField = styledTextField("Sprache", valueOrDefault(currentProfile.language(), "deutsch"));
+        TextArea bioArea = styledTextArea("Über mich");
+        bioArea.setValue(valueOrEmpty(currentProfile.bio()));
 
         Button save = saveBtn("Speichern");
         Button cancel = cancelBtn("Abbrechen");
 
-        // TODO: Backend – save listener
         save.addClickListener(e -> {
-            System.out.println("TODO: userService.updateProfile(name=" + nameField.getValue() + ")");
-            showUeberMich();
+            UserAuthResult result = userService.updateCurrentUserProfile(profileUpdateRequest(
+                    currentProfile.firstName(),
+                    currentProfile.lastName(),
+                    displayNameField.getValue(),
+                    currentProfile.phone(),
+                    currentProfile.birthDate(),
+                    currentProfile.nationality(),
+                    langField.getValue(),
+                    bioArea.getValue(),
+                    currentProfile.street(),
+                    currentProfile.houseNumber(),
+                    currentProfile.postalCode(),
+                    currentProfile.city(),
+                    currentProfile.addressAddition(),
+                    currentProfile.country()));
+            handleProfileResult(result, () -> {
+                showStatus(result.message());
+                showUeberMich();
+            });
         });
         cancel.addClickListener(e -> showUeberMich());
 
         panel.add(panelHeader("Über mich", cancel, save));
-        panel.add(buildAvatarCard(true, null));
+        panel.add(buildAvatarCard(true));
         panel.add(divider());
 
-        // Editable info fields
         Span infoLabel = new Span("Angaben bearbeiten:");
         infoLabel.getStyle().set("font-weight", "700").set("font-size", "15px").set("color", DARK);
         panel.add(infoLabel);
 
-        VerticalLayout fields = new VerticalLayout();
+        VerticalLayout fields = new VerticalLayout(displayNameField, langField);
         fields.setPadding(false);
         fields.setSpacing(false);
         fields.getStyle().set("gap", "12px").set("margin-top", "16px");
-        fields.add(nameField, petsField, locationField, langField);
         panel.add(fields);
 
         panel.add(divider());
@@ -332,8 +358,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         contentPanel.add(panel);
     }
 
-    // Avatar card (shared between view and edit mode)
-    private Component buildAvatarCard(boolean editMode, Object unused) {
+    private Component buildAvatarCard(boolean editMode) {
         Div card = new Div();
         card.getStyle()
             .set("background", "#fffdf8")
@@ -344,7 +369,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             .set("gap", "28px")
             .set("align-items", "flex-start");
 
-        // Avatar
         Div avatarWrap = new Div();
         avatarWrap.getStyle().set("position", "relative").set("flex-shrink", "0");
 
@@ -358,7 +382,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             .set("justify-content", "center")
             .set("overflow", "hidden");
 
-        // SVG person placeholder
         Div svgWrap = new Div();
         svgWrap.getElement().setProperty("innerHTML",
             "<svg width='56' height='56' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
@@ -368,7 +391,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         avatarWrap.add(avatar);
 
         if (editMode) {
-            // Camera overlay button
             Div camOverlay = new Div();
             camOverlay.getStyle()
                 .set("position", "absolute")
@@ -386,53 +408,45 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             camOverlay.add(cam);
             avatarWrap.add(camOverlay);
 
-            // Hidden upload – backend team hooks into addSucceededListener
             MemoryBuffer buffer = new MemoryBuffer();
             Upload upload = new Upload(buffer);
             upload.setAcceptedFileTypes("image/jpeg", "image/png", "image/gif", "image/webp");
             upload.setMaxFiles(1);
             upload.setMaxFileSize(5 * 1024 * 1024);
             upload.getStyle().set("display", "none");
-            // TODO: Backend – upload.addSucceededListener(ev -> userService.updateProfilePicture(buffer.getInputStream(), ev.getFileName()));
-
-            // Trigger file dialog when camera overlay is clicked
             camOverlay.getElement().executeJs(
                 "this.addEventListener('click', () => { var inp = $0.querySelector('input[type=file]'); if(inp) inp.click(); })",
                 upload.getElement());
             avatarWrap.add(upload);
         }
 
-        // Right side: stars, verified, name, info
         VerticalLayout info = new VerticalLayout();
         info.setPadding(false);
         info.setSpacing(false);
         info.getStyle().set("gap", "4px");
 
-        // Stars (static)
         Span stars = new Span("★★★★★");
         stars.getStyle().set("color", "#f5c842").set("font-size", "20px").set("letter-spacing", "2px");
 
-        // Verified badge
         Span verified = new Span("✓ Verifiziert");
         verified.getStyle()
             .set("color", "#4caf50").set("font-size", "13px").set("font-weight", "600");
 
-        // Top row: stars + verified
         HorizontalLayout topRow = new HorizontalLayout();
         topRow.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         topRow.setWidthFull();
         topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         topRow.add(stars, verified);
 
-        H3 name = new H3("Max Mustermann");
+        H3 name = new H3(displayName());
         name.getStyle()
             .set("margin", "4px 0 8px 0")
             .set("font-size", "20px")
             .set("font-weight", "800");
 
-        Span pets = styledInfoLine("🐾 Meine Haustiere: 2 Hunde");
-        Span loc  = styledInfoLine("📍 76689 Neuthard");
-        Span lang = styledInfoLine("🌐 deutsch");
+        Span pets = styledInfoLine("Meine Haustiere: " + valueOrDefault(currentProfile.petSummary(), "Keine Haustiere"));
+        Span loc  = styledInfoLine(locationLine());
+        Span lang = styledInfoLine(valueOrDefault(currentProfile.language(), "deutsch"));
 
         info.add(topRow, name, pets, loc, lang);
         card.add(avatarWrap, info);
@@ -445,7 +459,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return s;
     }
 
-    // Bio section
     private Component buildBioSection(boolean editMode, TextArea existingArea) {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
@@ -460,29 +473,30 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             existingArea.setWidthFull();
             existingArea.setMinHeight("120px");
             section.add(existingArea);
-        } else {
-            Div bioBox = new Div();
-            bioBox.getStyle()
-                .set("background", "#fffdf8")
-                .set("border", "1px solid #ead5ae")
-                .set("border-radius", "12px")
-                .set("padding", "18px 20px")
-                .set("font-size", "14px")
-                .set("line-height", "1.7")
-                .set("color", "#5a4030")
-                .set("min-height", "100px");
-
-            Paragraph line1 = new Paragraph("Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.");
-            Paragraph line2 = new Paragraph("Mir sind Vertrauen, klare Absprachen und ein liebevoller Umgang besonders wichtig.");
-            line1.getStyle().set("margin", "0 0 6px 0");
-            line2.getStyle().set("margin", "0");
-            bioBox.add(line1, line2);
-            section.add(bioBox);
+            return section;
         }
+
+        Div bioBox = new Div();
+        bioBox.getStyle()
+            .set("background", "#fffdf8")
+            .set("border", "1px solid #ead5ae")
+            .set("border-radius", "12px")
+            .set("padding", "18px 20px")
+            .set("font-size", "14px")
+            .set("line-height", "1.7")
+            .set("color", "#5a4030")
+            .set("min-height", "100px");
+
+        String bio = valueOrDefault(currentProfile.bio(), "Noch keine Beschreibung hinterlegt.");
+        for (String line : bio.split("\\R")) {
+            Paragraph paragraph = new Paragraph(line);
+            paragraph.getStyle().set("margin", "0 0 6px 0");
+            bioBox.add(paragraph);
+        }
+        section.add(bioBox);
         return section;
     }
 
-    // Reviews section
     private Component buildReviews() {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
@@ -494,9 +508,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         section.add(reviewTitle);
 
         section.add(reviewCard("★★★★★ Sehr zuverlässig",
-            "\u201EBruno war bestens betreut. Kommunikation und \u00DCbergabe waren super unkompliziert.\u201C"));
+            "Bruno war bestens betreut. Kommunikation und Übergabe waren super unkompliziert."));
         section.add(reviewCard("★★★★★ Freundlich und flexibel",
-            "\u201ESehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgef\u00FChlt.\u201C"));
+            "Sehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgefühlt."));
         return section;
     }
 
@@ -518,52 +532,131 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return card;
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // TAB 2 – MEINE TIERE
-    // ══════════════════════════════════════════════════════════════════════════
     private void showMeineTiere() {
         contentPanel.removeAll();
         contentPanel.add(new MyPetView());
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // TAB 3 – MEINE AUFTRÄGE
-    // ══════════════════════════════════════════════════════════════════════════
     private void showMeineAuftraege() {
         contentPanel.removeAll();
         contentPanel.add(new MyOffers());
-        // TODO: Backend – userService.getMyOrders() laden und anzeigen
-        System.out.println("TODO: userService.getMyOrders()");
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // TAB 4 – MEINE FAVORITEN
-    // ══════════════════════════════════════════════════════════════════════════
     private void showMeineFavoriten() {
         contentPanel.removeAll();
         contentPanel.add(new MyFavoritesView());
-        // TODO: Backend – userService.getMyFavorites() laden und anzeigen
-        System.out.println("TODO: userService.getMyFavorites()");
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // TAB 5 – PERSÖNLICHE ANGABEN
-    // ══════════════════════════════════════════════════════════════════════════
     private void showPersAngaben() {
+        if (!ensureProfileLoaded()) {
+            return;
+        }
         contentPanel.removeAll();
-        contentPanel.add(new PersonalDetailView());
+        contentPanel.add(new PersonalDetailView(userService, currentProfile, profile -> currentProfile = profile));
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    // TAB 6 – LOG OUT
-    // ══════════════════════════════════════════════════════════════════════════
     private void handleLogout() {
-        // TODO: Backend – AuthService.logout() / SecurityContextHolder.clearContext() aufrufen
-        System.out.println("TODO: AuthService.logout()");
-        UI.getCurrent().navigate("login");
+        UserSessionSupport.logout();
+        UI.getCurrent().getPage().setLocation("/logout");
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    private void reloadProfile() {
+        currentProfile = userService.getCurrentUserProfile().orElse(null);
+    }
+
+    private boolean ensureProfileLoaded() {
+        if (currentProfile != null) {
+            return true;
+        }
+        reloadProfile();
+        if (currentProfile == null) {
+            showMissingProfile();
+            return false;
+        }
+        return true;
+    }
+
+    private void showMissingProfile() {
+        contentPanel.removeAll();
+        Div panel = cardPanel();
+        panel.add(panelHeader("Profil"));
+        panel.add(placeholder("Bitte melde dich an, um dein Profil zu verwalten."));
+        contentPanel.add(panel);
+    }
+
+    private void handleProfileResult(UserAuthResult result, Runnable onSuccess) {
+        if (!result.success()) {
+            showError(result.message());
+            return;
+        }
+        if (result.userProfile() != null) {
+            currentProfile = result.userProfile();
+        }
+        onSuccess.run();
+    }
+
+    private UserProfileUpdateRequest profileUpdateRequest(
+            String firstName,
+            String lastName,
+            String displayName,
+            String phone,
+            LocalDate birthDate,
+            String nationality,
+            String language,
+            String bio,
+            String street,
+            String houseNumber,
+            String postalCode,
+            String city,
+            String addressAddition,
+            String country
+    ) {
+        return new UserProfileUpdateRequest(
+                firstName,
+                lastName,
+                displayName,
+                phone,
+                birthDate,
+                nationality,
+                language,
+                bio,
+                street,
+                houseNumber,
+                postalCode,
+                city,
+                addressAddition,
+                country);
+    }
+
+    private String fullName() {
+        return (valueOrEmpty(currentProfile.firstName()) + " " + valueOrEmpty(currentProfile.lastName())).trim();
+    }
+
+    private String displayName() {
+        return valueOrDefault(currentProfile.displayName(), fullName());
+    }
+
+    private String locationLine() {
+        String location = (valueOrEmpty(currentProfile.postalCode()) + " " + valueOrEmpty(currentProfile.city())).trim();
+        return valueOrDefault(location, "-");
+    }
+
+    private String valueOrEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String valueOrDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private void showError(String message) {
+        Notification.show(message, 3500, Notification.Position.TOP_CENTER);
+    }
+
+    private void showStatus(String message) {
+        Notification.show(message, 2500, Notification.Position.TOP_CENTER);
+    }
+
     private Div placeholder(String msg) {
         Div d = new Div();
         d.getStyle()
@@ -575,10 +668,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return d;
     }
 
-    private TextField styledTextField(String label, String placeholder) {
+    private TextField styledTextField(String label, String value) {
         TextField tf = new TextField(label);
-        tf.setPlaceholder(placeholder);
-        tf.setValue(placeholder);
+        tf.setValue(valueOrEmpty(value));
         tf.setWidthFull();
         return tf;
     }

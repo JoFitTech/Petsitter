@@ -27,8 +27,8 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 
-@Route("/login")
-@PageTitle("Anmelden – Petsitter")
+// @Route("/login")
+// @PageTitle("Anmelden – Petsitter")
 @AnonymousAllowed
 public class LoginView extends VerticalLayout {
 
@@ -108,8 +108,7 @@ public class LoginView extends VerticalLayout {
             clearMessages();
             UserAuthResult result = userService.login(new UserLoginRequest(
                     loginEmail.getValue(),
-                    loginPassword.getValue()
-            ));
+                    loginPassword.getValue()));
             handleAuthResult(result);
         });
 
@@ -149,8 +148,7 @@ public class LoginView extends VerticalLayout {
                 postalCode,
                 city,
                 addressAddition,
-                registrationCode
-        ).forEach(field -> field.setWidthFull());
+                registrationCode).forEach(field -> field.setWidthFull());
 
         Button registerButton = primaryButton("Registrieren");
         registerButton.addClickListener(event -> startRegistration());
@@ -174,8 +172,7 @@ public class LoginView extends VerticalLayout {
                 registerButton,
                 new Paragraph("Nach dem Registrieren kommt der Code per E-Mail."),
                 registrationCode,
-                confirmButton
-        );
+                confirmButton);
         return section;
     }
 
@@ -193,8 +190,7 @@ public class LoginView extends VerticalLayout {
                 houseNumber.getValue(),
                 postalCode.getValue(),
                 city.getValue(),
-                addressAddition.getValue()
-        ), "127.0.0.1");
+                addressAddition.getValue()), "127.0.0.1");
         showResult(result);
     }
 
@@ -205,8 +201,7 @@ public class LoginView extends VerticalLayout {
                 : currentRegistrationEmail;
         UserAuthResult result = userService.completeRegistration(new UserRegistrationConfirmationRequest(
                 email,
-                registrationCode.getValue()
-        ));
+                registrationCode.getValue()));
         handleAuthResult(result);
     }
 
@@ -222,18 +217,15 @@ public class LoginView extends VerticalLayout {
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 profile.email(),
                 null,
-                List.of(new SimpleGrantedAuthority("ROLE_" + profile.accountRole().name()))
-        );
+                List.of(new SimpleGrantedAuthority("ROLE_" + profile.accountRole().name())));
         SecurityContextHolder.getContext().setAuthentication(authentication);
         getUI().ifPresent(ui -> ui.getSession().setAttribute(
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                SecurityContextHolder.getContext()
-        ));
+                SecurityContextHolder.getContext()));
         if (VaadinService.getCurrentRequest() != null) {
             VaadinService.getCurrentRequest().getWrappedSession().setAttribute(
                     HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                    SecurityContextHolder.getContext()
-            );
+                    SecurityContextHolder.getContext());
         }
     }
 

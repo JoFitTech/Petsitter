@@ -10,6 +10,7 @@ import java.time.temporal.ChronoUnit;
 
 final class CreateOfferFormRules {
 
+    static final int TITLE_MAX_LENGTH = 120;
     static final int DESCRIPTION_MAX_LENGTH = 255;
 
     private static final String SELECT_DATES_MESSAGE = "Bitte Start- und Enddatum auswaehlen.";
@@ -55,6 +56,10 @@ final class CreateOfferFormRules {
 
     int descriptionMaxLength() {
         return DESCRIPTION_MAX_LENGTH;
+    }
+
+    int titleMaxLength() {
+        return TITLE_MAX_LENGTH;
     }
 
     private long totalDays(LocalDate startDate, LocalDate endDate) {

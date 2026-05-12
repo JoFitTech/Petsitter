@@ -1,5 +1,8 @@
 package com.softwareengineering.petsitter.ui.offer;
 
+import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferCareType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
@@ -54,13 +57,13 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private CreateOfferFormData formData;
     private OfferType currentOfferType;
     private TextField titleField;
-    private Select<String> animalTypeSelect;
+    private Select<OfferAnimalType> animalTypeSelect;
     private ComboBox<OfferPetOptionDto> petSelect;
-    private RadioButtonGroup<String> frequencyGroup;
+    private RadioButtonGroup<OfferFrequency> frequencyGroup;
     private DatePicker fromDatePicker;
     private DatePicker toDatePicker;
     private Span dateSummary;
-    private RadioButtonGroup<String> careTypeGroup;
+    private RadioButtonGroup<OfferCareType> careTypeGroup;
     private BigDecimalField priceField;
     private Span priceSummary;
     private TextArea additionalInfoArea;
@@ -330,6 +333,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         titleField = new TextField();
         titleField.setWidthFull();
+        titleField.setMaxLength(formData.titleMaxLength());
         titleField.getStyle()
                 .set("border-radius", "12px")
                 .set("border", "1px solid " + BORDER);
@@ -353,7 +357,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("display", "block");
 
         animalTypeSelect = new Select<>();
-        animalTypeSelect.setItems("Hund", "Katze", "Kleintier", "Vogel", "Reptil", "Fisch", "Sonstiges");
+        animalTypeSelect.setItems(formData.animalTypes());
+        animalTypeSelect.setItemLabelGenerator(animalType ->
+                animalType == null ? "Egal / keine Präferenz" : animalType.label());
         animalTypeSelect.setEmptySelectionAllowed(true);
         animalTypeSelect.setEmptySelectionCaption("Egal / keine Präferenz");
         animalTypeSelect.setWidthFull();
@@ -403,8 +409,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("display", "block");
 
         frequencyGroup = new RadioButtonGroup<>();
-        frequencyGroup.setItems("einmalig", "regelmäßig");
-        frequencyGroup.setValue("einmalig");
+        frequencyGroup.setItems(formData.frequencies());
+        frequencyGroup.setItemLabelGenerator(OfferFrequency::label);
+        frequencyGroup.setValue(OfferFrequency.ONE_TIME);
         frequencyGroup.getStyle()
                 .set("color", DARK)
                 .set("font-size", "14px");
@@ -457,10 +464,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("display", "block");
 
         careTypeGroup = new RadioButtonGroup<>();
-        // Note: Only "Tiersitting" or "Tiersitting + Haussitting" are allowed.
-        //       Pure "Haussitting" is intentionally excluded per business rule.
-        careTypeGroup.setItems("Tiersitting", "Tiersitting + Haussitting");
-        careTypeGroup.setValue("Tiersitting");
+        careTypeGroup.setItems(formData.careTypes());
+        careTypeGroup.setItemLabelGenerator(OfferCareType::label);
+        careTypeGroup.setValue(OfferCareType.PET_SITTING);
         careTypeGroup.getStyle()
                 .set("color", DARK)
                 .set("font-size", "14px");
@@ -621,6 +627,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private void onPublishClicked() {
         try {
             OfferPetOptionDto selectedPet = isOwnerOffer() ? petSelect.getValue() : null;
+            OfferAnimalType selectedAnimalType = isSitterOffer() ? animalTypeSelect.getValue() : null;
             if (isOwnerOffer() && selectedPet == null) {
                 showError("Bitte wähle ein Haustier für deinen Auftrag aus.");
                 return;
@@ -632,7 +639,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                     toDatePicker.getValue(),
                     selectedPet,
                     priceField.getValue(),
-                    buildDescription());
+                    titleField.getValue(),
+                    frequencyGroup.getValue(),
+                    careTypeGroup.getValue(),
+                    selectedAnimalType,
+                    additionalInfoArea.getValue());
             showSuccess("Eintrag wurde gespeichert: " + result.offerId());
             clearForm();
         } catch (RuntimeException exception) {
@@ -660,34 +671,6 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 price));
     }
 
-    private String buildDescription() {
-        StringBuilder description = new StringBuilder();
-        appendLine(description, "Titel", titleField.getValue());
-        if (isSitterOffer() && animalTypeSelect != null) {
-            appendLine(description, "Tierart", animalTypeSelect.getValue());
-        }
-        appendLine(description, "Häufigkeit", frequencyGroup.getValue());
-        appendLine(description, "Betreuung", careTypeGroup.getValue());
-        appendLine(description, "Zusatzinfo", additionalInfoArea.getValue());
-
-        String value = description.toString().trim();
-        int maxLength = formData.descriptionMaxLength();
-        if (value.length() > maxLength) {
-            return value.substring(0, maxLength);
-        }
-        return value;
-    }
-
-    private void appendLine(StringBuilder target, String label, String value) {
-        if (value == null || value.isBlank()) {
-            return;
-        }
-        if (!target.isEmpty()) {
-            target.append('\n');
-        }
-        target.append(label).append(": ").append(value.trim());
-    }
-
     private void clearForm() {
         titleField.clear();
         if (animalTypeSelect != null) {
@@ -696,11 +679,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         if (petSelect != null) {
             petSelect.clear();
         }
-        frequencyGroup.setValue("einmalig");
+        frequencyGroup.setValue(OfferFrequency.ONE_TIME);
         fromDatePicker.clear();
         toDatePicker.clear();
         applyDateSelection(offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
-        careTypeGroup.setValue("Tiersitting");
+        careTypeGroup.setValue(OfferCareType.PET_SITTING);
         priceField.clear();
         additionalInfoArea.clear();
         uploadedFileNames.clear();

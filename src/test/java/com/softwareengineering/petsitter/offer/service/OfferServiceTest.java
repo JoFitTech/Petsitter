@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferCareType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
@@ -69,10 +72,14 @@ class OfferServiceTest {
         CreateOfferFormData result = offerService.getCreateOfferFormData();
 
         assertThat(result.offerTypes()).containsExactly(OfferType.values());
+        assertThat(result.frequencies()).containsExactly(OfferFrequency.values());
+        assertThat(result.careTypes()).containsExactly(OfferCareType.values());
+        assertThat(result.animalTypes()).containsExactly(OfferAnimalType.values());
         assertThat(result.pets()).containsExactly(new OfferPetOptionDto(pet.getId(), "Balu", PetSpecies.DOG));
         assertThat(result.minimumStartDate()).isEqualTo(LocalDate.of(2026, 5, 10));
         assertThat(result.dateSelection().minimumEndDate()).isEqualTo(LocalDate.of(2026, 5, 11));
         assertThat(result.dateSelection().summary()).isEqualTo("Bitte Start- und Enddatum auswaehlen.");
+        assertThat(result.titleMaxLength()).isEqualTo(120);
         assertThat(result.descriptionMaxLength()).isEqualTo(255);
         assertThat(requestedOwnerId).hasValue(owner.getId());
     }
@@ -114,6 +121,10 @@ class OfferServiceTest {
                 endDate,
                 selectedPet.getId(),
                 BigDecimal.valueOf(25.50),
+                "Katzenbetreuung gesucht",
+                OfferFrequency.ONE_TIME,
+                OfferCareType.PET_SITTING,
+                null,
                 "Fuettern und Gassi gehen"
         );
 
@@ -127,6 +138,10 @@ class OfferServiceTest {
         assertThat(savedOffer.getCreateUser()).isSameAs(owner);
         assertThat(savedOffer.getUpdateUser()).isSameAs(owner);
         assertThat(savedOffer.getPet()).isSameAs(selectedPet);
+        assertThat(savedOffer.getTitle()).isEqualTo("Katzenbetreuung gesucht");
+        assertThat(savedOffer.getFrequency()).isEqualTo(OfferFrequency.ONE_TIME);
+        assertThat(savedOffer.getCareType()).isEqualTo(OfferCareType.PET_SITTING);
+        assertThat(savedOffer.getAnimalType()).isNull();
         assertThat(savedOffer.getOfferType()).isEqualTo(OfferType.OWNER_OFFER);
         assertThat(savedOffer.getPrice()).isEqualByComparingTo("25.50");
         assertThat(savedOffer.getDescription()).isEqualTo("Fuettern und Gassi gehen");
@@ -157,6 +172,47 @@ class OfferServiceTest {
 
         assertThat(saveCount).hasValue(1);
         assertThat(savedOfferReference.get().getPet()).isSameAs(selectedPet);
+    }
+
+    @Test
+    void createOfferSavesSitterAnimalTypeWithoutPet() {
+        UUID savedOfferId = UUID.randomUUID();
+        User sitter = user(UUID.randomUUID());
+        AtomicReference<Offer> savedOfferReference = new AtomicReference<>();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(savedOfferReference, saveCount, savedOfferId),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(sitter)
+        );
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(2);
+        CreateOfferRequest request = new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                startDate,
+                endDate,
+                null,
+                BigDecimal.valueOf(30),
+                "Ich betreue Hunde",
+                OfferFrequency.REGULAR,
+                OfferCareType.PET_AND_HOUSE_SITTING,
+                OfferAnimalType.DOG,
+                "Erfahrung mit großen Hunden"
+        );
+
+        CreateOfferResult result = offerService.createOffer(request);
+
+        Offer savedOffer = savedOfferReference.get();
+        assertThat(result.offerId()).isEqualTo(savedOfferId);
+        assertThat(saveCount).hasValue(1);
+        assertThat(savedOffer.getOfferType()).isEqualTo(OfferType.SITTER_OFFER);
+        assertThat(savedOffer.getPet()).isNull();
+        assertThat(savedOffer.getTitle()).isEqualTo("Ich betreue Hunde");
+        assertThat(savedOffer.getFrequency()).isEqualTo(OfferFrequency.REGULAR);
+        assertThat(savedOffer.getCareType()).isEqualTo(OfferCareType.PET_AND_HOUSE_SITTING);
+        assertThat(savedOffer.getAnimalType()).isEqualTo(OfferAnimalType.DOG);
+        assertThat(savedOffer.getDescription()).isEqualTo("Erfahrung mit großen Hunden");
+        assertThat(savedOffer.getStatus()).isEqualTo(OfferStatus.OPEN);
     }
 
     @Test
@@ -200,6 +256,56 @@ class OfferServiceTest {
                 null,
                 "x".repeat(256)
         ));
+        assertInvalid(offerService, new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                today,
+                tomorrow,
+                null,
+                null,
+                "x".repeat(121),
+                null,
+                null,
+                null,
+                null
+        ));
+        assertInvalid(offerService, new CreateOfferRequest(OfferType.OWNER_OFFER, today, tomorrow, null, null, null));
+
+        assertThat(saveCount).hasValue(0);
+    }
+
+    @Test
+    void createOfferRejectsPetOnSitterOfferAndAnimalTypeOnOwnerOffer() {
+        User owner = user(UUID.randomUUID());
+        Pet selectedPet = pet(UUID.randomUUID(), owner, "Mila", PetSpecies.CAT);
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), saveCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>(selectedPet)),
+                Optional.of(owner)
+        );
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+
+        assertInvalid(offerService, new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                today,
+                tomorrow,
+                selectedPet.getId(),
+                BigDecimal.TEN,
+                null
+        ));
+        assertInvalid(offerService, new CreateOfferRequest(
+                OfferType.OWNER_OFFER,
+                today,
+                tomorrow,
+                selectedPet.getId(),
+                BigDecimal.TEN,
+                null,
+                null,
+                null,
+                OfferAnimalType.CAT,
+                null
+        ));
 
         assertThat(saveCount).hasValue(0);
     }
@@ -215,7 +321,7 @@ class OfferServiceTest {
                 Optional.of(owner)
         );
 
-        assertThatThrownBy(() -> offerService.createOffer(validRequest(missingPetId)))
+        assertThatThrownBy(() -> offerService.createOffer(validOwnerRequest(missingPetId)))
                 .isInstanceOf(NotFoundException.class);
 
         assertThat(saveCount).hasValue(0);
@@ -233,7 +339,7 @@ class OfferServiceTest {
                 Optional.of(owner)
         );
 
-        assertThatThrownBy(() -> offerService.createOffer(validRequest(otherUsersPet.getId())))
+        assertThatThrownBy(() -> offerService.createOffer(validOwnerRequest(otherUsersPet.getId())))
                 .isInstanceOf(ForbiddenOperationException.class);
 
         assertThat(saveCount).hasValue(0);
@@ -248,6 +354,18 @@ class OfferServiceTest {
         LocalDate startDate = LocalDate.now();
         return new CreateOfferRequest(
                 OfferType.SITTER_OFFER,
+                startDate,
+                startDate.plusDays(1),
+                petId,
+                BigDecimal.TEN,
+                "Betreuung"
+        );
+    }
+
+    private CreateOfferRequest validOwnerRequest(UUID petId) {
+        LocalDate startDate = LocalDate.now();
+        return new CreateOfferRequest(
+                OfferType.OWNER_OFFER,
                 startDate,
                 startDate.plusDays(1),
                 petId,

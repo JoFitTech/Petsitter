@@ -56,6 +56,21 @@ public class Offer {
     @JoinColumn(name = "pet_id")
     private Pet pet;
 
+    @Column(name = "title", length = 120)
+    private String title;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "frequency", length = 32)
+    private OfferFrequency frequency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "care_type", length = 64)
+    private OfferCareType careType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "animal_type", length = 32)
+    private OfferAnimalType animalType;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "offer_type", nullable = false)
     private OfferType offerType;
@@ -167,6 +182,38 @@ public class Offer {
 
     public void setPet(Pet pet) {
         this.pet = pet;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public OfferFrequency getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(OfferFrequency frequency) {
+        this.frequency = frequency;
+    }
+
+    public OfferCareType getCareType() {
+        return careType;
+    }
+
+    public void setCareType(OfferCareType careType) {
+        this.careType = careType;
+    }
+
+    public OfferAnimalType getAnimalType() {
+        return animalType;
+    }
+
+    public void setAnimalType(OfferAnimalType animalType) {
+        this.animalType = animalType;
     }
 
     public OfferType getOfferType() {

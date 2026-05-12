@@ -1,6 +1,9 @@
 package com.softwareengineering.petsitter.offer.service;
 
 import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferCareType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
@@ -104,9 +107,13 @@ public class OfferService {
     public CreateOfferFormData getCreateOfferFormData() {
         return new CreateOfferFormData(
                 List.of(OfferType.values()),
+                List.of(OfferFrequency.values()),
+                List.of(OfferCareType.values()),
+                List.of(OfferAnimalType.values()),
                 findCurrentUserPetOptions(),
                 createOfferFormRules.minimumStartDate(),
                 createOfferFormRules.initialDateSelection(),
+                createOfferFormRules.titleMaxLength(),
                 createOfferFormRules.descriptionMaxLength());
     }
 
@@ -131,6 +138,23 @@ public class OfferService {
     }
 
     @Transactional
+    public CreateOfferResult createOffer(OfferType offerType, LocalDate startDate, LocalDate endDate,
+            OfferPetOptionDto selectedPet, BigDecimal price, String title, OfferFrequency frequency,
+            OfferCareType careType, OfferAnimalType animalType, String description) {
+        return createOffer(new CreateOfferRequest(
+                offerType,
+                startDate,
+                endDate,
+                selectedPetId(selectedPet),
+                price,
+                title,
+                frequency,
+                careType,
+                animalType,
+                description));
+    }
+
+    @Transactional
     public CreateOfferResult createOffer(CreateOfferRequest request) {
         User currentUser = authenticatedUser.get()
                 .orElseThrow(() -> new BusinessRuleViolationException(
@@ -143,9 +167,13 @@ public class OfferService {
         offer.setCreateUser(currentUser);
         offer.setUpdateUser(currentUser);
         offer.setPet(resolvePet(request.petId(), currentUser));
+        offer.setTitle(cleanText(request.title()));
+        offer.setFrequency(request.frequency());
+        offer.setCareType(request.careType());
+        offer.setAnimalType(request.animalType());
         offer.setOfferType(request.offerType());
         offer.setPrice(request.price());
-        offer.setDescription(request.description());
+        offer.setDescription(cleanText(request.description()));
         offer.setStatus(OfferStatus.OPEN);
 
         Offer savedOffer = offerRepository.save(offer);
@@ -310,6 +338,22 @@ public class OfferService {
             throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
         }
 
+        if (request.offerType() == OfferType.OWNER_OFFER && request.petId() == null) {
+            throw new BusinessRuleViolationException("Bitte ein Haustier fuer den Auftrag auswaehlen.");
+        }
+
+        if (request.offerType() == OfferType.OWNER_OFFER && request.animalType() != null) {
+            throw new BusinessRuleViolationException("Tierarten werden nur bei Sitter-Angeboten gespeichert.");
+        }
+
+        if (request.offerType() == OfferType.SITTER_OFFER && request.petId() != null) {
+            throw new BusinessRuleViolationException("Sitter-Angebote duerfen kein eigenes Haustier enthalten.");
+        }
+
+        if (request.title() != null && request.title().length() > createOfferFormRules.titleMaxLength()) {
+            throw new BusinessRuleViolationException("Der Titel darf maximal 120 Zeichen enthalten.");
+        }
+
         if (request.description() != null
                 && request.description().length() > createOfferFormRules.descriptionMaxLength()) {
             throw new BusinessRuleViolationException("Die Beschreibung darf maximal 255 Zeichen enthalten.");
@@ -327,5 +371,12 @@ public class OfferService {
             throw new ForbiddenOperationException("Pet gehoert nicht dem aktuellen User.");
         }
         return pet;
+    }
+
+    private String cleanText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 }

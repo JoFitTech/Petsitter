@@ -114,14 +114,7 @@ public class ForgotPasswordView extends VerticalLayout {
         Image logoImg = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
         logoImg.getStyle().set("height", "50px").set("width", "auto");
 
-        Span logoText = new Span("Pawsitter");
-        logoText.getStyle()
-                .set("font-size", "26px")
-                .set("font-weight", "800")
-                .set("color", DARK)
-                .set("letter-spacing", "-0.5px");
-
-        logoRow.add(logoImg, logoText);
+        logoRow.add(logoImg);
         logoRow.addClickListener(e -> UI.getCurrent().navigate(""));
         return logoRow;
     }
@@ -192,15 +185,11 @@ public class ForgotPasswordView extends VerticalLayout {
         });
 
         // "Zurück zum Login" link
-        Button backBtn = new Button("Zurück zum Login");
+        Span backBtn = new Span("Zurück zum Login");
         backBtn.getStyle()
-                .set("background", "transparent")
                 .set("color", LINK_CLR)
-                .set("box-shadow", "none")
                 .set("font-size", "14px")
                 .set("font-weight", "600")
-                .set("padding", "0")
-                .set("height", "auto")
                 .set("cursor", "pointer")
                 .set("text-decoration", "underline");
         backBtn.addClickListener(e -> {

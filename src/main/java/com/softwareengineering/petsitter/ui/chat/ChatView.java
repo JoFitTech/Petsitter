@@ -255,7 +255,13 @@ public class ChatView extends VerticalLayout {
         header.setAlignItems(FlexComponent.Alignment.CENTER);
         header.getStyle().set("gap", "16px").set("padding-bottom", "16px");
 
-        header.add(createAvatar(48));
+        Div avatar = createAvatar(48);
+        avatar.getStyle().set("cursor", "pointer");
+        avatar.addClickListener(e -> {
+            ProfilePopUp popUp = new ProfilePopUp();
+            popUp.open();
+        });
+        header.add(avatar);
 
         H2 nameHeader = new H2(name);
         nameHeader.getStyle().set("margin", "0").set("font-size", "28px").set("font-weight", "800").set("color", DARK);

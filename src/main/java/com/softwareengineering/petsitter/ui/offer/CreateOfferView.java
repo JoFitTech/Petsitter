@@ -11,6 +11,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
+import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
@@ -39,6 +40,7 @@ import java.util.List;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
 @PageTitle("Auftrag erstellen | Pawsitter")
+@RolesAllowed(AccountRole.ROLE_SIGNED_IN_USER)
 public class CreateOfferView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK = "#4a3428";
@@ -85,6 +87,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
+        if (!offerService.hasAuthenticatedUser()) {
+            event.rerouteTo(LoginView.class);
+            return;
+        }
+
         removeAll();
         java.util.List<String> modes = event.getLocation().getQueryParameters().getParameters().get("mode");
         String mode = (modes != null && !modes.isEmpty()) ? modes.get(0) : "offer";
@@ -98,9 +105,6 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         getStyle().set("background", pageBg);
 
         add(createPageWrapper(mode, pageBg));
-        if (!offerService.hasAuthenticatedUser()) {
-            showError("Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden.");
-        }
     }
 
     // ── Page wrapper with background blobs ────────────────────────────────

@@ -4,6 +4,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
@@ -31,6 +32,7 @@ import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import jakarta.annotation.security.RolesAllowed;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,13 +41,13 @@ import java.util.List;
 @PageTitle("Auftrag erstellen | Pawsitter")
 public class CreateOfferView extends VerticalLayout implements BeforeEnterObserver {
 
-    private static final String DARK       = "#4a3428";
-    private static final String BROWN      = "#7b5236";
-    private static final String LIGHT_BG   = "#fbf8f1";
-    private static final String CARD_BG    = "#ffffff";
+    private static final String DARK = "#4a3428";
+    private static final String BROWN = "#7b5236";
+    private static final String LIGHT_BG = "#fbf8f1";
+    private static final String CARD_BG = "#ffffff";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
-    private static final String BEIGE      = "#f6e8d0";
-    private static final String BORDER     = "#eadfce";
+    private static final String BEIGE = "#f6e8d0";
+    private static final String BORDER = "#eadfce";
 
     private final OfferService offerService;
 
@@ -91,10 +93,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         animalTypeSelect = null;
         petSelect = null;
         uploadedFileNames.clear();
-        
+
         String pageBg = "request".equals(mode) ? "#ebf6f0" : LIGHT_BG;
         getStyle().set("background", pageBg);
-        
+
         add(createPageWrapper(mode, pageBg));
         if (!offerService.hasAuthenticatedUser()) {
             showError("Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden.");
@@ -173,7 +175,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("color", DARK)
                 .set("margin", "0 0 4px 0");
 
-        String subtitleText = "request".equals(mode) ? "Details für deine Haustierbetreuung angeben" : "Details für dein Betreuungsangebot angeben";
+        String subtitleText = "request".equals(mode) ? "Details für deine Haustierbetreuung angeben"
+                : "Details für dein Betreuungsangebot angeben";
         Paragraph subtitle = new Paragraph(subtitleText);
         subtitle.getStyle()
                 .set("font-size", "15px")
@@ -212,8 +215,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 createImagePreviewSection(mode),
                 createSpacer("16px"),
                 createTitleSection(),
-                createSpacer("16px")
-        );
+                createSpacer("16px"));
 
         if (isSitterOffer()) {
             card.add(createAnimalTypeSection(), createSpacer("16px"));
@@ -231,8 +233,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 createSpacer("16px"),
                 createAdditionalInfoSection(mode),
                 createSpacer("24px"),
-                createActionButtons()
-        );
+                createActionButtons());
 
         section.add(topRow, card);
         return section;
@@ -358,8 +359,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         animalTypeSelect = new Select<>();
         animalTypeSelect.setItems(formData.animalTypes());
-        animalTypeSelect.setItemLabelGenerator(animalType ->
-                animalType == null ? "Egal / keine Präferenz" : animalType.label());
+        animalTypeSelect.setItemLabelGenerator(
+                animalType -> animalType == null ? "Egal / keine Präferenz" : animalType.label());
         animalTypeSelect.setEmptySelectionAllowed(true);
         animalTypeSelect.setEmptySelectionCaption("Egal / keine Präferenz");
         animalTypeSelect.setWidthFull();
@@ -581,13 +582,14 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private void onImageUploaded(String fileName) {
         System.out.println("Bild-Upload erfolgreich: " + fileName);
-        // TODO: Vorschau-Thumbnail aus uploadBuffer rendern und in imagePreviewArea einfügen
-        //       Beispiel:
-        //       InputStream stream = uploadBuffer.getInputStream(fileName);
-        //       StreamResource resource = new StreamResource(fileName, () -> stream);
-        //       Image img = new Image(resource, fileName);
-        //       img.setWidth("100px"); img.setHeight("100px");
-        //       imagePreviewArea.add(img);
+        // TODO: Vorschau-Thumbnail aus uploadBuffer rendern und in imagePreviewArea
+        // einfügen
+        // Beispiel:
+        // InputStream stream = uploadBuffer.getInputStream(fileName);
+        // StreamResource resource = new StreamResource(fileName, () -> stream);
+        // Image img = new Image(resource, fileName);
+        // img.setWidth("100px"); img.setHeight("100px");
+        // imagePreviewArea.add(img);
 
         // Minimal visual feedback: remove placeholder text on first upload
         imagePreviewArea.getChildren()
@@ -682,7 +684,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         frequencyGroup.setValue(OfferFrequency.ONE_TIME);
         fromDatePicker.clear();
         toDatePicker.clear();
-        applyDateSelection(offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
+        applyDateSelection(
+                offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
         careTypeGroup.setValue(OfferCareType.PET_SITTING);
         priceField.clear();
         additionalInfoArea.clear();

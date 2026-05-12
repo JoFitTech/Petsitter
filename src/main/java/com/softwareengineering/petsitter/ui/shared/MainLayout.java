@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.ui.shared;
 
-import com.softwareengineering.petsitter.ui.user.UserView;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
+import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.UI;
@@ -21,7 +22,11 @@ public class MainLayout extends AppLayout {
     private static final String LIGHT_BG  = "#fbf8f1";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
 
-    public MainLayout() {
+    private final AuthenticatedUser authenticatedUser;
+
+    public MainLayout(AuthenticatedUser authenticatedUser) {
+        this.authenticatedUser = authenticatedUser;
+
         // ── Global page background & font ─────────────────────────────────
         getElement().getStyle()
                 .set("background", LIGHT_BG)
@@ -100,7 +105,17 @@ public class MainLayout extends AppLayout {
 
         nav.add(findOwnerBtn, findSitterBtn);
 
-        // Right: Icon buttons (Nachrichten, Favoriten, Profil)
+        header.add(logoWrapper, nav, buildHeaderActions());
+        return header;
+    }
+
+    private Component buildHeaderActions() {
+        if (authenticatedUser.get().isEmpty()) {
+            Button loginBtn = headerLoginButton();
+            loginBtn.addClickListener(e -> UI.getCurrent().navigate(LoginView.class));
+            return loginBtn;
+        }
+
         HorizontalLayout rightIcons = new HorizontalLayout();
         rightIcons.setSpacing(false);
         rightIcons.setAlignItems(FlexComponent.Alignment.CENTER);
@@ -116,8 +131,7 @@ public class MainLayout extends AppLayout {
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
         rightIcons.add(mailBtn, heartBtn, profileBtn);
-        header.add(logoWrapper, nav, rightIcons);
-        return header;
+        return rightIcons;
     }
 
 
@@ -202,6 +216,21 @@ public class MainLayout extends AppLayout {
                 .set("border-radius", "50%")
                 .set("background", background)
                 .set("color", color)
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("flex-shrink", "0");
+        return btn;
+    }
+
+    private Button headerLoginButton() {
+        Button btn = new Button("Anmelden");
+        btn.getStyle()
+                .set("height", "42px")
+                .set("padding", "0 24px")
+                .set("border-radius", "22px")
+                .set("background", BROWN)
+                .set("color", "white")
+                .set("font-weight", "700")
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
                 .set("flex-shrink", "0");

@@ -169,7 +169,8 @@ public class MainLayout extends AppLayout {
                 footerLink("Über uns",    "info"),
                 footerLink("Kontakt",     "info"),
                 footerLink("Datenschutz", "info"),
-                footerLink("Impressum",   "info")
+                footerLink("Impressum",   "info"),
+                footerActionLink("Cookie-Einstellungen", () -> new CookiePopUp().open())
         );
 
         // Social buttons
@@ -234,6 +235,23 @@ public class MainLayout extends AppLayout {
         btn.addClickListener(e -> {
             System.out.println("Footer-Link geklickt: " + text + " -> navigiert zu: " + route);
             UI.getCurrent().navigate(route);
+        });
+        return btn;
+    }
+
+    private Component footerActionLink(String text, Runnable action) {
+        Button btn = new Button(text);
+        btn.getStyle()
+                .set("background", "transparent")
+                .set("color", "white")
+                .set("font-size", "14px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("cursor", "pointer");
+        btn.addClickListener(e -> {
+            System.out.println("Footer-Aktion geklickt: " + text);
+            action.run();
         });
         return btn;
     }

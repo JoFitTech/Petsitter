@@ -59,7 +59,10 @@ public class MyPetView extends Div {
             .set("height", "40px")
             .set("cursor", "pointer");
 
-        addBtn.addClickListener(e -> System.out.println("TODO: Tier hinzufügen clicked"));
+        addBtn.addClickListener(e -> {
+            AddPetPopUp popUp = new AddPetPopUp();
+            popUp.open();
+        });
 
         row.add(titleLayout, addBtn);
         return row;

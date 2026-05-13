@@ -4,6 +4,7 @@ import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
+import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
@@ -121,15 +122,7 @@ public class LoginView extends VerticalLayout {
         Image logoImg = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
         logoImg.getStyle().set("height", "50px").set("width", "auto");
 
-        // Fallback text logo if image fails to load – same styling as the app
-        Span logoText = new Span("Pawsitter");
-        logoText.getStyle()
-            .set("font-size", "26px")
-            .set("font-weight", "800")
-            .set("color", DARK)
-            .set("letter-spacing", "-0.5px");
-
-        logoRow.add(logoImg, logoText);
+        logoRow.add(logoImg);
         logoRow.addClickListener(e -> UI.getCurrent().navigate(""));
         return logoRow;
     }
@@ -182,23 +175,27 @@ public class LoginView extends VerticalLayout {
         PasswordField passwordField = new PasswordField();
         passwordField.setPlaceholder("Passwort");
         passwordField.setWidthFull();
+        
+        // Dummy-Icon im Prefix hinzugefügt, um das Augen-Icon im Suffix auszugleichen
+        // Dadurch wird der Platzhalter-Text perfekt zentriert
+        Icon dummyIcon = VaadinIcon.EYE.create();
+        dummyIcon.getStyle().set("visibility", "hidden");
+        passwordField.setPrefixComponent(dummyIcon);
+        
         passwordField.getStyle()
             .set("border-radius", "28px")
             .set("--vaadin-input-field-background", INPUT_BG)
             .set("--vaadin-input-field-border-radius", "28px")
-            .set("--vaadin-input-field-value-font-size", "15px");
+            .set("--vaadin-input-field-value-font-size", "15px")
+            .set("--vaadin-input-field-text-align", "center");
         styleInputField(passwordField.getElement());
 
         // "Passwort vergessen?" link (right-aligned)
-        Button forgotBtn = new Button("Passwort vergessen?");
+        Span forgotBtn = new Span("Passwort vergessen?");
         forgotBtn.getStyle()
-            .set("background", "transparent")
             .set("color", DARK)
-            .set("box-shadow", "none")
             .set("font-size", "13px")
             .set("font-weight", "600")
-            .set("padding", "0")
-            .set("height", "auto")
             .set("cursor", "pointer")
             .set("text-decoration", "underline")
             .set("align-self", "flex-end")
@@ -232,27 +229,23 @@ public class LoginView extends VerticalLayout {
         // "Noch kein Mitglied?" link
         Span registerSpan = new Span();
         registerSpan.getStyle()
-            .set("font-size", "14px")
             .set("color", DARK)
-            .set("text-align", "center")
-            .set("margin-top", "8px");
-
-        Button registerBtn = new Button("Noch kein Mitglied? Jetzt registrieren!");
-        registerBtn.getStyle()
-            .set("background", "transparent")
-            .set("color", DARK)
-            .set("box-shadow", "none")
             .set("font-size", "14px")
             .set("font-weight", "600")
-            .set("padding", "0")
-            .set("height", "auto")
             .set("cursor", "pointer")
-            .set("text-decoration", "underline");
-        registerBtn.addClickListener(e -> {
+            .set("align-self", "center")
+            .set("margin-top", "8px");
+
+        Span text1 = new Span("Noch kein Mitglied? ");
+        Span text2 = new Span("Jetzt registrieren!");
+        text2.getStyle().set("text-decoration", "underline");
+
+        registerSpan.add(text1, text2);
+        registerSpan.addClickListener(e -> {
             UI.getCurrent().navigate("register");
         });
 
-        form.add(emailField, passwordField, forgotBtn, loginBtn, registerBtn);
+        form.add(emailField, passwordField, forgotBtn, loginBtn, registerSpan);
         return form;
     }
 
@@ -263,6 +256,7 @@ public class LoginView extends VerticalLayout {
             .set("--lumo-border-radius-m", "28px")
             .set("--lumo-contrast-10pct", INPUT_BG)
             .set("text-align", "center");
+        el.setAttribute("theme", "align-center");
     }
 
     private void handleAuthResult(UserAuthResult result) {

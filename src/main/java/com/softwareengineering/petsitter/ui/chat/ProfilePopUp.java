@@ -33,6 +33,7 @@ public class ProfilePopUp extends Dialog {
         mainContainer.setPadding(true);
         mainContainer.setSpacing(true);
         mainContainer.getStyle()
+                .set("font-family", "Inter, Arial, sans-serif")
                 .set("background-color", LIGHT_BG)
                 .set("padding", "30px")
                 .set("border-radius", "20px");
@@ -90,7 +91,7 @@ public class ProfilePopUp extends Dialog {
         for (int i = 0; i < 5; i++) {
             Icon star = new Icon(VaadinIcon.STAR);
             star.setSize("20px");
-            star.getStyle().set("color", DARK);
+            star.getStyle().set("color", "#ffdf4a");
             starsLayout.add(star);
         }
 
@@ -108,11 +109,27 @@ public class ProfilePopUp extends Dialog {
         detailsLayout.setSpacing(false);
         detailsLayout.getStyle().set("margin-bottom", "20px").set("gap", "4px");
 
+        HorizontalLayout dogsLayout = new HorizontalLayout();
+        dogsLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        dogsLayout.setSpacing(false);
+        dogsLayout.getStyle().set("gap", "6px");
+        Icon pawIcon = new Icon(VaadinIcon.HEART);
+        pawIcon.setSize("16px");
+        pawIcon.getStyle().set("color", DARK);
         Span dogs = new Span("2 Hunde");
         dogs.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
+        dogsLayout.add(pawIcon, dogs);
         
+        HorizontalLayout ageLayout = new HorizontalLayout();
+        ageLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        ageLayout.setSpacing(false);
+        ageLayout.getStyle().set("gap", "6px");
+        Icon userIcon = new Icon(VaadinIcon.USER);
+        userIcon.setSize("16px");
+        userIcon.getStyle().set("color", DARK);
         Span age = new Span("21 Jahre alt");
         age.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
+        ageLayout.add(userIcon, age);
 
         HorizontalLayout locationLayout = new HorizontalLayout();
         locationLayout.setAlignItems(FlexComponent.Alignment.CENTER);
@@ -136,7 +153,7 @@ public class ProfilePopUp extends Dialog {
         lang.getStyle().set("font-style", "italic").set("font-weight", "600").set("color", DARK);
         langLayout.add(globeIcon, lang);
 
-        detailsLayout.add(dogs, age, locationLayout, langLayout);
+        detailsLayout.add(dogsLayout, ageLayout, locationLayout, langLayout);
 
         // Description
         Paragraph desc1 = new Paragraph("Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.");
@@ -256,7 +273,7 @@ public class ProfilePopUp extends Dialog {
         for (int i = 0; i < 5; i++) {
             Icon star = new Icon(i < starsCount ? VaadinIcon.STAR : VaadinIcon.STAR_O);
             star.setSize("14px");
-            star.getStyle().set("color", DARK);
+            star.getStyle().set("color", i < starsCount ? "#ffdf4a" : DARK);
             starsLayout.add(star);
         }
 

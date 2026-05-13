@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
@@ -42,6 +43,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
+    private final PetService petService;
     private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
@@ -52,8 +54,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnLogout;
     private Div contentPanel;
 
-    public UserView(UserService userService) {
+    public UserView(UserService userService, PetService petService) {
         this.userService = userService;
+        this.petService = petService;
         reloadProfile();
 
         setSizeFull();
@@ -218,7 +221,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         row.getStyle().set("margin-bottom", "28px");
 
         H2 title = new H2(titleText);
-        title.getStyle().set("margin", "0").set("font-size", "22px").set("font-weight", "800");
+        title.getStyle().set("margin", "0").set("font-size", "28px").set("font-weight", "800").set("color", DARK);
 
         HorizontalLayout actionRow = new HorizontalLayout();
         actionRow.setSpacing(false);
@@ -360,7 +363,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private Component buildAvatarCard(boolean editMode) {
         Div card = new Div();
+        card.setWidthFull();
         card.getStyle()
+            .set("box-sizing", "border-box")
             .set("background", "#fffdf8")
             .set("border", "1px solid #ead5ae")
             .set("border-radius", "16px")
@@ -444,29 +449,47 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             .set("font-size", "20px")
             .set("font-weight", "800");
 
-        Span pets = styledInfoLine("Meine Haustiere: " + valueOrDefault(currentProfile.petSummary(), "Keine Haustiere"));
-        Span loc  = styledInfoLine(locationLine());
-        Span lang = styledInfoLine(valueOrDefault(currentProfile.language(), "deutsch"));
+        Component pets = styledInfoLineWithIcon(VaadinIcon.HEART, valueOrDefault(currentProfile.petSummary(), "Keine Haustiere"));
+        
+        int age = currentProfile.birthDate() != null ? java.time.Period.between(currentProfile.birthDate(), java.time.LocalDate.now()).getYears() : 0;
+        String ageStr = age > 0 ? age + " Jahre" : "Alter nicht angegeben";
+        Component userAge = styledInfoLineWithIcon(VaadinIcon.USER, ageStr);
+        
+        Component loc  = styledInfoLineWithIcon(VaadinIcon.MAP_MARKER, locationLine());
+        Component lang = styledInfoLineWithIcon(VaadinIcon.GLOBE, valueOrDefault(currentProfile.language(), "deutsch"));
 
-        info.add(topRow, name, pets, loc, lang);
+        info.add(topRow, name, pets, userAge, loc, lang);
         card.add(avatarWrap, info);
         return card;
     }
 
-    private Span styledInfoLine(String text) {
+    private Component styledInfoLineWithIcon(VaadinIcon icon, String text) {
+        HorizontalLayout layout = new HorizontalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
+        layout.getStyle().set("gap", "8px");
+
+        Icon i = new Icon(icon);
+        i.setSize("16px");
+        i.setColor("#5a4030");
+
         Span s = new Span(text);
         s.getStyle().set("font-size", "14px").set("color", "#5a4030").set("font-weight", "500");
-        return s;
+        
+        layout.add(i, s);
+        return layout;
     }
 
     private Component buildBioSection(boolean editMode, TextArea existingArea) {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
         section.setSpacing(false);
+        section.setWidthFull();
         section.getStyle().set("gap", "12px");
 
-        Span label = new Span("Ich und meine Tiere:");
-        label.getStyle().set("font-weight", "700").set("font-size", "15px").set("color", DARK);
+        H3 label = new H3("Ich und meine Tiere:");
+        label.getStyle().set("margin", "0").set("font-weight", "800").set("font-size", "20px").set("color", DARK);
         section.add(label);
 
         if (editMode && existingArea != null) {
@@ -477,7 +500,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         }
 
         Div bioBox = new Div();
+        bioBox.setWidthFull();
         bioBox.getStyle()
+            .set("box-sizing", "border-box")
             .set("background", "#fffdf8")
             .set("border", "1px solid #ead5ae")
             .set("border-radius", "12px")
@@ -501,40 +526,53 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
         section.setSpacing(false);
+        section.setWidthFull();
         section.getStyle().set("gap", "14px");
 
         H3 reviewTitle = new H3("Meine Bewertungen");
-        reviewTitle.getStyle().set("margin", "0 0 8px 0").set("font-size", "20px").set("font-weight", "800");
+        reviewTitle.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
         section.add(reviewTitle);
 
-        section.add(reviewCard("★★★★★ Sehr zuverlässig",
+        section.add(reviewCard("★★★★★", "Sehr zuverlässig",
             "Bruno war bestens betreut. Kommunikation und Übergabe waren super unkompliziert."));
-        section.add(reviewCard("★★★★★ Freundlich und flexibel",
+        section.add(reviewCard("★★★★★", "Freundlich und flexibel",
             "Sehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgefühlt."));
         return section;
     }
 
-    private Div reviewCard(String headline, String text) {
+    private Div reviewCard(String starsText, String headline, String text) {
         Div card = new Div();
+        card.setWidthFull();
         card.getStyle()
+            .set("box-sizing", "border-box")
             .set("background", "#fffdf8")
             .set("border", "1px solid #ead5ae")
             .set("border-radius", "14px")
             .set("padding", "18px 22px");
 
+        HorizontalLayout top = new HorizontalLayout();
+        top.setAlignItems(FlexComponent.Alignment.CENTER);
+        top.setSpacing(false);
+        top.getStyle().set("gap", "8px");
+
+        Span stars = new Span(starsText);
+        stars.getStyle().set("color", "#f5c842").set("font-size", "16px").set("letter-spacing", "1px");
+
         Span h = new Span(headline);
-        h.getStyle().set("font-weight", "700").set("font-size", "14px").set("color", DARK).set("display", "block");
+        h.getStyle().set("font-weight", "700").set("font-size", "14px").set("color", DARK);
+
+        top.add(stars, h);
 
         Span t = new Span(text);
         t.getStyle().set("font-size", "13px").set("color", "#7a6050").set("margin-top", "6px").set("display", "block");
 
-        card.add(h, t);
+        card.add(top, t);
         return card;
     }
 
     private void showMeineTiere() {
         contentPanel.removeAll();
-        contentPanel.add(new MyPetView());
+        contentPanel.add(new MyPetView(petService));
     }
 
     private void showMeineAuftraege() {

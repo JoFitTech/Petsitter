@@ -18,7 +18,8 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 public class CookiePopUp extends Dialog {
 
     private static final String DARK = "#4a3428";
-    private static final String BROWN = "#7E5E4C";
+    private static final String BROWN_BTN = "#5c3d1e";
+    private static final String CREAM = "#e8d9c8";
     private static final String LIGHT_BG = "#F8EFE4";
     private static final String TOGGLE_BG = "#FCF9F2";
     
@@ -34,17 +35,21 @@ public class CookiePopUp extends Dialog {
         mainContainer.getStyle()
                 .set("background-color", LIGHT_BG)
                 .set("padding", "32px 48px")
-                .set("border-radius", "16px");
+                .set("border-radius", "16px")
+                .set("font-family", "'Inter', sans-serif");
 
         // Header
         HorizontalLayout header = new HorizontalLayout();
         header.setWidthFull();
-        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         header.setAlignItems(FlexComponent.Alignment.CENTER);
-        header.getStyle().set("margin-bottom", "16px");
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        header.getStyle()
+                .set("margin-bottom", "16px")
+                .set("position", "relative");
         
         HorizontalLayout titleLayout = new HorizontalLayout();
         titleLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        titleLayout.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
         Image logoImg = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
         logoImg.setHeight("40px");
         H2 logoText = new H2("– Cookie-Einstellungen");
@@ -60,7 +65,11 @@ public class CookiePopUp extends Dialog {
         closeButton.getStyle()
                 .set("color", DARK)
                 .set("font-size", "22px")
-                .set("cursor", "pointer");
+                .set("cursor", "pointer")
+                .set("position", "absolute")
+                .set("right", "0")
+                .set("top", "50%")
+                .set("transform", "translateY(-50%)");
         closeButton.addClickListener(e -> {
             System.out.println("CookiePopUp: Close button clicked");
             this.close();
@@ -99,10 +108,10 @@ public class CookiePopUp extends Dialog {
         togglesLayout.setWidthFull();
         togglesLayout.getStyle().set("gap", "12px");
 
-        togglesLayout.add(createToggleItem("Notwendige Cookies", "Diese Cookies sind für die Grundfunktion der Website erforderlich.", true));
-        togglesLayout.add(createToggleItem("Funktionale Cookies", "Verbessern die Performance und Funktionalität (z.B. Spracheinstellungen).", true));
-        togglesLayout.add(createToggleItem("Analytische Cookies", "Helfen uns zu verstehen, wie Nutzer mit der Website interagieren.", true));
-        togglesLayout.add(createToggleItem("Marketing Cookies", "Werden verwendet, um personalisierte Werbung anzuzeigen.", true));
+        togglesLayout.add(createToggleItem("Notwendige Cookies", "Diese Cookies sind für die Grundfunktion der Website erforderlich.", true, true));
+        togglesLayout.add(createToggleItem("Funktionale Cookies", "Verbessern die Performance und Funktionalität (z.B. Spracheinstellungen).", true, false));
+        togglesLayout.add(createToggleItem("Analytische Cookies", "Helfen uns zu verstehen, wie Nutzer mit der Website interagieren.", true, false));
+        togglesLayout.add(createToggleItem("Marketing Cookies", "Werden verwendet, um personalisierte Werbung anzuzeigen.", true, false));
 
         // Footer Buttons
         HorizontalLayout footerButtons = new HorizontalLayout();
@@ -112,9 +121,9 @@ public class CookiePopUp extends Dialog {
 
         Button btnOnlyNecessary = new Button("Nur notwendige akzeptieren");
         btnOnlyNecessary.getStyle()
-                .set("background-color", "#EBE0D2")
-                .set("color", BROWN)
-                .set("border", "1px solid " + BROWN)
+                .set("background-color", CREAM)
+                .set("color", BROWN_BTN)
+                .set("border", "1px solid " + BROWN_BTN)
                 .set("border-radius", "24px")
                 .set("padding", "0 24px")
                 .set("height", "48px")
@@ -128,7 +137,7 @@ public class CookiePopUp extends Dialog {
 
         Button btnAcceptAll = new Button("Alle akzeptieren");
         btnAcceptAll.getStyle()
-                .set("background-color", BROWN)
+                .set("background-color", BROWN_BTN)
                 .set("color", "white")
                 .set("border-radius", "24px")
                 .set("padding", "0 28px")
@@ -148,7 +157,7 @@ public class CookiePopUp extends Dialog {
         add(mainContainer);
     }
 
-    private Div createToggleItem(String titleText, String descText, boolean activeInitially) {
+    private Div createToggleItem(String titleText, String descText, boolean activeInitially, boolean isReadOnly) {
         Div item = new Div();
         item.getStyle()
                 .set("background-color", TOGGLE_BG)
@@ -157,7 +166,9 @@ public class CookiePopUp extends Dialog {
                 .set("display", "flex")
                 .set("justify-content", "space-between")
                 .set("align-items", "center")
-                .set("border", "1px solid #efe4d3");
+                .set("border", "1px solid #efe4d3")
+                .set("width", "100%")
+                .set("box-sizing", "border-box");
 
         VerticalLayout textLayout = new VerticalLayout();
         textLayout.setPadding(false);
@@ -184,9 +195,13 @@ public class CookiePopUp extends Dialog {
                 .set("height", "28px")
                 .set("border-radius", "14px")
                 .set("position", "relative")
-                .set("cursor", "pointer")
+                .set("cursor", isReadOnly ? "default" : "pointer")
                 .set("flex-shrink", "0")
                 .set("transition", "background-color 0.2s");
+        
+        if (isReadOnly) {
+            toggleSwitch.getStyle().set("opacity", "0.6");
+        }
 
         Div lineIndicator = new Div();
         lineIndicator.getStyle()
@@ -216,7 +231,7 @@ public class CookiePopUp extends Dialog {
         Runnable updateToggleStyle = () -> {
             if (isActive[0]) {
                 knob.getStyle().set("left", "31px");
-                toggleSwitch.getStyle().set("background-color", BROWN);
+                toggleSwitch.getStyle().set("background-color", BROWN_BTN);
                 lineIndicator.getStyle().set("display", "block");
             } else {
                 knob.getStyle().set("left", "3px");
@@ -226,11 +241,13 @@ public class CookiePopUp extends Dialog {
         };
         updateToggleStyle.run();
 
-        toggleSwitch.addClickListener(e -> {
-            isActive[0] = !isActive[0];
-            updateToggleStyle.run();
-            System.out.println("CookiePopUp: " + titleText + " turned " + (isActive[0] ? "ON" : "OFF"));
-        });
+        if (!isReadOnly) {
+            toggleSwitch.addClickListener(e -> {
+                isActive[0] = !isActive[0];
+                updateToggleStyle.run();
+                System.out.println("CookiePopUp: " + titleText + " turned " + (isActive[0] ? "ON" : "OFF"));
+            });
+        }
 
         item.add(textLayout, toggleSwitch);
         return item;

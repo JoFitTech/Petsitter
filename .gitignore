@@ -36,6 +36,7 @@ build/
 
 ### Vaadin generated frontend ###
 src/main/frontend/generated/
+.vaadin-node-tasks.lock
 
 ### Local Maven override ###
 .mvn/maven.config

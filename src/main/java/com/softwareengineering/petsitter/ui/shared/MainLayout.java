@@ -14,15 +14,25 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.AfterNavigationEvent;
+import com.vaadin.flow.router.AfterNavigationObserver;
 
-public class MainLayout extends AppLayout {
+import java.util.List;
+import java.util.Map;
+
+public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
     private static final String DARK      = "#4a3428";
     private static final String BROWN     = "#7b5236";
     private static final String LIGHT_BG  = "#fbf8f1";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
+    private static final String NAV_ACTIVE_BG = "#f6e3bd";
+    private static final String NAV_INACTIVE_BG = "#fff6e6";
+    private static final String NAV_BORDER = "#ead5ae";
 
     private final AuthenticatedUser authenticatedUser;
+    private Button findOwnerBtn;
+    private Button findSitterBtn;
 
     public MainLayout(AuthenticatedUser authenticatedUser) {
         this.authenticatedUser = authenticatedUser;
@@ -96,17 +106,38 @@ public class MainLayout extends AppLayout {
         nav.setSpacing(true);
         nav.setAlignItems(FlexComponent.Alignment.CENTER);
 
-        Button findOwnerBtn = pillButton("Tierhalter finden", "#f6e3bd", DARK);
+        findOwnerBtn = pillButton("Tierhalter finden");
         findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
 
-        Button findSitterBtn = pillButton("Tiersitter finden", "#fff6e6", DARK);
-        findSitterBtn.getStyle().set("border", "1px solid #ead5ae");
+        findSitterBtn = pillButton("Tiersitter finden");
         findSitterBtn.addClickListener(e -> UI.getCurrent().navigate("tierhalter-finden"));
 
         nav.add(findOwnerBtn, findSitterBtn);
 
         header.add(logoWrapper, nav, buildHeaderActions());
         return header;
+    }
+
+    @Override
+    public void afterNavigation(AfterNavigationEvent event) {
+        updateNavigationState(
+                event.getLocation().getPath(),
+                event.getLocation().getQueryParameters().getParameters()
+        );
+    }
+
+    private void updateNavigationState(String path, Map<String, List<String>> queryParameters) {
+        boolean ownerActive = path == null || path.isBlank();
+        boolean sitterActive = "tierhalter-finden".equals(path);
+
+        if ("petsitter-suche".equals(path)) {
+            List<String> modes = queryParameters.getOrDefault("mode", List.of());
+            ownerActive = modes.contains("tierhalter");
+            sitterActive = modes.contains("tiersitter");
+        }
+
+        setPillActive(findOwnerBtn, ownerActive);
+        setPillActive(findSitterBtn, sitterActive);
     }
 
     private Component buildHeaderActions() {
@@ -237,18 +268,29 @@ public class MainLayout extends AppLayout {
         return btn;
     }
 
-    private Button pillButton(String text, String background, String color) {
+    private Button pillButton(String text) {
         Button button = new Button(text);
         button.getStyle()
                 .set("height", "44px")
                 .set("padding", "0 36px")
                 .set("border-radius", "28px")
-                .set("background", background)
-                .set("color", color)
+                .set("background", NAV_INACTIVE_BG)
+                .set("border", "1px solid " + NAV_BORDER)
+                .set("color", DARK)
                 .set("font-weight", "700")
                 .set("box-shadow", "none")
                 .set("cursor", "pointer");
         return button;
+    }
+
+    private void setPillActive(Button button, boolean active) {
+        if (button == null) {
+            return;
+        }
+
+        button.getStyle()
+                .set("background", active ? NAV_ACTIVE_BG : NAV_INACTIVE_BG)
+                .set("border", active ? "1px solid transparent" : "1px solid " + NAV_BORDER);
     }
 
     private Component footerLink(String text, String route) {

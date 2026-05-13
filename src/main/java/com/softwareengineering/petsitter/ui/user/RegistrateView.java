@@ -128,14 +128,7 @@ public class RegistrateView extends VerticalLayout {
         Image logoImg = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
         logoImg.getStyle().set("height", "48px").set("width", "auto");
 
-        Span logoText = new Span("Pawsitter");
-        logoText.getStyle()
-                .set("font-size", "26px")
-                .set("font-weight", "800")
-                .set("color", DARK)
-                .set("letter-spacing", "-0.5px");
-
-        logoRow.add(logoImg, logoText);
+        logoRow.add(logoImg);
         logoRow.addClickListener(e -> UI.getCurrent().navigate(""));
         return logoRow;
     }
@@ -162,22 +155,40 @@ public class RegistrateView extends VerticalLayout {
         form.setSpacing(false);
         form.getStyle().set("gap", "12px");
 
-        // ── Persönliche Angaben ────────────────────────────────────────────
-        H2 personalHeading = sectionHeading("Persönliche Angaben");
+        // ── Tabs ──────────────────────────────────────────────────────────
+        HorizontalLayout tabs = new HorizontalLayout();
+        tabs.setWidthFull();
+        tabs.setSpacing(false);
+        tabs.getStyle()
+                .set("gap", "8px")
+                .set("margin-bottom", "8px");
 
-        // Row 1: Vorname | Nachname
-        TextField vornameField = pillTextField("Vorname");
-        TextField nachnameField = pillTextField("Nachname");
-        HorizontalLayout row1 = twoColRow(vornameField, nachnameField);
+        Button kontoTab = new Button("Konto");
+        Button datenTab = new Button("Daten");
 
-        // Row 2: E-Mail | Telefonnummer
+        VerticalLayout kontoLayout = new VerticalLayout();
+        kontoLayout.setPadding(false);
+        kontoLayout.setSpacing(false);
+        kontoLayout.getStyle().set("gap", "12px");
+
+        VerticalLayout datenLayout = new VerticalLayout();
+        datenLayout.setPadding(false);
+        datenLayout.setSpacing(false);
+        datenLayout.getStyle().set("gap", "12px");
+        datenLayout.setVisible(false);
+
+        styleTabButton(kontoTab, true);
+        styleTabButton(datenTab, false);
+
+        // Tab click listeners are defined further down
+
+        tabs.add(kontoTab, datenTab);
+
+        // ── Konto Fields ──────────────────────────────────────────────────
         EmailField emailField = new EmailField();
         emailField.setPlaceholder("E-Mail");
         styleEmailField(emailField);
-        TextField telefonField = pillTextField("Telefonnummer");
-        HorizontalLayout row2 = twoColRow(emailField, telefonField);
 
-        // Row 3: Passwort | Passwort bestätigen (warmer Hintergrund – active look)
         PasswordField passwortField = new PasswordField();
         passwortField.setPlaceholder("Passwort");
         passwortField.setWidthFull();
@@ -188,38 +199,55 @@ public class RegistrateView extends VerticalLayout {
         passwortConfirmField.setWidthFull();
         stylePasswordField(passwortConfirmField);
 
-        HorizontalLayout row3 = twoColRow(passwortField, passwortConfirmField);
+        HorizontalLayout rowPass = twoColRow(passwortField, passwortConfirmField);
+        
+        kontoLayout.add(emailField, rowPass);
 
-        // Row 4: Geburtstag | Nationalität
+        // ── Daten Fields ──────────────────────────────────────────────────
+        H2 personalHeading = sectionHeading("Persönliche Angaben");
+
+        TextField vornameField = pillTextField("Vorname");
+        TextField nachnameField = pillTextField("Nachname");
+        HorizontalLayout rowVorNach = twoColRow(vornameField, nachnameField);
+
+        TextField telefonField = pillTextField("Telefonnummer");
         DatePicker geburtstagsField = new DatePicker();
         geburtstagsField.setPlaceholder("Geburtstag");
         geburtstagsField.setWidthFull();
         styleDateField(geburtstagsField.getElement());
+        HorizontalLayout rowTelGeb = twoColRow(telefonField, geburtstagsField);
 
         TextField nationalitaetField = pillTextField("Nationalität");
-        HorizontalLayout row4 = twoColRow(geburtstagsField, nationalitaetField);
+        nationalitaetField.getStyle().set("width", "50%").set("min-width", "200px");
+        HorizontalLayout rowNat = new HorizontalLayout(nationalitaetField);
+        rowNat.setWidthFull();
+        rowNat.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
 
-        // ── Standort ──────────────────────────────────────────────────────
         H2 standortHeading = sectionHeading("Standort");
 
-        // Row 5: Straße | Hausnummer
         TextField strasseField = pillTextField("Straße");
         TextField hausnummerField = pillTextField("Hausnummer");
-        HorizontalLayout row5 = twoColRow(strasseField, hausnummerField);
+        HorizontalLayout rowStrasseHaus = twoColRow(strasseField, hausnummerField);
 
-        // Row 6: Postleitzahl | Ort (single visual field with divider)
-        HorizontalLayout row6 = buildPlzOrtRow();
+        postalCodeField = pillTextField("Postleitzahl");
+        cityField = pillTextField("Ort");
+        HorizontalLayout rowPlzOrt = twoColRow(postalCodeField, cityField);
 
-        // Row 7: Land (half width, centered)
         TextField landField = pillTextField("Land");
         landField.getStyle().set("width", "50%").set("min-width", "200px");
+        HorizontalLayout rowLand = new HorizontalLayout(landField);
+        rowLand.setWidthFull();
+        rowLand.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
 
-        HorizontalLayout row7 = new HorizontalLayout(landField);
-        row7.setWidthFull();
-        row7.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
+        datenLayout.add(
+                personalHeading,
+                rowVorNach, rowTelGeb, rowNat,
+                standortHeading,
+                rowStrasseHaus, rowPlzOrt, rowLand
+        );
 
         // ── Register button ────────────────────────────────────────────────
-        Button registerBtn = new Button("Registrieren & Starten");
+        Button registerBtn = new Button("Weiter");
         registerBtn.setWidthFull();
         registerBtn.getStyle()
                 .set("background", BROWN_BTN)
@@ -233,21 +261,25 @@ public class RegistrateView extends VerticalLayout {
                 .set("margin-top", "10px")
                 .set("letter-spacing", "0.3px");
         registerBtn.addClickListener(e -> {
-            clearMessages();
-            currentRegistrationEmail = emailField.getValue();
-            UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
-                    emailField.getValue(),
-                    passwortField.getValue(),
-                    passwortConfirmField.getValue(),
-                    vornameField.getValue(),
-                    nachnameField.getValue(),
-                    telefonField.getValue(),
-                    strasseField.getValue(),
-                    hausnummerField.getValue(),
-                    postalCodeField.getValue(),
-                    cityField.getValue(),
-                    null), currentRequestIp());
-            showResult(result);
+            if ("Weiter".equals(registerBtn.getText())) {
+                datenTab.click();
+            } else {
+                clearMessages();
+                currentRegistrationEmail = emailField.getValue();
+                UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
+                        emailField.getValue(),
+                        passwortField.getValue(),
+                        passwortConfirmField.getValue(),
+                        vornameField.getValue(),
+                        nachnameField.getValue(),
+                        telefonField.getValue(),
+                        strasseField.getValue(),
+                        hausnummerField.getValue(),
+                        postalCodeField.getValue(),
+                        cityField.getValue(),
+                        null), currentRequestIp());
+                showResult(result);
+            }
         });
 
         TextField codeField = pillTextField("Bestätigungscode");
@@ -275,85 +307,56 @@ public class RegistrateView extends VerticalLayout {
 
         Paragraph codeHint = new Paragraph("Nach der Registrierung kommt der Code per E-Mail.");
         codeHint.getStyle()
-                .set("margin", "0")
+                .set("margin", "16px 0 0 0")
                 .set("font-size", "13px")
-                .set("color", "#8a7060");
+                .set("color", "#8a7060")
+                .set("align-self", "center");
 
         // ── "Bereits registriert?" link ────────────────────────────────────
-        Button loginBtn = new Button("Bereits registriert? Hier einloggen");
+        Span loginBtn = new Span("Bereits registriert? Hier einloggen");
         loginBtn.getStyle()
-                .set("background", "transparent")
                 .set("color", LINK_CLR)
-                .set("box-shadow", "none")
                 .set("font-size", "14px")
                 .set("font-weight", "600")
-                .set("padding", "0")
-                .set("height", "auto")
                 .set("cursor", "pointer")
                 .set("text-decoration", "underline")
-                .set("margin-top", "4px");
+                .set("margin-top", "4px")
+                .set("align-self", "center");
         loginBtn.addClickListener(e -> {
             UI.getCurrent().navigate("login");
         });
+        kontoTab.addClickListener(e -> {
+            styleTabButton(kontoTab, true);
+            styleTabButton(datenTab, false);
+            kontoLayout.setVisible(true);
+            datenLayout.setVisible(false);
+            codeHint.setVisible(true);
+            codeField.setVisible(true);
+            confirmBtn.setVisible(true);
+            registerBtn.setText("Weiter");
+        });
+
+        datenTab.addClickListener(e -> {
+            styleTabButton(kontoTab, false);
+            styleTabButton(datenTab, true);
+            kontoLayout.setVisible(false);
+            datenLayout.setVisible(true);
+            codeHint.setVisible(false);
+            codeField.setVisible(false);
+            confirmBtn.setVisible(false);
+            registerBtn.setText("Registrieren & Starten");
+        });
 
         form.add(
-                personalHeading,
-                row1, row2, row3, row4,
-                standortHeading,
-                row5, row6, row7,
+                tabs,
+                kontoLayout,
+                datenLayout,
                 registerBtn, codeHint, codeField, confirmBtn, loginBtn
         );
         return form;
     }
 
-    // ── Postleitzahl | Ort – single rounded container with divider ────────────
-    private HorizontalLayout buildPlzOrtRow() {
-        postalCodeField = new TextField();
-        postalCodeField.setPlaceholder("Postleitzahl");
-        postalCodeField.getStyle()
-                .set("flex", "1")
-                .set("--vaadin-input-field-background", INPUT_BG)
-                .set("--vaadin-input-field-border-radius", "0")
-                .set("border", "none")
-                .set("box-shadow", "none");
-        postalCodeField.getElement().getStyle()
-                .set("--lumo-contrast-10pct", INPUT_BG)
-                .set("--lumo-border-radius-m", "0");
 
-        Span divider = new Span("|");
-        divider.getStyle()
-                .set("color", "#b8a898")
-                .set("align-self", "center")
-                .set("flex-shrink", "0")
-                .set("font-size", "18px")
-                .set("line-height", "1")
-                .set("padding", "0 4px");
-
-        cityField = new TextField();
-        cityField.setPlaceholder("Ort");
-        cityField.getStyle()
-                .set("flex", "1")
-                .set("--vaadin-input-field-background", INPUT_BG)
-                .set("--vaadin-input-field-border-radius", "0")
-                .set("border", "none")
-                .set("box-shadow", "none");
-        cityField.getElement().getStyle()
-                .set("--lumo-contrast-10pct", INPUT_BG)
-                .set("--lumo-border-radius-m", "0");
-
-        HorizontalLayout combined = new HorizontalLayout(postalCodeField, divider, cityField);
-        combined.setWidthFull();
-        combined.setAlignItems(FlexComponent.Alignment.CENTER);
-        combined.setSpacing(false);
-        combined.getStyle()
-                .set("background", INPUT_BG)
-                .set("border-radius", "28px")
-                .set("padding", "0 12px")
-                .set("box-sizing", "border-box")
-                .set("border", "1.5px solid rgba(74,52,40,0.08)")
-                .set("overflow", "hidden");
-        return combined;
-    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -423,7 +426,8 @@ public class RegistrateView extends VerticalLayout {
                 .set("--lumo-border-radius-m", "28px")
                 .set("--lumo-contrast-10pct", INPUT_BG)
                 .set("--vaadin-input-field-background", INPUT_BG)
-                .set("--vaadin-input-field-border-radius", "28px");
+                .set("--vaadin-input-field-border-radius", "28px")
+                .set("text-align", "center");
     }
 
     private void handleAuthResult(UserAuthResult result) {
@@ -493,5 +497,27 @@ public class RegistrateView extends VerticalLayout {
     private void clearMessages() {
         errorMessage.getStyle().set("display", "none");
         statusMessage.getStyle().set("display", "none");
+    }
+
+    private void styleTabButton(Button btn, boolean active) {
+        btn.getStyle()
+                .set("border-radius", "12px")
+                .set("font-size", "16px")
+                .set("font-weight", "500")
+                .set("cursor", "pointer")
+                .set("box-shadow", "none")
+                .set("border", "none")
+                .set("padding", "0 20px")
+                .set("height", "40px");
+
+        if (active) {
+            btn.getStyle()
+                    .set("background", INPUT_BG)
+                    .set("color", DARK);
+        } else {
+            btn.getStyle()
+                    .set("background", "transparent")
+                    .set("color", "#8a7060");
+        }
     }
 }

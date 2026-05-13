@@ -450,7 +450,7 @@ class UserServiceTest {
     }
 
     private PetService petService(String summary) {
-        return new PetService(null) {
+        return new PetService(null, null) {
             @Override
             public String getPetSummaryForOwner(UUID ownerId) {
                 return summary;

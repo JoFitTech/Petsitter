@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.ui.shared;
 
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.vaadin.flow.component.Component;
@@ -235,16 +236,16 @@ public class StartView extends VerticalLayout {
     // ── Backend-Interface hooks ───────────────────────────────────────────
 
     private void onSearchClicked(FilterSearchBar.SearchCriteria criteria) {
-        UI.getCurrent().navigate("petsitter-suche", queryParametersFor("tierhalter", criteria));
+        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(OfferSearchMode.TIERHALTER, criteria));
     }
 
     private void onCreateOfferClicked() {
         UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "offer"));
     }
 
-    private QueryParameters queryParametersFor(String mode, FilterSearchBar.SearchCriteria criteria) {
+    private QueryParameters queryParametersFor(OfferSearchMode mode, FilterSearchBar.SearchCriteria criteria) {
         Map<String, List<String>> parameters = new LinkedHashMap<>();
-        parameters.put("mode", List.of(mode));
+        parameters.put("mode", List.of(mode.queryValue()));
         if (criteria.from() != null) {
             parameters.put("from", List.of(criteria.from().toString()));
         }

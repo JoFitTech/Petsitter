@@ -7,6 +7,7 @@ import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
@@ -14,6 +15,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
+import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
@@ -371,7 +373,7 @@ class OfferServiceTest {
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
-                OfferType.OWNER_OFFER, from, to, BigDecimal.valueOf(100), true);
+                new OfferSearchCriteria(OfferSearchMode.TIERHALTER, from, to, BigDecimal.valueOf(100), 5));
 
         assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
         assertThat(requestedType).hasValue(OfferType.OWNER_OFFER);
@@ -395,7 +397,7 @@ class OfferServiceTest {
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
-                OfferType.SITTER_OFFER, from, to, BigDecimal.valueOf(100), false);
+                new OfferSearchCriteria(OfferSearchMode.TIERSITTER, from, to, BigDecimal.valueOf(100), 5));
 
         assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
     }
@@ -418,7 +420,7 @@ class OfferServiceTest {
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
-                OfferType.SITTER_OFFER, from, to, null, false);
+                new OfferSearchCriteria(OfferSearchMode.TIERSITTER, from, to, null, 5));
 
         assertThat(result).extracting(OfferCardDto::id).containsExactly(pricedOfferId, unpricedOfferId);
     }

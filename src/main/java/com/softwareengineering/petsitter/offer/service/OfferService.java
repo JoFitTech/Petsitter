@@ -12,6 +12,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
+import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
@@ -107,17 +108,16 @@ public class OfferService {
     }
 
     @Transactional(readOnly = true)
-    public List<OfferCardDto> searchOpenOffers(OfferType offerType, LocalDate from, LocalDate to,
-            BigDecimal earnings, boolean minimumEarnings) {
-        if (offerType == null || hasInvalidSearchRange(from, to)) {
+    public List<OfferCardDto> searchOpenOffers(OfferSearchCriteria criteria) {
+        if (criteria == null || hasInvalidSearchRange(criteria.from(), criteria.to())) {
             return List.of();
         }
 
         return offerRepository
-                .findAllByOfferTypeAndStatus(offerType, OfferStatus.OPEN)
+                .findAllByOfferTypeAndStatus(criteria.mode().targetOfferType(), OfferStatus.OPEN)
                 .stream()
-                .filter(offer -> matchesDateRange(offer, from, to))
-                .filter(offer -> matchesEarnings(offer, earnings, minimumEarnings))
+                .filter(offer -> matchesDateRange(offer, criteria.from(), criteria.to()))
+                .filter(offer -> matchesEarnings(offer, criteria.earnings(), criteria.mode().minimumEarnings()))
                 .map(this::toCardDto)
                 .toList();
     }

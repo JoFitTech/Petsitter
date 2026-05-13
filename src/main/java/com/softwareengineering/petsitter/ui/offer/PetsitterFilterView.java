@@ -1,7 +1,8 @@
 package com.softwareengineering.petsitter.ui.offer;
 
-import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.FilterPopUp;
 import com.softwareengineering.petsitter.ui.shared.FilterSearchBar;
@@ -66,8 +67,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private Div filterBarContainer;
     private Div offerGrid;
     private Div mapMarkerLayer;
-    private SearchMode currentMode = SearchMode.TIERSITTER;
-    private FilterSearchBar.SearchCriteria currentCriteria = FilterSearchBar.defaultCriteria();
+    private OfferSearchCriteria currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
 
     @Autowired
     public PetsitterFilterView(OfferService offerService) {
@@ -92,7 +92,6 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
         Map<String, List<String>> parameters = event.getLocation().getQueryParameters().getParameters();
-        currentMode = SearchMode.from(parameters);
         currentCriteria = parseCriteria(parameters);
 
         applyModeChrome();
@@ -101,17 +100,25 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void applyModeChrome() {
-        pageTitle.setText(currentMode.pageTitle);
-        leftBlob.getStyle().set("background", currentMode.leftBlobColor);
+        SearchDisplay display = displayFor(currentCriteria.mode());
+        pageTitle.setText(display.pageTitle);
+        leftBlob.getStyle().set("background", display.leftBlobColor);
     }
 
-    private FilterSearchBar.SearchCriteria parseCriteria(Map<String, List<String>> parameters) {
+    private OfferSearchCriteria parseCriteria(Map<String, List<String>> parameters) {
+        OfferSearchMode mode = OfferSearchMode.fromQueryValue(firstValue(parameters, "mode"));
         FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria();
         if (!containsAnyFilterParameter(parameters)) {
-            return defaultCriteria;
+            return new OfferSearchCriteria(
+                    mode,
+                    defaultCriteria.from(),
+                    defaultCriteria.to(),
+                    defaultCriteria.earnings(),
+                    defaultCriteria.distanceKm());
         }
 
-        return new FilterSearchBar.SearchCriteria(
+        return new OfferSearchCriteria(
+                mode,
                 parseDate(firstValue(parameters, "from")),
                 parseDate(firstValue(parameters, "to")),
                 parseAmount(firstValue(parameters, "earnings")),
@@ -207,7 +214,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 .set("position", "relative")
                 .set("z-index", "1");
 
-        pageTitle = new H1(SearchMode.TIERSITTER.pageTitle);
+        pageTitle = new H1(displayFor(OfferSearchMode.TIERSITTER).pageTitle);
         pageTitle.getStyle()
                 .set("margin", "0")
                 .set("font-size", "32px")
@@ -240,9 +247,10 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 .set("gap", "16px")
                 .set("flex-wrap", "wrap");
 
+        SearchDisplay display = displayFor(currentCriteria.mode());
         FilterSearchBar searchBar = new FilterSearchBar(
-                currentMode.earningsMode,
-                currentCriteria,
+                display.earningsMode,
+                toFilterCriteria(currentCriteria),
                 this::onSearchClicked);
         searchBar.getStyle()
                 .set("margin", "0")
@@ -272,12 +280,20 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void onSearchClicked(FilterSearchBar.SearchCriteria criteria) {
-        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(currentMode, criteria));
+        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(currentCriteria.mode(), criteria));
     }
 
-    private QueryParameters queryParametersFor(SearchMode mode, FilterSearchBar.SearchCriteria criteria) {
+    private FilterSearchBar.SearchCriteria toFilterCriteria(OfferSearchCriteria criteria) {
+        return new FilterSearchBar.SearchCriteria(
+                criteria.from(),
+                criteria.to(),
+                criteria.earnings(),
+                criteria.distanceKm());
+    }
+
+    private QueryParameters queryParametersFor(OfferSearchMode mode, FilterSearchBar.SearchCriteria criteria) {
         Map<String, List<String>> parameters = new LinkedHashMap<>();
-        parameters.put("mode", List.of(mode.queryValue));
+        parameters.put("mode", List.of(mode.queryValue()));
         if (criteria.from() != null) {
             parameters.put("from", List.of(criteria.from().toString()));
         }
@@ -335,12 +351,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void renderOffers() {
-        List<OfferCardDto> offers = offerService.searchOpenOffers(
-                currentMode.offerType,
-                currentCriteria.from(),
-                currentCriteria.to(),
-                currentCriteria.earnings(),
-                currentMode.minimumEarnings);
+        List<OfferCardDto> offers = offerService.searchOpenOffers(currentCriteria);
 
         resultsLabel.setText(resultText(offers.size()));
         renderMapMarkers(offers);
@@ -372,9 +383,10 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private String resultText(int count) {
+        String resultNoun = displayFor(currentCriteria.mode()).resultNoun;
         return count == 1
-                ? "1 " + currentMode.resultNoun + " gefunden"
-                : count + " " + currentMode.resultNoun + " gefunden";
+                ? "1 " + resultNoun + " gefunden"
+                : count + " " + resultNoun + " gefunden";
     }
 
     private Component buildEmptyState() {
@@ -387,7 +399,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 .set("box-sizing", "border-box")
                 .set("grid-column", "1 / -1");
 
-        H3 title = new H3("Keine passenden " + currentMode.resultNoun + " gefunden");
+        H3 title = new H3("Keine passenden " + displayFor(currentCriteria.mode()).resultNoun + " gefunden");
         title.getStyle()
                 .set("margin", "0 0 8px 0")
                 .set("font-size", "18px")
@@ -607,49 +619,36 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         mapArea.add(road1, road2, road3);
     }
 
-    private enum SearchMode {
-        TIERHALTER(
-                "tierhalter",
-                OfferType.OWNER_OFFER,
-                FilterSearchBar.EarningsMode.MINIMUM,
-                true,
-                "Finde liebevolle Tierhalter in deiner Nähe",
-                "Tierhalter",
-                "#f6ead5"),
-        TIERSITTER(
-                "tiersitter",
-                OfferType.SITTER_OFFER,
-                FilterSearchBar.EarningsMode.MAXIMUM,
-                false,
-                "Finde liebevolle Tiersitter in deiner Nähe",
-                "Tiersitter",
-                "#e2f2eb");
+    private OfferSearchCriteria defaultCriteria(OfferSearchMode mode) {
+        FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria();
+        return new OfferSearchCriteria(
+                mode,
+                defaultCriteria.from(),
+                defaultCriteria.to(),
+                defaultCriteria.earnings(),
+                defaultCriteria.distanceKm());
+    }
 
-        private final String queryValue;
-        private final OfferType offerType;
-        private final FilterSearchBar.EarningsMode earningsMode;
-        private final boolean minimumEarnings;
-        private final String pageTitle;
-        private final String resultNoun;
-        private final String leftBlobColor;
+    private SearchDisplay displayFor(OfferSearchMode mode) {
+        return switch (mode) {
+            case TIERHALTER -> new SearchDisplay(
+                    FilterSearchBar.EarningsMode.MINIMUM,
+                    "Finde liebevolle Tierhalter in deiner Nähe",
+                    "Tierhalter",
+                    "#f6ead5");
+            case TIERSITTER -> new SearchDisplay(
+                    FilterSearchBar.EarningsMode.MAXIMUM,
+                    "Finde liebevolle Tiersitter in deiner Nähe",
+                    "Tiersitter",
+                    "#e2f2eb");
+        };
+    }
 
-        SearchMode(String queryValue, OfferType offerType, FilterSearchBar.EarningsMode earningsMode,
-                boolean minimumEarnings, String pageTitle, String resultNoun, String leftBlobColor) {
-            this.queryValue = queryValue;
-            this.offerType = offerType;
-            this.earningsMode = earningsMode;
-            this.minimumEarnings = minimumEarnings;
-            this.pageTitle = pageTitle;
-            this.resultNoun = resultNoun;
-            this.leftBlobColor = leftBlobColor;
-        }
-
-        private static SearchMode from(Map<String, List<String>> parameters) {
-            List<String> modes = parameters.get("mode");
-            if (modes != null && modes.contains(TIERHALTER.queryValue)) {
-                return TIERHALTER;
-            }
-            return TIERSITTER;
-        }
+    private record SearchDisplay(
+            FilterSearchBar.EarningsMode earningsMode,
+            String pageTitle,
+            String resultNoun,
+            String leftBlobColor
+    ) {
     }
 }

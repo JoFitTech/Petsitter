@@ -4,8 +4,6 @@ import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.combobox.ComboBox;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
@@ -14,12 +12,9 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextArea;
-import com.vaadin.flow.component.textfield.TextField;
 import java.time.LocalDate;
 import java.time.Period;
 import java.util.List;
-import java.util.Locale;
 
 public class MyPetView extends Div {
 
@@ -219,121 +214,16 @@ public class MyPetView extends Div {
     }
 
     private void openPetDialog(PetDto existing) {
-        Dialog dialog = new Dialog();
-        dialog.setWidth("480px");
-        dialog.setCloseOnEsc(true);
-        dialog.setCloseOnOutsideClick(false);
-
-        VerticalLayout layout = new VerticalLayout();
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle().set("gap", "14px");
-
-        H2 title = new H2(existing == null ? "Tier hinzufügen" : "Tier bearbeiten");
-        title.getStyle().set("margin", "0 0 6px 0").set("font-size", "22px").set("font-weight", "800").set("color",
-                DARK);
-
-        TextField nameField = new TextField("Name *");
-        nameField.setWidthFull();
-        nameField.setRequiredIndicatorVisible(true);
-        if (existing != null)
-            nameField.setValue(existing.name());
-
-        // Species: ComboBox with all values; OTHER triggers custom text field
-        ComboBox<PetSpecies> speciesBox = new ComboBox<>("Tierart *");
-        speciesBox.setItems(PetSpecies.values());
-        speciesBox.setItemLabelGenerator(PetService::speciesLabel);
-        speciesBox.setWidthFull();
-        speciesBox.setRequiredIndicatorVisible(true);
-
-        TextField customSpeciesField = new TextField("Tierart (eigene Beschreibung) *");
-        customSpeciesField.setWidthFull();
-        customSpeciesField.setPlaceholder("z.B. Schildkröte, Hamster, ...");
-        customSpeciesField.setVisible(false);
-
-        if (existing != null) {
-            speciesBox.setValue(existing.species());
-            if (existing.species() == PetSpecies.OTHER) {
-                customSpeciesField.setVisible(true);
-                if (existing.customSpecies() != null)
-                    customSpeciesField.setValue(existing.customSpecies());
+        AddPetPopUp dialog = new AddPetPopUp(existing, dto -> {
+            if (existing == null) {
+                petService.createPetForCurrentUser(dto);
+                Notification.show("Tier hinzugefügt.", 2500, Notification.Position.TOP_CENTER);
+            } else {
+                petService.updatePet(existing.id(), dto);
+                Notification.show("Änderungen gespeichert.", 2500, Notification.Position.TOP_CENTER);
             }
-        }
-
-        speciesBox.addValueChangeListener(e -> {
-            boolean isOther = e.getValue() == PetSpecies.OTHER;
-            customSpeciesField.setVisible(isOther);
-            if (!isOther)
-                customSpeciesField.clear();
+            loadPets();
         });
-
-        TextField breedField = new TextField("Rasse");
-        breedField.setWidthFull();
-        if (existing != null && existing.breed() != null)
-            breedField.setValue(existing.breed());
-
-        DatePicker birthDatePicker = new DatePicker("Geburtstag");
-        birthDatePicker.setWidthFull();
-        birthDatePicker.setMax(LocalDate.now());
-        birthDatePicker.setLocale(Locale.GERMAN);
-        if (existing != null && existing.birthDate() != null)
-            birthDatePicker.setValue(existing.birthDate());
-
-        TextArea notesArea = new TextArea("Wichtige Infos");
-        notesArea.setWidthFull();
-        notesArea.setMinHeight("80px");
-        if (existing != null && existing.notes() != null)
-            notesArea.setValue(existing.notes());
-
-        Button saveBtn = styledSaveBtn("Speichern");
-        Button cancelBtn = styledCancelBtn("Abbrechen");
-        cancelBtn.addClickListener(e -> dialog.close());
-
-        saveBtn.addClickListener(e -> {
-            String name = nameField.getValue();
-            PetSpecies species = speciesBox.getValue();
-            if (name == null || name.isBlank()) {
-                Notification.show("Bitte einen Namen eingeben.", 2500, Notification.Position.TOP_CENTER);
-                return;
-            }
-            if (species == null) {
-                Notification.show("Bitte eine Tierart auswählen.", 2500, Notification.Position.TOP_CENTER);
-                return;
-            }
-            if (species == PetSpecies.OTHER && customSpeciesField.getValue().isBlank()) {
-                Notification.show("Bitte die Tierart beschreiben.", 2500, Notification.Position.TOP_CENTER);
-                return;
-            }
-            try {
-                PetDto dto = new PetDto(
-                        existing != null ? existing.id() : null,
-                        name.trim(),
-                        species,
-                        species == PetSpecies.OTHER ? customSpeciesField.getValue().trim() : null,
-                        breedField.getValue().isBlank() ? null : breedField.getValue().trim(),
-                        birthDatePicker.getValue(),
-                        notesArea.getValue().isBlank() ? null : notesArea.getValue().trim());
-                if (existing == null) {
-                    petService.createPetForCurrentUser(dto);
-                    Notification.show("Tier hinzugefügt.", 2500, Notification.Position.TOP_CENTER);
-                } else {
-                    petService.updatePet(existing.id(), dto);
-                    Notification.show("Änderungen gespeichert.", 2500, Notification.Position.TOP_CENTER);
-                }
-                dialog.close();
-                loadPets();
-            } catch (Exception ex) {
-                Notification.show("Fehler: " + ex.getMessage(), 3500, Notification.Position.TOP_CENTER);
-            }
-        });
-
-        HorizontalLayout btns = new HorizontalLayout(cancelBtn, saveBtn);
-        btns.setWidthFull();
-        btns.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        btns.getStyle().set("margin-top", "8px");
-
-        layout.add(title, nameField, speciesBox, customSpeciesField, breedField, birthDatePicker, notesArea, btns);
-        dialog.add(layout);
         dialog.open();
     }
 

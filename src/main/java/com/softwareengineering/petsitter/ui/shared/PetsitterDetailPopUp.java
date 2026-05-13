@@ -3,6 +3,8 @@ package com.softwareengineering.petsitter.ui.shared;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
+
+import java.util.UUID;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -38,7 +40,7 @@ public class PetsitterDetailPopUp extends Dialog {
      * @param topColor  CSS colour for the image area, e.g. "#94b883"
      * @param stars     Number of filled stars (0–5)
      */
-    public PetsitterDetailPopUp(long offerId, String title, String date,
+    public PetsitterDetailPopUp(UUID offerId, String title, String date,
                                 String price, String distance,
                                 String topColor, int stars) {
         setWidth("520px");
@@ -205,7 +207,7 @@ public class PetsitterDetailPopUp extends Dialog {
      * Called when the user clicks "Auftrag anfragen".
      * TODO: Backend-Team ersetzt den Print durch einen echten Service-Call.
      */
-    private void onAuftragAnfragenClicked(long offerId, String serviceType,
+    private void onAuftragAnfragenClicked(UUID offerId, String serviceType,
                                           String frequency, String haustiere,
                                           String haustierarten, String zusatzinfos) {
         System.out.println("Auftrag anfragen geklickt für Offer-ID: " + offerId);

@@ -15,4 +15,6 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
             LocalDate endDate,
             LocalDate startDate
     );
+
+    List<Offer> findAllByOfferTypeAndStatus(OfferType offerType, OfferStatus status);
 }

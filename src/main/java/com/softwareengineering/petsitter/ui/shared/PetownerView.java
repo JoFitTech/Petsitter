@@ -343,15 +343,7 @@ public class PetownerView extends VerticalLayout {
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(
-                dto.id(),
-                dto.title(),
-                OfferCardComponent.formatDateRange(dto.startDate(), dto.endDate()),
-                OfferCardComponent.formatPrice(dto.price()),
-                "–",
-                OfferCardComponent.colorFor(dto.animalType()),
-                4
-        ).open();
+        new PetsitterDetailPopUp(dto, "–", 4).open();
     }
 
     private void onFavoriteClicked(OfferCardDto dto) {

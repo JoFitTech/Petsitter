@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.offer;
 
+import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -110,17 +111,21 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria();
         if (!containsAnyFilterParameter(parameters)) {
             return new OfferSearchCriteria(
-                    mode,
-                    defaultCriteria.from(),
-                    defaultCriteria.to(),
-                    defaultCriteria.earnings(),
-                    defaultCriteria.distanceKm());
+                mode,
+                defaultCriteria.from(),
+                defaultCriteria.to(),
+                defaultCriteria.dateFilterMode(),
+                defaultCriteria.dateFlexDays(),
+                defaultCriteria.earnings(),
+                defaultCriteria.distanceKm());
         }
 
         return new OfferSearchCriteria(
                 mode,
                 parseDate(firstValue(parameters, "from")),
                 parseDate(firstValue(parameters, "to")),
+                OfferDateFilterMode.fromQueryValue(firstValue(parameters, "dateMode")),
+                parseFlexDays(firstValue(parameters, "dateFlexDays")),
                 parseAmount(firstValue(parameters, "earnings")),
                 parseDistance(firstValue(parameters, "distanceKm"), defaultCriteria.distanceKm()));
     }
@@ -128,6 +133,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private boolean containsAnyFilterParameter(Map<String, List<String>> parameters) {
         return parameters.containsKey("from")
                 || parameters.containsKey("to")
+                || parameters.containsKey("dateMode")
+                || parameters.containsKey("dateFlexDays")
                 || parameters.containsKey("earnings")
                 || parameters.containsKey("distanceKm");
     }
@@ -168,6 +175,21 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
             return Integer.parseInt(value);
         } catch (NumberFormatException ignored) {
             return defaultDistance;
+        }
+    }
+
+    private int parseFlexDays(String value) {
+        if (value == null || value.isBlank()) {
+            return 0;
+        }
+        try {
+            int parsedFlexDays = Integer.parseInt(value);
+            return switch (parsedFlexDays) {
+                case 0, 1, 2, 3, 7 -> parsedFlexDays;
+                default -> 0;
+            };
+        } catch (NumberFormatException ignored) {
+            return 0;
         }
     }
 
@@ -287,6 +309,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         return new FilterSearchBar.SearchCriteria(
                 criteria.from(),
                 criteria.to(),
+                criteria.dateFilterMode(),
+                criteria.dateFlexDays(),
                 criteria.earnings(),
                 criteria.distanceKm());
     }
@@ -300,6 +324,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         if (criteria.to() != null) {
             parameters.put("to", List.of(criteria.to().toString()));
         }
+        parameters.put("dateMode", List.of(criteria.dateFilterMode().queryValue()));
+        parameters.put("dateFlexDays", List.of(String.valueOf(criteria.dateFlexDays())));
         if (criteria.earnings() != null) {
             parameters.put("earnings", List.of(criteria.earnings().stripTrailingZeros().toPlainString()));
         }
@@ -625,6 +651,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 mode,
                 defaultCriteria.from(),
                 defaultCriteria.to(),
+                defaultCriteria.dateFilterMode(),
+                defaultCriteria.dateFlexDays(),
                 defaultCriteria.earnings(),
                 defaultCriteria.distanceKm());
     }

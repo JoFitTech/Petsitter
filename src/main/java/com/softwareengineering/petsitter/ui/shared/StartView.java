@@ -252,6 +252,8 @@ public class StartView extends VerticalLayout {
         if (criteria.to() != null) {
             parameters.put("to", List.of(criteria.to().toString()));
         }
+        parameters.put("dateMode", List.of(criteria.dateFilterMode().queryValue()));
+        parameters.put("dateFlexDays", List.of(String.valueOf(criteria.dateFlexDays())));
         if (criteria.earnings() != null) {
             parameters.put("earnings", List.of(formatQueryAmount(criteria.earnings())));
         }

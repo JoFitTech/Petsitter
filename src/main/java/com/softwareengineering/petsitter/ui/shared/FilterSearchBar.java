@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.datepicker.DatePicker;
@@ -14,6 +15,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.popover.Popover;
 import com.vaadin.flow.component.popover.PopoverPosition;
 import com.vaadin.flow.component.popover.PopoverVariant;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.slider.Slider;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
@@ -42,6 +44,7 @@ public class FilterSearchBar extends Div {
             15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
             65, 70, 75, 80, 85, 90, 95, 100
     );
+    private static final List<Integer> DATE_FLEX_VALUES = List.of(0, 1, 2, 3, 7);
 
     private final Span whenValue;
     private final Span earningsValue;
@@ -54,6 +57,8 @@ public class FilterSearchBar extends Div {
 
     private LocalDate selectedFrom;
     private LocalDate selectedTo;
+    private OfferDateFilterMode selectedDateFilterMode;
+    private int selectedDateFlexDays;
     private BigDecimal selectedEarnings;
     private int selectedDistance;
 
@@ -68,6 +73,8 @@ public class FilterSearchBar extends Div {
         SearchCriteria criteria = initialCriteria != null ? initialCriteria : defaultCriteria();
         selectedFrom = criteria.from();
         selectedTo = criteria.to();
+        selectedDateFilterMode = criteria.dateFilterMode();
+        selectedDateFlexDays = normalizeDateFlexDays(criteria.dateFlexDays());
         selectedEarnings = criteria.earnings();
         selectedDistance = normalizeDistance(criteria.distanceKm());
 
@@ -132,7 +139,13 @@ public class FilterSearchBar extends Div {
     }
 
     public SearchCriteria getCriteria() {
-        return new SearchCriteria(selectedFrom, selectedTo, selectedEarnings, selectedDistance);
+        return new SearchCriteria(
+                selectedFrom,
+                selectedTo,
+                selectedDateFilterMode,
+                selectedDateFlexDays,
+                selectedEarnings,
+                selectedDistance);
     }
 
     public static SearchCriteria defaultCriteria() {
@@ -140,6 +153,8 @@ public class FilterSearchBar extends Div {
         return new SearchCriteria(
                 LocalDate.of(currentYear, 6, 15),
                 LocalDate.of(currentYear, 6, 18),
+                OfferDateFilterMode.OVERLAP,
+                0,
                 new BigDecimal("80"),
                 5);
     }
@@ -236,6 +251,9 @@ public class FilterSearchBar extends Div {
         DatePicker fromPicker = styledDatePicker("Von", selectedFrom);
         DatePicker toPicker = styledDatePicker("Bis", selectedTo);
         toPicker.setMin(selectedFrom);
+        RadioButtonGroup<OfferDateFilterMode> dateModeGroup = dateModeGroup();
+        RadioButtonGroup<Integer> flexDaysGroup = flexDaysGroup();
+        flexDaysGroup.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
 
         fromPicker.addValueChangeListener(event -> {
             selectedFrom = event.getValue();
@@ -246,14 +264,64 @@ public class FilterSearchBar extends Div {
             selectedTo = event.getValue();
             updateDateFilter(fromPicker, toPicker);
         });
+        dateModeGroup.addValueChangeListener(event -> {
+            if (event.getValue() == null) {
+                return;
+            }
+            selectedDateFilterMode = event.getValue();
+            flexDaysGroup.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
+            updateDateFilter(fromPicker, toPicker);
+        });
+        flexDaysGroup.addValueChangeListener(event -> {
+            if (event.getValue() == null) {
+                return;
+            }
+            selectedDateFlexDays = event.getValue();
+            updateDateFilter(fromPicker, toPicker);
+        });
 
         HorizontalLayout row = new HorizontalLayout(fromPicker, toPicker);
         row.setWidthFull();
         row.setAlignItems(FlexComponent.Alignment.START);
         row.getStyle().set("gap", "12px");
 
-        content.add(popoverTitle("Zeitraum"), row);
+        content.add(popoverTitle("Zeitraum"), dateModeGroup, row, flexDaysGroup);
         return content;
+    }
+
+    private RadioButtonGroup<OfferDateFilterMode> dateModeGroup() {
+        RadioButtonGroup<OfferDateFilterMode> group = new RadioButtonGroup<>();
+        group.setItems(OfferDateFilterMode.ANY, OfferDateFilterMode.EXACT,
+                OfferDateFilterMode.CONTAINED, OfferDateFilterMode.OVERLAP);
+        group.setValue(selectedDateFilterMode);
+        group.setItemLabelGenerator(this::dateModeLabel);
+        group.getStyle()
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("color", DARK);
+        return group;
+    }
+
+    private RadioButtonGroup<Integer> flexDaysGroup() {
+        RadioButtonGroup<Integer> group = new RadioButtonGroup<>();
+        group.setLabel("Toleranz");
+        group.setItems(DATE_FLEX_VALUES);
+        group.setValue(selectedDateFlexDays);
+        group.setItemLabelGenerator(days -> "+/- " + days + (days == 1 ? " Tag" : " Tage"));
+        group.getStyle()
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("color", DARK);
+        return group;
+    }
+
+    private String dateModeLabel(OfferDateFilterMode mode) {
+        return switch (mode) {
+            case ANY       -> "Zeitlich flexibel";
+            case EXACT     -> "Exakter Zeitraum";
+            case CONTAINED -> "Innerhalb des Zeitraums";
+            case OVERLAP   -> "Zeitraum mit Toleranz";
+        };
     }
 
     private DatePicker styledDatePicker(String label, LocalDate value) {
@@ -391,6 +459,10 @@ public class FilterSearchBar extends Div {
                 .orElse(5);
     }
 
+    private static int normalizeDateFlexDays(int dateFlexDays) {
+        return DATE_FLEX_VALUES.contains(dateFlexDays) ? dateFlexDays : 0;
+    }
+
     private void openOnly(Popover popover) {
         boolean wasOpen = popover.isOpened();
         whenPopover.close();
@@ -402,6 +474,22 @@ public class FilterSearchBar extends Div {
     }
 
     private String formatDateRange() {
+        if (selectedDateFilterMode == OfferDateFilterMode.ANY) {
+            return "Zeitlich flexibel";
+        }
+
+        String formattedRange = formatPlainDateRange();
+        return switch (selectedDateFilterMode) {
+            case ANY -> "Zeitlich flexibel";
+            case EXACT -> "Exakt " + formattedRange;
+            case CONTAINED -> "Innerhalb " + formattedRange;
+            case OVERLAP -> selectedDateFlexDays > 0
+                    ? formattedRange + " +/- " + selectedDateFlexDays + " Tage"
+                    : formattedRange;
+        };
+    }
+
+    private String formatPlainDateRange() {
         if (selectedFrom != null && selectedTo != null) {
             if (selectedFrom.getMonth().equals(selectedTo.getMonth())) {
                 return selectedFrom.getDayOfMonth() + ".–" + selectedTo.format(DAY_MONTH_FORMATTER);
@@ -418,7 +506,8 @@ public class FilterSearchBar extends Div {
     }
 
     private boolean hasInvalidDateRange() {
-        return selectedFrom != null
+        return selectedDateFilterMode != OfferDateFilterMode.ANY
+                && selectedFrom != null
                 && selectedTo != null
                 && selectedTo.isBefore(selectedFrom);
     }
@@ -471,7 +560,22 @@ public class FilterSearchBar extends Div {
     private record FilterPill(Div component, Span value) {
     }
 
-    public record SearchCriteria(LocalDate from, LocalDate to, BigDecimal earnings, int distanceKm) {
+    public record SearchCriteria(
+            LocalDate from,
+            LocalDate to,
+            OfferDateFilterMode dateFilterMode,
+            int dateFlexDays,
+            BigDecimal earnings,
+            int distanceKm
+    ) {
+        public SearchCriteria {
+            if (dateFilterMode == null) {
+                dateFilterMode = OfferDateFilterMode.OVERLAP;
+            }
+            if (dateFlexDays < 0) {
+                dateFlexDays = 0;
+            }
+        }
     }
 
     public enum EarningsMode {

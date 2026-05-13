@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
@@ -42,6 +43,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
+    private final PetService petService;
     private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
@@ -52,8 +54,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnLogout;
     private Div contentPanel;
 
-    public UserView(UserService userService) {
+    public UserView(UserService userService, PetService petService) {
         this.userService = userService;
+        this.petService = petService;
         reloadProfile();
 
         setSizeFull();
@@ -534,7 +537,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineTiere() {
         contentPanel.removeAll();
-        contentPanel.add(new MyPetView());
+        contentPanel.add(new MyPetView(petService));
     }
 
     private void showMeineAuftraege() {

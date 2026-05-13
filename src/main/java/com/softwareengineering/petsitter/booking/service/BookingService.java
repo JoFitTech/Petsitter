@@ -1,116 +1,225 @@
 package com.softwareengineering.petsitter.booking.service;
 
 import com.softwareengineering.petsitter.booking.domain.Booking;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.util.Collections;
+import com.softwareengineering.petsitter.booking.domain.BookingStatus;
+import com.softwareengineering.petsitter.booking.dto.BookingDto;
+import com.softwareengineering.petsitter.booking.repository.BookingRepository;
+import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
+import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
+import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
+import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
+import com.softwareengineering.petsitter.shared.exception.NotFoundException;
+import com.softwareengineering.petsitter.user.domain.User;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * BookingService – verwaltet Buchungen (Bookings) und die zentrale Akzeptanz-Logik.
  *
  * <p>Kernverantwortung:
  * <ul>
- *   <li><b>acceptRequest:</b> Dies ist DIE ZENTRALE Methode der gesamten Anwendung!
- *       Sie implementiert eine komplexe Transaktion:
- *       <ol>
- *         <li>1. Request wird auf Status ACCEPTED gesetzt</li>
- *         <li>2. Neues Booking wird erstellt (mit Owner, Sitter, Pet, Zeitraum, Preis)</li>
- *         <li>3. Offer wird auf Status BOOKED gesetzt (keine neuen Requests mehr möglich)</li>
- *         <li>4. ALLE anderen PENDING Requests auf dasselbe Offer werden auf DENIED gesetzt</li>
- *         <li>5. Optional: Notification an alle non-akzeptierten Requester</li>
- *       </ol>
- *       Wenn irgendein Schritt fehlschlägt → ROLLBACK, nichts bleibt!
- *   </li>
- *   <li><b>cancelBooking:</b> User (Owner oder Sitter) storniert ein bestätigtes Booking.
- *   </li>
- *   <li><b>getBookings:</b> Findet alle Bookings für einen User (als Owner oder Sitter).
- *   </li>
+ *   <li><b>acceptRequest:</b> Atomare Transaktion: Request ACCEPTED → Booking erstellen
+ *       → Offer BOOKED → andere Requests DENIED</li>
+ *   <li><b>cancelBooking:</b> Storniert ein Booking (nur Owner oder Sitter)</li>
+ *   <li><b>getBookings:</b> Alle Bookings eines Users als DTOs</li>
  * </ul>
  *
- * <p>Wichtige Regeln (in acceptRequest durchgesetzt):
- * <ul>
- *   <li>Nur der Offer-Creator (Owner oder Sitter) darf einen Request akzeptieren!</li>
- *   <li>Request.status muss PENDING sein</li>
- *   <li>Offer.status muss OPEN sein</li>
- *   <li>startDate <= endDate (impliziert vom Offer)</li>
- *   <li>Wenn akzeptiert: Offer wird BOOKED → keine Edits mehr möglich!</li>
- * </ul>
- *
- * <p>Warum @Transactional? Damit alle 4-5 Schritte atomar ablaufen.
- * Ein DB-Fehler nach Schritt 2 würde Inkonsistenz verursachen (Booking ohne Offer-Update).
- * Deshalb: "Alles erfolgreich oder Rollback!"
- *
- * @see com.softwareengineering.petsitter.booking.domain.Booking
+ * @see Booking
  * @see com.softwareengineering.petsitter.offerrequest.domain.OfferRequest
  * @see com.softwareengineering.petsitter.offer.domain.Offer
  */
 @Service
 public class BookingService {
 
+    private final BookingRepository bookingRepository;
+    private final OfferRequestRepository offerRequestRepository;
+    private final OfferRepository offerRepository;
+
+    public BookingService(
+            BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
+            OfferRepository offerRepository
+    ) {
+        this.bookingRepository = bookingRepository;
+        this.offerRequestRepository = offerRequestRepository;
+        this.offerRepository = offerRepository;
+    }
+
     /**
-     * Akzeptiert einen Request und erzeugt ein Booking.
+     * Akzeptiert einen Request und erzeugt ein Booking (atomare Transaktion).
      *
-     * <p><b>Dies ist eine atomare Transaktion mit 4 Schritten:</b>
+     * <p>Schritte:
      * <ol>
-     *   <li>Request wird auf ACCEPTED gesetzt</li>
-     *   <li>Neues Booking wird erstellt und persistiert</li>
-     *   <li>Offer wird auf BOOKED gesetzt</li>
-     *   <li>Alle anderen PENDING Requests auf diesem Offer werden DENIED</li>
+     *   <li>Request validieren (gefunden, PENDING, Offer OPEN)</li>
+     *   <li>Zugriffskontrolle: offerCreatorId == offer.creator.id</li>
+     *   <li>Request → ACCEPTED</li>
+     *   <li>Booking erstellen und speichern</li>
+     *   <li>Offer → BOOKED</li>
+     *   <li>Alle anderen PENDING Requests → DENIED</li>
      * </ol>
      *
-     * <p>Validierungen (vor Step 1):
-     * - {@code offerCreatorId} muss == Request.offer.creator.id (Zugriffskontrolle)
-     * - Request.status == PENDING
-     * - Offer.status == OPEN
-     *
-     * <p>Diese Methode ist SEHR wichtig und wird von der UI aufgerufen, wenn der
-     * Offer-Ersteller einen Request annimmt.
-     *
-     * @param requestId Die ID des zu akzeptierenden Requests
-     * @param offerCreatorId Die User-ID des Offer-Creators (zur Zugriffskontrolle)
-     * @return Das neu erzeugte Booking
-     * @throws com.softwareengineering.petsitter.shared.exception.NotFoundException
-     *         wenn Request, Offer oder User nicht gefunden
-     * @throws com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException
-     *         wenn {@code offerCreatorId} != Offer.creator.id
-     *         (nur Offer-Creator darf akzeptieren!)
-     * @throws com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException
-     *         wenn Request.status != PENDING oder Offer.status != OPEN
+     * @param requestId      ID des zu akzeptierenden Requests
+     * @param offerCreatorId ID des Offer-Creators (Zugriffskontrolle)
+     * @return Das neu erstellte Booking
      */
     @Transactional
     public Booking acceptRequest(UUID requestId, UUID offerCreatorId) {
-        throw new UnsupportedOperationException("acceptRequest noch nicht implementiert");
+        OfferRequest request = offerRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+
+        Offer offer = request.getOffer();
+
+        // Zugriffskontrolle: nur Offer-Creator darf akzeptieren
+        if (!offer.getCreator().getId().equals(offerCreatorId)) {
+            throw new ForbiddenOperationException(
+                    "Nur der Offer-Creator darf einen Request akzeptieren.");
+        }
+
+        // Businessregel: Request muss PENDING sein
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new BusinessRuleViolationException(
+                    "Request ist nicht mehr PENDING (aktuell: " + request.getStatus() + ").");
+        }
+
+        // Businessregel: Offer muss OPEN sein
+        if (offer.getStatus() != OfferStatus.OPEN) {
+            throw new BusinessRuleViolationException(
+                    "Das Offer ist nicht mehr OPEN (aktuell: " + offer.getStatus() + ").");
+        }
+
+        // Schritt 1: Request auf ACCEPTED setzen
+        request.setStatus(RequestStatus.ACCEPTED);
+        offerRequestRepository.save(request);
+
+        // Schritt 2: Booking erstellen
+        Booking booking = buildBooking(offer, request);
+        booking = bookingRepository.save(booking);
+
+        // Schritt 3: Offer auf BOOKED setzen
+        offer.setStatus(OfferStatus.BOOKED);
+        offerRepository.save(offer);
+
+        // Schritt 4: Alle anderen PENDING Requests auf DENIED setzen
+        List<OfferRequest> otherPending = offerRequestRepository
+                .findAllByOfferOfferIdAndStatus(offer.getOfferId(), RequestStatus.PENDING);
+        for (OfferRequest other : otherPending) {
+            other.setStatus(RequestStatus.DENIED);
+        }
+        offerRequestRepository.saveAll(otherPending);
+
+        return booking;
     }
 
     /**
-     * Storniert ein Booking.
+     * Storniert ein Booking. Nur Owner oder Sitter dürfen stornieren.
      *
-     * <p>Nur Owner oder Sitter (aus dem Booking) darf stornieren.
-     * Status wird zu CANCELLED.
-     *
-     * Hinweis: Je nach Anforderung könnte man dadurch auch das Offer zurück auf OPEN setzen,
-     * damit andere Requests erneut erfolgreich sein können. Für Phase 1 einfach CANCELLED halten.
-     *
-     * @param bookingId Die Booking-ID
-     * @param userId Die User-ID des Requesters (Owner oder Sitter, zur Zugriffskontrolle)
-     * @throws com.softwareengineering.petsitter.shared.exception.NotFoundException
-     *         wenn Booking nicht gefunden
-     * @throws com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException
-     *         wenn {@code userId} weder Owner noch Sitter des Bookings ist
+     * @param bookingId ID des Bookings
+     * @param userId    ID des anfragenden Users
      */
+    @Transactional
     public void cancelBooking(UUID bookingId, UUID userId) {
-        throw new UnsupportedOperationException("cancelBooking noch nicht implementiert");
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+
+        boolean isOwner  = booking.getOwner().getId().equals(userId);
+        boolean isSitter = booking.getSitter().getId().equals(userId);
+
+        if (!isOwner && !isSitter) {
+            throw new ForbiddenOperationException(
+                    "Nur Owner oder Sitter dürfen ein Booking stornieren.");
+        }
+
+        booking.setStatus(BookingStatus.CANCELLED);
+        bookingRepository.save(booking);
     }
 
     /**
-     * Findet alle Bookings eines Users (entweder als Owner oder als Sitter).
+     * Gibt alle Bookings eines Users zurück (als Owner oder Sitter), gemappt auf DTOs.
      *
-     * @param userId Die User-ID
-     * @return Liste aller Bookings, in denen dieser User involviert ist
+     * @param userId ID des Users
+     * @return Liste der BookingDtos
      */
-    public List<String> getBookings() {
-        return Collections.emptyList();
+    public List<BookingDto> getBookings(UUID userId) {
+        return bookingRepository.findAllByOwnerIdOrSitterId(userId, userId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    // ── Private Hilfsmethoden ────────────────────────────────────────────
+
+    private Booking buildBooking(Offer offer, OfferRequest acceptedRequest) {
+        User creator  = offer.getCreator();
+        User requester = acceptedRequest.getRequester();
+
+        User owner;
+        User sitter;
+
+        if (offer.getType() == OfferType.OWNER_OFFER) {
+            // Owner hat das Offer erstellt, Sitter hat den Request gestellt
+            owner  = creator;
+            sitter = requester;
+        } else {
+            // Sitter hat das Offer erstellt, Owner hat den Request gestellt
+            sitter = creator;
+            owner  = requester;
+        }
+
+        Booking booking = new Booking();
+        booking.setOffer(offer);
+        booking.setAcceptedRequest(acceptedRequest);
+        booking.setOwner(owner);
+        booking.setSitter(sitter);
+        booking.setPet(offer.getPet());
+        booking.setStartDate(offer.getStartDate());
+        booking.setEndDate(offer.getEndDate());
+        booking.setPricePerWeek(offer.getPricePerWeek());
+        booking.setStatus(BookingStatus.CREATED);
+        return booking;
+    }
+
+    private BookingDto toDto(Booking booking) {
+        String offerTitle = (booking.getOffer().getTitle() != null && !booking.getOffer().getTitle().isBlank())
+                ? booking.getOffer().getTitle()
+                : "Betreuungsvereinbarung";
+
+        String petName = (booking.getPet() != null) ? booking.getPet().getName() : null;
+
+        String ownerName  = fullName(booking.getOwner());
+        String sitterName = fullName(booking.getSitter());
+
+        return new BookingDto(
+                booking.getId(),
+                offerTitle,
+                ownerName,
+                sitterName,
+                petName,
+                booking.getStartDate(),
+                booking.getEndDate(),
+                booking.getPricePerWeek(),
+                booking.getStatus()
+        );
+    }
+
+    private String fullName(User user) {
+        if (user == null) {
+            throw new BusinessRuleViolationException("Benutzerdaten fehlen fuer die Namensanzeige.");
+        }
+
+        if (user.getFirstName() == null || user.getFirstName().isBlank()) {
+            throw new BusinessRuleViolationException("Vorname darf nicht leer sein.");
+        }
+        if (user.getLastName() == null || user.getLastName().isBlank()) {
+            throw new BusinessRuleViolationException("Nachname darf nicht leer sein.");
+        }
+
+        return user.getFirstName().trim() + " " + user.getLastName().trim();
     }
 }

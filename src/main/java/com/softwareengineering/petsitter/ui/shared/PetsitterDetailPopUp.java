@@ -1,49 +1,32 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
+
+import java.util.UUID;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 
-/**
- * Reusable "Auftragsdetails" popup dialog.
- *
- * <p>Usage from any view:</p>
- * <pre>
- *   new PetsitterDetailPopUp(
- *       offerId, "Wochenende mit Nala",
- *       "28.–30. Juni", "160 €", "4,2 km",
- *       "#94b883", 4
- *   ).open();
- * </pre>
- */
 public class PetsitterDetailPopUp extends Dialog {
 
     private static final String DARK  = "#4a3428";
     private static final String BROWN = "#7b5236";
 
-    /**
-     * @param offerId   Unique ID of the offer (used in backend hooks)
-     * @param title     Display title, e.g. "Wochenende mit Nala"
-     * @param date      Date range string, e.g. "28.–30. Juni"
-     * @param price     Price string, e.g. "160 €"
-     * @param distance  Distance string, e.g. "4,2 km"
-     * @param topColor  CSS colour for the image area, e.g. "#94b883"
-     * @param stars     Number of filled stars (0–5)
-     */
-    public PetsitterDetailPopUp(long offerId, String title, String date,
-                                String price, String distance,
-                                String topColor, int stars) {
+    public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars) {
         setWidth("520px");
         setCloseOnOutsideClick(true);
         this.getElement().getThemeList().add("no-padding");
+
+        String topColor = OfferCardComponent.colorFor(dto.animalType());
+        String date     = OfferCardComponent.formatDateRange(dto.startDate(), dto.endDate());
+        String price    = OfferCardComponent.formatPrice(dto.price());
 
         // ── Outer container ───────────────────────────────────────────────
         VerticalLayout content = new VerticalLayout();
@@ -106,7 +89,7 @@ public class PetsitterDetailPopUp extends Dialog {
         imageArea.add(starsBadge);
 
         // ── Offer title ───────────────────────────────────────────────────
-        H3 offerTitle = new H3(title);
+        H3 offerTitle = new H3(dto.title());
         offerTitle.getStyle()
                 .set("font-size", "18px")
                 .set("font-weight", "800")
@@ -131,50 +114,63 @@ public class PetsitterDetailPopUp extends Dialog {
                 factColumn("Entfernung", distance)
         );
 
-        // ── Radio buttons: service type + frequency ───────────────────────
-        HorizontalLayout radioRow = new HorizontalLayout();
-        radioRow.setAlignItems(FlexComponent.Alignment.CENTER);
-        radioRow.getStyle().set("gap", "8px").set("flex-wrap", "wrap");
+        // ── Info row: Betreuungsart | Häufigkeit (read-only text) ─────────
+        String careLabel      = dto.careType()  != null ? dto.careType().label()  : "–";
+        String frequencyLabel = dto.frequency() != null ? dto.frequency().label() : "–";
 
-        RadioButtonGroup<String> serviceType = new RadioButtonGroup<>();
-        serviceType.setItems("Tiersitting", "Haussitting");
-        serviceType.setValue("Tiersitting");
-        applyRadioStyle(serviceType);
-        serviceType.addValueChangeListener(e ->
-                System.out.println("Servicetyp gewählt: " + e.getValue()));
+        HorizontalLayout infoRow = new HorizontalLayout();
+        infoRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        infoRow.getStyle().set("gap", "8px").set("flex-wrap", "wrap");
 
-        Div radioSep = new Div();
-        radioSep.getStyle()
+        Span careSpan = new Span(careLabel);
+        careSpan.getStyle()
+                .set("font-weight", "700")
+                .set("color", BROWN)
+                .set("font-size", "15px");
+
+        Div infoSep = new Div();
+        infoSep.getStyle()
                 .set("width", "1px").set("height", "22px")
                 .set("background", "#ccc").set("margin", "0 8px");
 
-        RadioButtonGroup<String> frequency = new RadioButtonGroup<>();
-        frequency.setItems("einmalig", "regelmäßig");
-        frequency.setValue("einmalig");
-        applyRadioStyle(frequency);
-        frequency.addValueChangeListener(e ->
-                System.out.println("Häufigkeit gewählt: " + e.getValue()));
+        Span freqSpan = new Span(frequencyLabel);
+        freqSpan.getStyle()
+                .set("font-weight", "700")
+                .set("color", BROWN)
+                .set("font-size", "15px");
 
-        radioRow.add(serviceType, radioSep, frequency);
+        infoRow.add(careSpan, infoSep, freqSpan);
 
-        // ── Input fields ──────────────────────────────────────────────────
-        TextField haustierField = styledTextField("Meine Haustiere");
-        haustierField.addValueChangeListener(e ->
-                System.out.println("Haustiere eingegeben: " + e.getValue()));
+        // ── Tier-Feld: dynamisch je nach OWNER_OFFER vs SITTER_OFFER ──────
+        content.add(header, imageArea, offerTitle, factsRow, infoRow);
 
-        TextField haustierartField = styledTextField("Haustierarten");
-        haustierartField.addValueChangeListener(e ->
-                System.out.println("Haustierarten eingegeben: " + e.getValue()));
+        if (dto.petName() != null) {
+            // OWNER_OFFER: zeige konkretes Haustier
+            StringBuilder petValue = new StringBuilder(dto.petName());
+            if (dto.petSpecies() != null || dto.petBreed() != null) {
+                petValue.append(" (");
+                if (dto.petSpecies() != null) petValue.append(dto.petSpecies());
+                if (dto.petSpecies() != null && dto.petBreed() != null) petValue.append(", ");
+                if (dto.petBreed() != null) petValue.append(dto.petBreed());
+                petValue.append(")");
+            }
+            content.add(readOnlyTextField("Haustier", petValue.toString()));
+        } else if (dto.animalType() != null) {
+            // SITTER_OFFER: zeige bevorzugte Tierart
+            content.add(readOnlyTextField("Bevorzugte Tierart", dto.animalType().label()));
+        }
 
-        TextArea zusatzField = new TextArea("Zusatzinfos");
+        // ── Beschreibung ──────────────────────────────────────────────────
+        TextArea zusatzField = new TextArea("Beschreibung");
         zusatzField.setWidthFull();
         zusatzField.setMinHeight("90px");
+        zusatzField.setValue(dto.description() != null ? dto.description() : "");
+        zusatzField.setReadOnly(true);
         zusatzField.getStyle()
                 .set("background", "white")
                 .set("border-radius", "10px")
                 .set("font-family", "Inter, Arial, sans-serif");
-        zusatzField.addValueChangeListener(e ->
-                System.out.println("Zusatzinfos eingegeben: " + e.getValue()));
+        content.add(zusatzField);
 
         // ── "Auftrag anfragen" button ─────────────────────────────────────
         Button anfragenBtn = new Button("Auftrag anfragen");
@@ -190,34 +186,18 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("cursor", "pointer")
                 .set("margin-top", "8px");
         anfragenBtn.addClickListener(e -> {
-            onAuftragAnfragenClicked(offerId,
-                    serviceType.getValue(), frequency.getValue(),
-                    haustierField.getValue(), haustierartField.getValue(),
-                    zusatzField.getValue());
+            onAuftragAnfragenClicked(dto.id());
             close();
         });
+        content.add(anfragenBtn);
 
-        content.add(header, imageArea, offerTitle, factsRow,
-                radioRow, haustierField, haustierartField, zusatzField, anfragenBtn);
         add(content);
     }
 
     // ── Backend-Interface hook ────────────────────────────────────────────
-    /**
-     * Called when the user clicks "Auftrag anfragen".
-     * TODO: Backend-Team ersetzt den Print durch einen echten Service-Call.
-     */
-    private void onAuftragAnfragenClicked(long offerId, String serviceType,
-                                          String frequency, String haustiere,
-                                          String haustierarten, String zusatzinfos) {
+    private void onAuftragAnfragenClicked(UUID offerId) {
         System.out.println("Auftrag anfragen geklickt für Offer-ID: " + offerId);
-        System.out.println("  Servicetyp:    " + serviceType);
-        System.out.println("  Häufigkeit:    " + frequency);
-        System.out.println("  Haustiere:     " + haustiere);
-        System.out.println("  Haustierarten: " + haustierarten);
-        System.out.println("  Zusatzinfos:   " + zusatzinfos);
-        // TODO: requestService.createRequest(offerId, serviceType, frequency,
-        //           haustiere, haustierarten, zusatzinfos);
+        // TODO: requestService.createRequest(offerId);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────
@@ -250,16 +230,11 @@ public class PetsitterDetailPopUp extends Dialog {
         return d;
     }
 
-    private void applyRadioStyle(RadioButtonGroup<String> group) {
-        group.getStyle()
-                .set("font-weight", "700")
-                .set("color", BROWN)
-                .set("font-size", "15px");
-    }
-
-    private static TextField styledTextField(String label) {
+    private static TextField readOnlyTextField(String label, String value) {
         TextField field = new TextField(label);
         field.setWidthFull();
+        field.setValue(value != null ? value : "");
+        field.setReadOnly(true);
         field.getStyle()
                 .set("background", "white")
                 .set("border-radius", "10px")

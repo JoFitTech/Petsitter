@@ -10,9 +10,12 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
+import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
@@ -92,6 +95,49 @@ public class OfferService {
 
     public boolean hasAuthenticatedUser() {
         return authenticatedUser.get().isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OfferCardDto> getOpenOffersByType(OfferType offerType) {
+        return offerRepository
+                .findAllByOfferTypeAndStatus(offerType, OfferStatus.OPEN)
+                .stream()
+                .map(this::toCardDto)
+                .toList();
+    }
+
+    private OfferCardDto toCardDto(Offer offer) {
+        boolean verified = offer.getCreateUser() != null
+                && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
+        Pet pet = offer.getPet();
+        return new OfferCardDto(
+                offer.getOfferId(),
+                offer.getTitle() != null ? offer.getTitle() : "Angebot",
+                offer.getStartDate(),
+                offer.getEndDate(),
+                offer.getPrice(),
+                offer.getAnimalType(),
+                verified,
+                offer.getDescription(),
+                offer.getFrequency(),
+                offer.getCareType(),
+                pet != null ? pet.getName() : null,
+                pet != null ? petSpeciesLabel(pet) : null,
+                pet != null ? pet.getBreed() : null
+        );
+    }
+
+    private String petSpeciesLabel(Pet pet) {
+        if (pet.getSpecies() == PetSpecies.OTHER) {
+            return pet.getCustomSpecies() != null ? pet.getCustomSpecies() : "Sonstiges";
+        }
+        return switch (pet.getSpecies()) {
+            case DOG    -> "Hund";
+            case CAT    -> "Katze";
+            case BIRD   -> "Vogel";
+            case RABBIT -> "Kaninchen";
+            default     -> pet.getSpecies().name();
+        };
     }
 
     @Transactional(readOnly = true)

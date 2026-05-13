@@ -1,30 +1,31 @@
 package com.softwareengineering.petsitter.config;
 
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DockerComposeStartupGuardTest {
 
-    private static final String DOCKER_COMPOSE_ENABLED = "spring.docker.compose.enabled";
     private static final String ANSI_ESCAPE = "\u001B[";
-
-    @AfterEach
-    void clearProperty() {
-        System.clearProperty(DOCKER_COMPOSE_ENABLED);
-    }
 
     @Test
     void dockerComposeCheckIsEnabledByDefault() {
-        assertThat(DockerComposeStartupGuard.isDockerComposeEnabled()).isTrue();
+        assertThat(DockerComposeStartupGuard.isDockerComposeEnabled(null, null)).isTrue();
     }
 
     @Test
     void dockerComposeCheckCanBeDisabledViaSystemProperty() {
-        System.setProperty(DOCKER_COMPOSE_ENABLED, "false");
+        assertThat(DockerComposeStartupGuard.isDockerComposeEnabled("false", null)).isFalse();
+    }
 
-        assertThat(DockerComposeStartupGuard.isDockerComposeEnabled()).isFalse();
+    @Test
+    void dockerComposeCheckCanBeDisabledViaEnvironmentVariable() {
+        assertThat(DockerComposeStartupGuard.isDockerComposeEnabled(null, "false")).isFalse();
+    }
+
+    @Test
+    void systemPropertyTakesPrecedenceOverEnvironmentVariable() {
+        assertThat(DockerComposeStartupGuard.isDockerComposeEnabled("true", "false")).isTrue();
     }
 
     @Test

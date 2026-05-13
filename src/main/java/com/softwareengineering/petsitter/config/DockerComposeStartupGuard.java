@@ -46,15 +46,17 @@ public final class DockerComposeStartupGuard {
 
     static boolean isDockerComposeEnabled() {
         String systemProperty = System.getProperty("spring.docker.compose.enabled");
+        String environmentProperty = System.getenv("SPRING_DOCKER_COMPOSE_ENABLED");
+        return isDockerComposeEnabled(systemProperty, environmentProperty);
+    }
+
+    static boolean isDockerComposeEnabled(String systemProperty, String environmentProperty) {
         if (systemProperty != null) {
             return !"false".equalsIgnoreCase(systemProperty);
         }
-
-        String environmentProperty = System.getenv("SPRING_DOCKER_COMPOSE_ENABLED");
         if (environmentProperty != null) {
             return !"false".equalsIgnoreCase(environmentProperty);
         }
-
         return true;
     }
 

@@ -164,7 +164,7 @@ public class FilterSearchBar extends Div {
     private Popover popoverFor(Component target, Component content, String width) {
         Popover popover = new Popover();
         popover.setTarget(target);
-        popover.setPosition(PopoverPosition.BOTTOM_START);
+        popover.setPosition(PopoverPosition.BOTTOM);
         popover.setCloseOnEsc(true);
         popover.setCloseOnOutsideClick(true);
         popover.setOpenOnClick(false);

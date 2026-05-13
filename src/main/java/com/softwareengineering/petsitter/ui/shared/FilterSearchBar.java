@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 @CssImport(value = "./styles/filter-search-popover.css", themeFor = "vaadin-popover-overlay")
 @CssImport(value = "./styles/filter-search-slider-bubble.css", themeFor = "vaadin-slider-bubble-overlay")
@@ -48,13 +49,28 @@ public class FilterSearchBar extends Div {
     private final Popover whenPopover;
     private final Popover earningsPopover;
     private final Popover distancePopover;
+    private final EarningsMode earningsMode;
+    private final Consumer<SearchCriteria> onSearch;
 
-    private LocalDate selectedFrom = LocalDate.of(LocalDate.now().getYear(), 6, 15);
-    private LocalDate selectedTo = LocalDate.of(LocalDate.now().getYear(), 6, 18);
-    private BigDecimal selectedEarnings = new BigDecimal("80");
-    private int selectedDistance = 5;
+    private LocalDate selectedFrom;
+    private LocalDate selectedTo;
+    private BigDecimal selectedEarnings;
+    private int selectedDistance;
 
-    public FilterSearchBar(Runnable onSearch) {
+    public FilterSearchBar(EarningsMode earningsMode, Consumer<SearchCriteria> onSearch) {
+        this(earningsMode, defaultCriteria(), onSearch);
+    }
+
+    public FilterSearchBar(EarningsMode earningsMode, SearchCriteria initialCriteria,
+            Consumer<SearchCriteria> onSearch) {
+        this.earningsMode = earningsMode;
+        this.onSearch = onSearch;
+        SearchCriteria criteria = initialCriteria != null ? initialCriteria : defaultCriteria();
+        selectedFrom = criteria.from();
+        selectedTo = criteria.to();
+        selectedEarnings = criteria.earnings();
+        selectedDistance = normalizeDistance(criteria.distanceKm());
+
         getStyle()
                 .set("display", "flex")
                 .set("align-items", "center")
@@ -68,8 +84,8 @@ public class FilterSearchBar extends Div {
                 .set("gap", "0");
 
         FilterPill whenField = filterPill("📅", "Wann?", formatDateRange(), true);
-        FilterPill earningsField = filterPill("€", "Verdienst", "ab 80 €", false);
-        FilterPill distanceField = filterPill("↕", "Entfernung", "bis 5 km", false);
+        FilterPill earningsField = filterPill("€", "Verdienst", formatEarningsValue(), false);
+        FilterPill distanceField = filterPill("↕", "Entfernung", "bis " + selectedDistance + " km", false);
 
         whenValue = whenField.value();
         earningsValue = earningsField.value();
@@ -88,7 +104,11 @@ public class FilterSearchBar extends Div {
                 .set("cursor", "pointer")
                 .set("margin-left", "16px")
                 .set("flex-shrink", "0");
-        searchBtn.addClickListener(e -> onSearch.run());
+        searchBtn.addClickListener(e -> {
+            if (!hasInvalidDateRange()) {
+                this.onSearch.accept(getCriteria());
+            }
+        });
 
         whenPopover = popoverFor(whenField.component(), buildDatePopover(), "460px");
         earningsPopover = popoverFor(earningsField.component(), buildEarningsPopover(), "340px");
@@ -109,6 +129,19 @@ public class FilterSearchBar extends Div {
                 earningsPopover,
                 distancePopover
         );
+    }
+
+    public SearchCriteria getCriteria() {
+        return new SearchCriteria(selectedFrom, selectedTo, selectedEarnings, selectedDistance);
+    }
+
+    public static SearchCriteria defaultCriteria() {
+        int currentYear = LocalDate.now().getYear();
+        return new SearchCriteria(
+                LocalDate.of(currentYear, 6, 15),
+                LocalDate.of(currentYear, 6, 18),
+                new BigDecimal("80"),
+                5);
     }
 
     private FilterPill filterPill(String icon, String label, String value, boolean first) {
@@ -236,9 +269,7 @@ public class FilterSearchBar extends Div {
     }
 
     private void updateDateFilter(DatePicker fromPicker, DatePicker toPicker) {
-        boolean invalidRange = selectedFrom != null
-                && selectedTo != null
-                && selectedTo.isBefore(selectedFrom);
+        boolean invalidRange = hasInvalidDateRange();
         toPicker.setInvalid(invalidRange);
         toPicker.setErrorMessage("Bis darf nicht vor Von liegen.");
         if (invalidRange) {
@@ -251,8 +282,8 @@ public class FilterSearchBar extends Div {
 
     private Component buildEarningsPopover() {
         VerticalLayout content = popoverContent();
-        TextField field = new TextField("Mindestverdienst");
-        field.setValue(formatEuroAmount(selectedEarnings));
+        TextField field = new TextField(earningsMode.fieldLabel());
+        field.setValue(selectedEarnings == null ? "" : formatEuroAmount(selectedEarnings));
         field.setPlaceholder("z. B. 20 €");
         field.setAllowedCharPattern("[0-9,. €]");
         field.setPattern("\\s*\\d+([,.]\\d{1,2})?\\s*€?\\s*");
@@ -294,14 +325,21 @@ public class FilterSearchBar extends Div {
     }
 
     private void updateEarningsFilter(TextField field) {
+        if (field.getValue() == null || field.getValue().isBlank()) {
+            field.setInvalid(false);
+            selectedEarnings = null;
+            earningsValue.setText(formatEarningsValue());
+            return;
+        }
+
         BigDecimal parsedAmount = parseEuroAmount(field.getValue());
         if (parsedAmount == null) {
-            field.setInvalid(!field.getValue().isBlank());
+            field.setInvalid(true);
             return;
         }
         field.setInvalid(false);
         selectedEarnings = parsedAmount;
-        earningsValue.setText("ab " + formatEuroAmount(selectedEarnings));
+        earningsValue.setText(formatEarningsValue());
     }
 
     private Component buildDistancePopover() {
@@ -347,6 +385,12 @@ public class FilterSearchBar extends Div {
         return index >= 0 ? index : 0;
     }
 
+    private static int normalizeDistance(int distance) {
+        return DISTANCE_VALUES.stream()
+                .min((left, right) -> Integer.compare(Math.abs(left - distance), Math.abs(right - distance)))
+                .orElse(5);
+    }
+
     private void openOnly(Popover popover) {
         boolean wasOpen = popover.isOpened();
         whenPopover.close();
@@ -373,6 +417,12 @@ public class FilterSearchBar extends Div {
         return "Wann?";
     }
 
+    private boolean hasInvalidDateRange() {
+        return selectedFrom != null
+                && selectedTo != null
+                && selectedTo.isBefore(selectedFrom);
+    }
+
     private BigDecimal parseEuroAmount(String value) {
         String normalized = value == null ? "" : value
                 .trim()
@@ -397,6 +447,13 @@ public class FilterSearchBar extends Div {
                 : normalized.toPlainString().replace(".", ",") + " €";
     }
 
+    private String formatEarningsValue() {
+        if (selectedEarnings == null) {
+            return "beliebig";
+        }
+        return earningsMode.valuePrefix() + " " + formatEuroAmount(selectedEarnings);
+    }
+
     private DatePicker.DatePickerI18n germanDatePickerI18n() {
         return new DatePicker.DatePickerI18n()
                 .setMonthNames(List.of(
@@ -412,5 +469,29 @@ public class FilterSearchBar extends Div {
     }
 
     private record FilterPill(Div component, Span value) {
+    }
+
+    public record SearchCriteria(LocalDate from, LocalDate to, BigDecimal earnings, int distanceKm) {
+    }
+
+    public enum EarningsMode {
+        MINIMUM("Mindestverdienst", "ab"),
+        MAXIMUM("Maximalverdienst", "bis");
+
+        private final String fieldLabel;
+        private final String valuePrefix;
+
+        EarningsMode(String fieldLabel, String valuePrefix) {
+            this.fieldLabel = fieldLabel;
+            this.valuePrefix = valuePrefix;
+        }
+
+        private String fieldLabel() {
+            return fieldLabel;
+        }
+
+        private String valuePrefix() {
+            return valuePrefix;
+        }
     }
 }

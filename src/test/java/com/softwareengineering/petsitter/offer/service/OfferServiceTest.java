@@ -12,6 +12,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
@@ -345,6 +346,83 @@ class OfferServiceTest {
         assertThat(saveCount).hasValue(0);
     }
 
+    @Test
+    void searchOpenOffersForTierhalterUsesMinimumEarningsAndOverlappingDates() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID matchingOfferId = UUID.randomUUID();
+        AtomicReference<OfferType> requestedType = new AtomicReference<>();
+        AtomicReference<OfferStatus> requestedStatus = new AtomicReference<>();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(matchingOfferId, OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                                LocalDate.of(2026, 6, 14), LocalDate.of(2026, 6, 19), BigDecimal.valueOf(120)),
+                        offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                                LocalDate.of(2026, 6, 15), LocalDate.of(2026, 6, 18), BigDecimal.valueOf(90)),
+                        offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                                LocalDate.of(2026, 6, 1), LocalDate.of(2026, 6, 10), BigDecimal.valueOf(200)),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                LocalDate.of(2026, 6, 15), LocalDate.of(2026, 6, 18), BigDecimal.valueOf(150)),
+                        offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.BOOKED,
+                                LocalDate.of(2026, 6, 15), LocalDate.of(2026, 6, 18), BigDecimal.valueOf(150))
+                ), requestedType, requestedStatus),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                OfferType.OWNER_OFFER, from, to, BigDecimal.valueOf(100), true);
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
+        assertThat(requestedType).hasValue(OfferType.OWNER_OFFER);
+        assertThat(requestedStatus).hasValue(OfferStatus.OPEN);
+    }
+
+    @Test
+    void searchOpenOffersForTiersitterUsesMaximumEarnings() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID matchingOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(matchingOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80)),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(130))
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                OfferType.SITTER_OFFER, from, to, BigDecimal.valueOf(100), false);
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
+    }
+
+    @Test
+    void searchOpenOffersWithoutEarningsDoesNotFilterByPrice() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID pricedOfferId = UUID.randomUUID();
+        UUID unpricedOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(pricedOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(130)),
+                        offer(unpricedOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, null)
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                OfferType.SITTER_OFFER, from, to, null, false);
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(pricedOfferId, unpricedOfferId);
+    }
+
     private void assertInvalid(OfferService offerService, CreateOfferRequest request) {
         assertThatThrownBy(() -> offerService.createOffer(request))
                 .isInstanceOf(BusinessRuleViolationException.class);
@@ -421,6 +499,19 @@ class OfferServiceTest {
         return pet;
     }
 
+    private Offer offer(UUID offerId, OfferType offerType, OfferStatus status,
+            LocalDate startDate, LocalDate endDate, BigDecimal price) {
+        Offer offer = new Offer();
+        offer.setOfferId(offerId);
+        offer.setOfferType(offerType);
+        offer.setStatus(status);
+        offer.setStartDate(startDate);
+        offer.setEndDate(endDate);
+        offer.setPrice(price);
+        offer.setTitle(offerType.name());
+        return offer;
+    }
+
     private OfferRepository offerRepository(AtomicReference<Offer> savedOffer, AtomicInteger saveCount) {
         return offerRepository(savedOffer, saveCount, UUID.randomUUID());
     }
@@ -439,6 +530,30 @@ class OfferServiceTest {
                     }
                     if ("toString".equals(method.getName())) {
                         return "OfferRepositoryTestDouble";
+                    }
+                    throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
+                }
+        );
+    }
+
+    private OfferRepository offerRepositoryReturningOffers(List<Offer> offers,
+            AtomicReference<OfferType> requestedType, AtomicReference<OfferStatus> requestedStatus) {
+        return (OfferRepository) Proxy.newProxyInstance(
+                OfferRepository.class.getClassLoader(),
+                new Class<?>[] {OfferRepository.class},
+                (proxy, method, args) -> {
+                    if ("findAllByOfferTypeAndStatus".equals(method.getName())) {
+                        OfferType offerType = (OfferType) args[0];
+                        OfferStatus status = (OfferStatus) args[1];
+                        requestedType.set(offerType);
+                        requestedStatus.set(status);
+                        return offers.stream()
+                                .filter(offer -> offer.getOfferType() == offerType)
+                                .filter(offer -> offer.getStatus() == status)
+                                .toList();
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "OfferRepositorySearchTestDouble";
                     }
                     throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
                 }

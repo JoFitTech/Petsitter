@@ -106,6 +106,47 @@ public class OfferService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<OfferCardDto> searchOpenOffers(OfferType offerType, LocalDate from, LocalDate to,
+            BigDecimal earnings, boolean minimumEarnings) {
+        if (offerType == null || hasInvalidSearchRange(from, to)) {
+            return List.of();
+        }
+
+        return offerRepository
+                .findAllByOfferTypeAndStatus(offerType, OfferStatus.OPEN)
+                .stream()
+                .filter(offer -> matchesDateRange(offer, from, to))
+                .filter(offer -> matchesEarnings(offer, earnings, minimumEarnings))
+                .map(this::toCardDto)
+                .toList();
+    }
+
+    private boolean hasInvalidSearchRange(LocalDate from, LocalDate to) {
+        return from != null && to != null && to.isBefore(from);
+    }
+
+    private boolean matchesDateRange(Offer offer, LocalDate from, LocalDate to) {
+        if (from != null && offer.getEndDate().isBefore(from)) {
+            return false;
+        }
+        if (to != null && offer.getStartDate().isAfter(to)) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean matchesEarnings(Offer offer, BigDecimal earnings, boolean minimumEarnings) {
+        if (earnings == null) {
+            return true;
+        }
+        if (offer.getPrice() == null) {
+            return false;
+        }
+        int comparison = offer.getPrice().compareTo(earnings);
+        return minimumEarnings ? comparison >= 0 : comparison <= 0;
+    }
+
     private OfferCardDto toCardDto(Offer offer) {
         boolean verified = offer.getCreateUser() != null
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;

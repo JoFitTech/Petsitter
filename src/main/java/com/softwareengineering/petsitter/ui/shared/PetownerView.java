@@ -8,10 +8,14 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.*;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Route(value = "tierhalter-finden", layout = MainLayout.class)
 public class PetownerView extends VerticalLayout {
@@ -185,7 +189,7 @@ public class PetownerView extends VerticalLayout {
         statBox.add(available, statHeadline, rating);
         heroTop.add(copy, statBox);
 
-        FilterSearchBar searchBar = new FilterSearchBar(this::onSearchClicked);
+        FilterSearchBar searchBar = new FilterSearchBar(FilterSearchBar.EarningsMode.MAXIMUM, this::onSearchClicked);
 
         Hr line = new Hr();
         line.getStyle()
@@ -230,12 +234,32 @@ public class PetownerView extends VerticalLayout {
 
     // ── Backend-Interface hooks ───────────────────────────────────────────
 
-    private void onSearchClicked() {
-        UI.getCurrent().navigate("petsitter-suche", com.vaadin.flow.router.QueryParameters.of("mode", "tiersitter"));
+    private void onSearchClicked(FilterSearchBar.SearchCriteria criteria) {
+        UI.getCurrent().navigate("petsitter-suche", queryParametersFor("tiersitter", criteria));
     }
 
     private void onCreateOfferClicked() {
         UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "request"));
+    }
+
+    private QueryParameters queryParametersFor(String mode, FilterSearchBar.SearchCriteria criteria) {
+        Map<String, List<String>> parameters = new LinkedHashMap<>();
+        parameters.put("mode", List.of(mode));
+        if (criteria.from() != null) {
+            parameters.put("from", List.of(criteria.from().toString()));
+        }
+        if (criteria.to() != null) {
+            parameters.put("to", List.of(criteria.to().toString()));
+        }
+        if (criteria.earnings() != null) {
+            parameters.put("earnings", List.of(formatQueryAmount(criteria.earnings())));
+        }
+        parameters.put("distanceKm", List.of(String.valueOf(criteria.distanceKm())));
+        return new QueryParameters(parameters);
+    }
+
+    private String formatQueryAmount(BigDecimal amount) {
+        return amount.stripTrailingZeros().toPlainString();
     }
 
     private void openOfferDialog(OfferCardDto dto) {

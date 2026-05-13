@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -71,9 +72,15 @@ public class Pet {
     private String breed;
 
     /**
-     * Alter des Pets in Jahren (optional).
+     * Geburtstag des Pets (optional).
      */
-    private Integer age;
+    private LocalDate birthDate;
+
+    /**
+     * Freitext-Tierart für species = OTHER (optional, max 100 Zeichen).
+     */
+    @Column(length = 100)
+    private String customSpecies;
 
     /**
      * Notizen des Owners (z.B. "Sehr aktiv!", "Allergie gegen Hühnchen").
@@ -125,12 +132,20 @@ public class Pet {
         this.breed = breed;
     }
 
-    public Integer getAge() {
-        return age;
+    public LocalDate getBirthDate() {
+        return birthDate;
     }
 
-    public void setAge(Integer age) {
-        this.age = age;
+    public void setBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
+
+    public String getCustomSpecies() {
+        return customSpecies;
+    }
+
+    public void setCustomSpecies(String customSpecies) {
+        this.customSpecies = customSpecies;
     }
 
     public String getNotes() {

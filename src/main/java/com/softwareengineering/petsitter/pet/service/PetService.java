@@ -116,14 +116,16 @@ public class PetService {
     private void applyDtoToPet(Pet pet, PetDto dto) {
         pet.setName(dto.name() == null ? "" : dto.name().trim());
         pet.setSpecies(dto.species());
+        pet.setCustomSpecies(dto.species() == PetSpecies.OTHER && dto.customSpecies() != null && !dto.customSpecies().isBlank()
+                ? dto.customSpecies().trim() : null);
         pet.setBreed(dto.breed() == null || dto.breed().isBlank() ? null : dto.breed().trim());
-        pet.setAge(dto.age());
+        pet.setBirthDate(dto.birthDate());
         pet.setNotes(dto.notes() == null || dto.notes().isBlank() ? null : dto.notes().trim());
     }
 
     private PetDto toDto(Pet pet) {
         return new PetDto(pet.getId(), pet.getName(), pet.getSpecies(),
-                pet.getBreed(), pet.getAge(), pet.getNotes());
+                pet.getCustomSpecies(), pet.getBreed(), pet.getBirthDate(), pet.getNotes());
     }
 
     private String formatSpeciesCount(PetSpecies species, long count) {

@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
@@ -13,10 +14,12 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.List;
+import java.util.Locale;
 
 public class MyPetView extends Div {
 
@@ -132,9 +135,9 @@ public class MyPetView extends Div {
         nameSpan.getStyle().set("margin", "0 0 8px 0").set("font-size", "22px").set("font-weight", "800").set("color", DARK);
         info.add(nameSpan);
 
-        String speciesText = PetService.speciesLabel(pet.species());
+        String speciesText = displaySpeciesLabel(pet);
         String breedText   = pet.breed() != null && !pet.breed().isBlank() ? pet.breed() : "";
-        String ageText     = pet.age() != null ? pet.age() + " Jahre alt" : "";
+        String ageText     = pet.birthDate() != null ? formatAge(pet.birthDate()) : "";
 
         for (String detail : new String[]{speciesText, breedText, ageText}) {
             if (!detail.isBlank()) {
@@ -230,22 +233,41 @@ public class MyPetView extends Div {
         nameField.setRequiredIndicatorVisible(true);
         if (existing != null) nameField.setValue(existing.name());
 
+        // Species: ComboBox with all values; OTHER triggers custom text field
         ComboBox<PetSpecies> speciesBox = new ComboBox<>("Tierart *");
         speciesBox.setItems(PetSpecies.values());
         speciesBox.setItemLabelGenerator(PetService::speciesLabel);
         speciesBox.setWidthFull();
         speciesBox.setRequiredIndicatorVisible(true);
-        if (existing != null) speciesBox.setValue(existing.species());
+
+        TextField customSpeciesField = new TextField("Tierart (eigene Beschreibung) *");
+        customSpeciesField.setWidthFull();
+        customSpeciesField.setPlaceholder("z.B. Schildkröte, Hamster, ...");
+        customSpeciesField.setVisible(false);
+
+        if (existing != null) {
+            speciesBox.setValue(existing.species());
+            if (existing.species() == PetSpecies.OTHER) {
+                customSpeciesField.setVisible(true);
+                if (existing.customSpecies() != null) customSpeciesField.setValue(existing.customSpecies());
+            }
+        }
+
+        speciesBox.addValueChangeListener(e -> {
+            boolean isOther = e.getValue() == PetSpecies.OTHER;
+            customSpeciesField.setVisible(isOther);
+            if (!isOther) customSpeciesField.clear();
+        });
 
         TextField breedField = new TextField("Rasse");
         breedField.setWidthFull();
         if (existing != null && existing.breed() != null) breedField.setValue(existing.breed());
 
-        IntegerField ageField = new IntegerField("Alter (Jahre)");
-        ageField.setMin(0);
-        ageField.setMax(100);
-        ageField.setWidthFull();
-        if (existing != null && existing.age() != null) ageField.setValue(existing.age());
+        DatePicker birthDatePicker = new DatePicker("Geburtstag");
+        birthDatePicker.setWidthFull();
+        birthDatePicker.setMax(LocalDate.now());
+        birthDatePicker.setLocale(Locale.GERMAN);
+        if (existing != null && existing.birthDate() != null) birthDatePicker.setValue(existing.birthDate());
 
         TextArea notesArea = new TextArea("Wichtige Infos");
         notesArea.setWidthFull();
@@ -267,13 +289,18 @@ public class MyPetView extends Div {
                 Notification.show("Bitte eine Tierart auswählen.", 2500, Notification.Position.TOP_CENTER);
                 return;
             }
+            if (species == PetSpecies.OTHER && customSpeciesField.getValue().isBlank()) {
+                Notification.show("Bitte die Tierart beschreiben.", 2500, Notification.Position.TOP_CENTER);
+                return;
+            }
             try {
                 PetDto dto = new PetDto(
                         existing != null ? existing.id() : null,
                         name.trim(),
                         species,
+                        species == PetSpecies.OTHER ? customSpeciesField.getValue().trim() : null,
                         breedField.getValue().isBlank() ? null : breedField.getValue().trim(),
-                        ageField.getValue(),
+                        birthDatePicker.getValue(),
                         notesArea.getValue().isBlank() ? null : notesArea.getValue().trim()
                 );
                 if (existing == null) {
@@ -291,11 +318,11 @@ public class MyPetView extends Div {
         });
 
         HorizontalLayout btns = new HorizontalLayout(cancelBtn, saveBtn);
-        btns.getStyle().set("margin-top", "8px").set("justify-content", "flex-end");
         btns.setWidthFull();
         btns.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        btns.getStyle().set("margin-top", "8px");
 
-        layout.add(title, nameField, speciesBox, breedField, ageField, notesArea, btns);
+        layout.add(title, nameField, speciesBox, customSpeciesField, breedField, birthDatePicker, notesArea, btns);
         dialog.add(layout);
         dialog.open();
     }
@@ -336,6 +363,22 @@ public class MyPetView extends Div {
         layout.add(msg, btns);
         confirm.add(layout);
         confirm.open();
+    }
+
+    private String displaySpeciesLabel(PetDto pet) {
+        if (pet.species() == PetSpecies.OTHER && pet.customSpecies() != null && !pet.customSpecies().isBlank()) {
+            return pet.customSpecies();
+        }
+        return PetService.speciesLabel(pet.species());
+    }
+
+    private String formatAge(LocalDate birthDate) {
+        int years = Period.between(birthDate, LocalDate.now()).getYears();
+        if (years == 0) {
+            int months = Period.between(birthDate, LocalDate.now()).getMonths();
+            return months <= 1 ? "weniger als 1 Monat alt" : months + " Monate alt";
+        }
+        return years == 1 ? "1 Jahr alt" : years + " Jahre alt";
     }
 
     private Button styledSaveBtn(String label) {

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Locale;
 
 @CssImport(value = "./styles/filter-search-popover.css", themeFor = "vaadin-popover-overlay")
+@CssImport(value = "./styles/filter-search-slider-bubble.css", themeFor = "vaadin-slider-bubble-overlay")
 public class FilterSearchBar extends Div {
 
     private static final String DARK = "#4a3428";
@@ -312,22 +313,19 @@ public class FilterSearchBar extends Div {
                 .set("line-height", "1")
                 .set("color", DARK);
 
-        Slider slider = new Slider(1, 100);
+        Slider slider = new Slider(0, DISTANCE_VALUES.size() - 1);
         slider.setStep(1);
-        slider.setValue((double) selectedDistance);
+        slider.setValue((double) distanceIndex(selectedDistance));
         slider.setAriaLabel("Entfernung in Kilometern");
         slider.setMinMaxVisible(false);
         slider.setValueAlwaysVisible(false);
-        slider.setValueChangeMode(ValueChangeMode.ON_CHANGE);
+        slider.setValueChangeMode(ValueChangeMode.EAGER);
         slider.setWidthFull();
+        slider.getElement().getThemeList().add("distance-slider");
         slider.getStyle().set("margin-top", "22px");
         slider.addValueChangeListener(event -> {
-            int rawDistance = Math.max(1, Math.min(100, (int) Math.round(event.getValue())));
-            int snappedDistance = nearestAllowedDistance(rawDistance);
-            if (rawDistance != snappedDistance) {
-                slider.setValue((double) snappedDistance);
-            }
-            selectedDistance = snappedDistance;
+            int index = Math.max(0, Math.min(DISTANCE_VALUES.size() - 1, (int) Math.round(event.getValue())));
+            selectedDistance = DISTANCE_VALUES.get(index);
             currentValue.setText(selectedDistance + " km");
             distanceValue.setText("bis " + selectedDistance + " km");
         });
@@ -344,17 +342,9 @@ public class FilterSearchBar extends Div {
         return content;
     }
 
-    private int nearestAllowedDistance(int rawDistance) {
-        int nearest = DISTANCE_VALUES.get(0);
-        int smallestDifference = Math.abs(rawDistance - nearest);
-        for (Integer distance : DISTANCE_VALUES) {
-            int difference = Math.abs(rawDistance - distance);
-            if (difference < smallestDifference) {
-                nearest = distance;
-                smallestDifference = difference;
-            }
-        }
-        return nearest;
+    private int distanceIndex(int distance) {
+        int index = DISTANCE_VALUES.indexOf(distance);
+        return index >= 0 ? index : 0;
     }
 
     private void openOnly(Popover popover) {

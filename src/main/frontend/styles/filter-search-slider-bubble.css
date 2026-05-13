@@ -1,0 +1,3 @@
+:host([theme~="distance-slider"]) [part="overlay"] {
+  display: none;
+}

@@ -43,6 +43,7 @@ public class PetsitterDetailPopUp extends Dialog {
                                 String topColor, int stars) {
         setWidth("520px");
         setCloseOnOutsideClick(true);
+        this.getElement().getThemeList().add("no-padding");
 
         // ── Outer container ───────────────────────────────────────────────
         VerticalLayout content = new VerticalLayout();
@@ -50,6 +51,7 @@ public class PetsitterDetailPopUp extends Dialog {
         content.setSpacing(false);
         content.getStyle()
                 .set("background", "#fdf8f0")
+                .set("font-family", "Inter, Arial, sans-serif")
                 .set("border-radius", "20px")
                 .set("padding", "28px 28px 24px 28px")
                 .set("gap", "16px");

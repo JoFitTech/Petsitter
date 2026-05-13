@@ -170,7 +170,9 @@ public class ChatView extends VerticalLayout {
             .set("cursor", "pointer")
             .set("display", "flex")
             .set("gap", "14px")
-            .set("align-items", "center");
+            .set("align-items", "center")
+            .set("width", "100%")
+            .set("box-sizing", "border-box");
 
         if (selected) {
             item.getStyle().set("background", "#ebd7c0"); // darker beige
@@ -289,16 +291,25 @@ public class ChatView extends VerticalLayout {
         rightMsgRow.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
         
         Div rightBubbleWrap = new Div();
-        rightBubbleWrap.getStyle().set("position", "relative");
+        rightBubbleWrap.getStyle()
+            .set("position", "relative")
+            .set("margin-right", "18px")
+            .set("margin-bottom", "18px");
         
         Div rightBubble = new Div();
         rightBubble.getStyle()
             .set("background", "#f7f5f0")
             .set("border", "1px solid #e8ddd4")
             .set("border-radius", "16px")
-            .set("padding", "20px")
+            .set("padding", "16px 20px")
             .set("width", "360px")
-            .set("height", "80px");
+            .set("box-sizing", "border-box")
+            .set("color", DARK)
+            .set("font-size", "15px")
+            .set("line-height", "1.5");
+            
+        Span rightText = new Span("Hallo max3010, hast du morgen Nachmittag Zeit, auf meinen Hund aufzupassen?");
+        rightBubble.add(rightText);
             
         Div rightAvatar = createAvatar(36);
         rightAvatar.getStyle()
@@ -316,15 +327,25 @@ public class ChatView extends VerticalLayout {
         leftMsgRow.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
         
         Div leftBubbleWrap = new Div();
-        leftBubbleWrap.getStyle().set("position", "relative").set("margin-top", "12px");
+        leftBubbleWrap.getStyle()
+            .set("position", "relative")
+            .set("margin-top", "12px")
+            .set("margin-left", "18px")
+            .set("margin-bottom", "18px");
         
         Div leftBubble = new Div();
         leftBubble.getStyle()
             .set("background", "#ebd7c0")
             .set("border-radius", "16px")
-            .set("padding", "20px")
+            .set("padding", "16px 20px")
             .set("width", "360px")
-            .set("height", "80px");
+            .set("box-sizing", "border-box")
+            .set("color", DARK)
+            .set("font-size", "15px")
+            .set("line-height", "1.5");
+            
+        Span leftText = new Span("Hallo! Ja, ich habe morgen ab 14 Uhr Zeit. Sollen wir uns vorher noch kurz treffen?");
+        leftBubble.add(leftText);
             
         Div leftAvatar = createAvatar(36);
         leftAvatar.getStyle()
@@ -369,7 +390,7 @@ public class ChatView extends VerticalLayout {
             .set("font-family", "Inter, Arial, sans-serif");
             
         Icon sendIcon = new Icon(VaadinIcon.PAPERPLANE_O);
-        sendIcon.getStyle().set("color", "#4a3428").set("cursor", "pointer");
+        sendIcon.getStyle().set("color", "#a08060").set("cursor", "pointer");
         sendIcon.setSize("24px");
         sendIcon.addClickListener(e -> {
             System.out.println("Send clicked, message: " + messageInput.getValue());

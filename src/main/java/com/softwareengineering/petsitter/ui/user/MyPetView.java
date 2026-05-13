@@ -23,7 +23,7 @@ import java.util.Locale;
 
 public class MyPetView extends Div {
 
-    private static final String DARK    = "#4a3428";
+    private static final String DARK = "#4a3428";
     private static final String CARD_BG = "#ffffff";
 
     private final PetService petService;
@@ -34,11 +34,11 @@ public class MyPetView extends Div {
 
         setWidthFull();
         getStyle()
-            .set("background", CARD_BG)
-            .set("border-radius", "20px")
-            .set("padding", "36px")
-            .set("box-shadow", "0 8px 32px rgba(74,52,40,0.09)")
-            .set("box-sizing", "border-box");
+                .set("background", CARD_BG)
+                .set("border-radius", "20px")
+                .set("padding", "36px")
+                .set("box-shadow", "0 8px 32px rgba(74,52,40,0.09)")
+                .set("box-sizing", "border-box");
 
         add(buildHeader());
 
@@ -76,21 +76,22 @@ public class MyPetView extends Div {
         title.getStyle().set("margin", "0").set("font-size", "28px").set("font-weight", "800").set("color", DARK);
 
         Span subtitle = new Span("*Diese Inhalte werden automatisch in deine Aufträge übernommen*");
-        subtitle.getStyle().set("margin", "4px 0 0 0").set("font-size", "13px").set("color", "#a08060").set("font-style", "italic").set("font-weight", "700");
+        subtitle.getStyle().set("margin", "4px 0 0 0").set("font-size", "13px").set("color", "#a08060")
+                .set("font-style", "italic").set("font-weight", "700");
 
         titleLayout.add(title, subtitle);
 
         Button addBtn = new Button("Tier hinzufügen", new Icon(VaadinIcon.PLUS));
         addBtn.getStyle()
-            .set("border-radius", "24px")
-            .set("background", DARK)
-            .set("color", "white")
-            .set("box-shadow", "none")
-            .set("font-weight", "600")
-            .set("font-size", "14px")
-            .set("padding", "0 20px")
-            .set("height", "40px")
-            .set("cursor", "pointer");
+                .set("border-radius", "24px")
+                .set("background", DARK)
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("font-weight", "600")
+                .set("font-size", "14px")
+                .set("padding", "0 20px")
+                .set("height", "40px")
+                .set("cursor", "pointer");
         addBtn.addClickListener(e -> openPetDialog(null));
 
         row.add(titleLayout, addBtn);
@@ -104,11 +105,11 @@ public class MyPetView extends Div {
     private Div buildPetCard(PetDto pet) {
         Div card = new Div();
         card.getStyle()
-            .set("border", "1px solid #ead5ae")
-            .set("border-radius", "16px")
-            .set("padding", "28px")
-            .set("margin-bottom", "20px")
-            .set("background", "#ffffff");
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "16px")
+                .set("padding", "28px")
+                .set("margin-bottom", "20px")
+                .set("background", "#ffffff");
 
         HorizontalLayout topRow = new HorizontalLayout();
         topRow.setWidthFull();
@@ -122,27 +123,29 @@ public class MyPetView extends Div {
 
         Div avatar = new Div();
         avatar.getStyle()
-            .set("width", "100px").set("height", "100px")
-            .set("border-radius", "50%")
-            .set("background", "#e3cda8")
-            .set("flex-shrink", "0");
+                .set("width", "100px").set("height", "100px")
+                .set("border-radius", "50%")
+                .set("background", "#e3cda8")
+                .set("flex-shrink", "0");
 
         VerticalLayout info = new VerticalLayout();
         info.setPadding(false);
         info.setSpacing(false);
 
         H3 nameSpan = new H3(pet.name());
-        nameSpan.getStyle().set("margin", "0 0 8px 0").set("font-size", "22px").set("font-weight", "800").set("color", DARK);
+        nameSpan.getStyle().set("margin", "0 0 8px 0").set("font-size", "22px").set("font-weight", "800").set("color",
+                DARK);
         info.add(nameSpan);
 
         String speciesText = displaySpeciesLabel(pet);
-        String breedText   = pet.breed() != null && !pet.breed().isBlank() ? pet.breed() : "";
-        String ageText     = pet.birthDate() != null ? formatAge(pet.birthDate()) : "";
+        String breedText = pet.breed() != null && !pet.breed().isBlank() ? pet.breed() : "";
+        String ageText = pet.birthDate() != null ? formatAge(pet.birthDate()) : "";
 
-        for (String detail : new String[]{speciesText, breedText, ageText}) {
+        for (String detail : new String[] { speciesText, breedText, ageText }) {
             if (!detail.isBlank()) {
                 Span s = new Span(detail);
-                s.getStyle().set("font-size", "15px").set("color", "#7a6050").set("font-weight", "700").set("font-style", "italic").set("line-height", "1.4");
+                s.getStyle().set("font-size", "15px").set("color", "#7a6050").set("font-weight", "700")
+                        .set("font-style", "italic").set("line-height", "1.4");
                 info.add(s);
             }
         }
@@ -155,27 +158,27 @@ public class MyPetView extends Div {
 
         Button editBtn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
         editBtn.getStyle()
-            .set("border-radius", "24px")
-            .set("background", DARK)
-            .set("color", "white")
-            .set("box-shadow", "none")
-            .set("font-weight", "600")
-            .set("font-size", "14px")
-            .set("padding", "0 20px")
-            .set("height", "40px")
-            .set("cursor", "pointer");
+                .set("border-radius", "24px")
+                .set("background", DARK)
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("font-weight", "600")
+                .set("font-size", "14px")
+                .set("padding", "0 20px")
+                .set("height", "40px")
+                .set("cursor", "pointer");
         editBtn.addClickListener(e -> openPetDialog(pet));
 
         Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH));
         deleteBtn.getStyle()
-            .set("border-radius", "24px")
-            .set("background", "#e8ddd4")
-            .set("color", DARK)
-            .set("box-shadow", "none")
-            .set("height", "40px")
-            .set("width", "40px")
-            .set("padding", "0")
-            .set("cursor", "pointer");
+                .set("border-radius", "24px")
+                .set("background", "#e8ddd4")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("height", "40px")
+                .set("width", "40px")
+                .set("padding", "0")
+                .set("cursor", "pointer");
         deleteBtn.addClickListener(e -> confirmDelete(pet));
 
         btnRow.add(editBtn, deleteBtn);
@@ -187,19 +190,20 @@ public class MyPetView extends Div {
         bottomSection.getStyle().set("margin-top", "24px");
 
         Span infosLabel = new Span("Wichtige Infos");
-        infosLabel.getStyle().set("font-weight", "800").set("font-size", "18px").set("color", DARK).set("margin-bottom", "10px");
+        infosLabel.getStyle().set("font-weight", "800").set("font-size", "18px").set("color", DARK).set("margin-bottom",
+                "10px");
 
         Div infosBox = new Div();
         infosBox.getStyle()
-            .set("border", "1px solid #ead5ae")
-            .set("border-radius", "12px")
-            .set("min-height", "80px")
-            .set("padding", "14px 16px")
-            .set("width", "100%")
-            .set("background", "#fbf8f1")
-            .set("font-size", "14px")
-            .set("color", "#7a6050")
-            .set("line-height", "1.6");
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "12px")
+                .set("min-height", "80px")
+                .set("padding", "14px 16px")
+                .set("width", "100%")
+                .set("background", "#fbf8f1")
+                .set("font-size", "14px")
+                .set("color", "#7a6050")
+                .set("line-height", "1.6");
 
         if (pet.notes() != null && !pet.notes().isBlank()) {
             infosBox.add(new Span(pet.notes()));
@@ -226,12 +230,14 @@ public class MyPetView extends Div {
         layout.getStyle().set("gap", "14px");
 
         H2 title = new H2(existing == null ? "Tier hinzufügen" : "Tier bearbeiten");
-        title.getStyle().set("margin", "0 0 6px 0").set("font-size", "22px").set("font-weight", "800").set("color", DARK);
+        title.getStyle().set("margin", "0 0 6px 0").set("font-size", "22px").set("font-weight", "800").set("color",
+                DARK);
 
         TextField nameField = new TextField("Name *");
         nameField.setWidthFull();
         nameField.setRequiredIndicatorVisible(true);
-        if (existing != null) nameField.setValue(existing.name());
+        if (existing != null)
+            nameField.setValue(existing.name());
 
         // Species: ComboBox with all values; OTHER triggers custom text field
         ComboBox<PetSpecies> speciesBox = new ComboBox<>("Tierart *");
@@ -249,30 +255,35 @@ public class MyPetView extends Div {
             speciesBox.setValue(existing.species());
             if (existing.species() == PetSpecies.OTHER) {
                 customSpeciesField.setVisible(true);
-                if (existing.customSpecies() != null) customSpeciesField.setValue(existing.customSpecies());
+                if (existing.customSpecies() != null)
+                    customSpeciesField.setValue(existing.customSpecies());
             }
         }
 
         speciesBox.addValueChangeListener(e -> {
             boolean isOther = e.getValue() == PetSpecies.OTHER;
             customSpeciesField.setVisible(isOther);
-            if (!isOther) customSpeciesField.clear();
+            if (!isOther)
+                customSpeciesField.clear();
         });
 
         TextField breedField = new TextField("Rasse");
         breedField.setWidthFull();
-        if (existing != null && existing.breed() != null) breedField.setValue(existing.breed());
+        if (existing != null && existing.breed() != null)
+            breedField.setValue(existing.breed());
 
         DatePicker birthDatePicker = new DatePicker("Geburtstag");
         birthDatePicker.setWidthFull();
         birthDatePicker.setMax(LocalDate.now());
         birthDatePicker.setLocale(Locale.GERMAN);
-        if (existing != null && existing.birthDate() != null) birthDatePicker.setValue(existing.birthDate());
+        if (existing != null && existing.birthDate() != null)
+            birthDatePicker.setValue(existing.birthDate());
 
         TextArea notesArea = new TextArea("Wichtige Infos");
         notesArea.setWidthFull();
         notesArea.setMinHeight("80px");
-        if (existing != null && existing.notes() != null) notesArea.setValue(existing.notes());
+        if (existing != null && existing.notes() != null)
+            notesArea.setValue(existing.notes());
 
         Button saveBtn = styledSaveBtn("Speichern");
         Button cancelBtn = styledCancelBtn("Abbrechen");
@@ -301,8 +312,7 @@ public class MyPetView extends Div {
                         species == PetSpecies.OTHER ? customSpeciesField.getValue().trim() : null,
                         breedField.getValue().isBlank() ? null : breedField.getValue().trim(),
                         birthDatePicker.getValue(),
-                        notesArea.getValue().isBlank() ? null : notesArea.getValue().trim()
-                );
+                        notesArea.getValue().isBlank() ? null : notesArea.getValue().trim());
                 if (existing == null) {
                     petService.createPetForCurrentUser(dto);
                     Notification.show("Tier hinzugefügt.", 2500, Notification.Position.TOP_CENTER);
@@ -342,7 +352,7 @@ public class MyPetView extends Div {
         msg.getStyle().set("font-size", "15px").set("color", DARK).set("font-weight", "600");
 
         Button yes = styledSaveBtn("Löschen");
-        Button no  = styledCancelBtn("Abbrechen");
+        Button no = styledCancelBtn("Abbrechen");
         no.addClickListener(e -> confirm.close());
         yes.addClickListener(e -> {
             try {
@@ -384,26 +394,26 @@ public class MyPetView extends Div {
     private Button styledSaveBtn(String label) {
         Button btn = new Button(label);
         btn.getStyle()
-            .set("border-radius", "24px")
-            .set("background", DARK)
-            .set("color", "white")
-            .set("box-shadow", "none")
-            .set("font-weight", "600")
-            .set("height", "38px")
-            .set("cursor", "pointer");
+                .set("border-radius", "24px")
+                .set("background", DARK)
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("font-weight", "600")
+                .set("height", "38px")
+                .set("cursor", "pointer");
         return btn;
     }
 
     private Button styledCancelBtn(String label) {
         Button btn = new Button(label);
         btn.getStyle()
-            .set("border-radius", "24px")
-            .set("background", "#e8ddd4")
-            .set("color", DARK)
-            .set("box-shadow", "none")
-            .set("font-weight", "600")
-            .set("height", "38px")
-            .set("cursor", "pointer");
+                .set("border-radius", "24px")
+                .set("background", "#e8ddd4")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("font-weight", "600")
+                .set("height", "38px")
+                .set("cursor", "pointer");
         return btn;
     }
 }

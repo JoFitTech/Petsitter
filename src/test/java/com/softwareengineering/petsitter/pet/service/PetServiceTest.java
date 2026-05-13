@@ -18,7 +18,7 @@ class PetServiceTest {
         UUID ownerId = UUID.randomUUID();
         PetRepositoryFake petRepository = new PetRepositoryFake(List.of(pet(PetSpecies.DOG)));
 
-        List<Pet> result = new PetService(petRepository.repository()).getPetsForOwner(ownerId);
+        List<Pet> result = new PetService(petRepository.repository(), null).getPetsForOwner(ownerId);
 
         assertThat(result).hasSize(1);
         assertThat(petRepository.requestedOwnerId).hasValue(ownerId);
@@ -34,14 +34,14 @@ class PetServiceTest {
                 pet(PetSpecies.RABBIT)
         ));
 
-        String summary = new PetService(petRepository.repository()).getPetSummaryForOwner(ownerId);
+        String summary = new PetService(petRepository.repository(), null).getPetSummaryForOwner(ownerId);
 
         assertThat(summary).isEqualTo("2 Hunde, 1 Katze, 1 Kaninchen");
     }
 
     @Test
     void getPetSummaryForOwnerHandlesEmptyPets() {
-        String summary = new PetService(new PetRepositoryFake(List.of()).repository())
+        String summary = new PetService(new PetRepositoryFake(List.of()).repository(), null)
                 .getPetSummaryForOwner(UUID.randomUUID());
 
         assertThat(summary).isEqualTo("Keine Haustiere");

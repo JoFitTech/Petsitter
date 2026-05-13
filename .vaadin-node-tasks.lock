@@ -1,3 +1,0 @@
-30369
-/opt/homebrew/opt/openjdk@21/bin/java --enable-native-access=ALL-UNNAMED -classpath /Users/luisschirmbeck/.m2/wrapper/dists/apache-maven-3.9.14/db91789b/boot/plexus-classworlds-2.9.0.jar -Dclassworlds.conf=/Users/luisschirmbeck/.m2/wrapper/dists/apache-maven-3.9.14/db91789b/bin/m2.conf -Dmaven.home=/Users/luisschirmbeck/.m2/wrapper/dists/apache-maven-3.9.14/db91789b -Dlibrary.jansi.path=/Users/luisschirmbeck/.m2/wrapper/dists/apache-maven-3.9.14/db91789b/lib/jansi-native -Dmaven.multiModuleProjectDirectory=/Users/luisschirmbeck/Studium/Software Engineering/Petsitter org.codehaus.plexus.classworlds.launcher.Launcher -q -DskipTests compile
-StartupGuardTest test

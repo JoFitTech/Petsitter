@@ -15,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -96,6 +97,41 @@ class PostalCodeServiceTest {
     }
 
     @Test
+    void findCachedGermanLocationDoesNotCallApiWhenLocationIsMissing() {
+        Optional<PostalCodeLocation> result = service.findCachedGermanLocation("10115");
+
+        assertThat(result).isEmpty();
+        assertThat(client.lookupCount).isZero();
+    }
+
+    @Test
+    void findCachedGermanLocationIgnoresCachedLocationWithImplausibleCoordinatesWithoutApiCall() {
+        repository.seed(location("DE", "49080", "Osnabrück", "Osnabrück", "3404", "52.2491"));
+
+        Optional<PostalCodeLocation> result = service.findCachedGermanLocation("49080");
+
+        assertThat(result).isEmpty();
+        assertThat(client.lookupCount).isZero();
+    }
+
+    @Test
+    void findCachedGermanLocationsLoadsLocationsInBatchWithoutApiCall() {
+        PostalCodeLocation berlin = location("DE", "10115", "Berlin", "Berlin", "52.5321", "13.3849");
+        PostalCodeLocation osnabrueck = location("DE", "49080", "Osnabrück", "Osnabrück", "52.2588709", "8.0327320");
+        repository.seed(berlin);
+        repository.seed(osnabrueck);
+        repository.seed(location("DE", "99999", "Invalid", "Invalid", "3404", "52.2491"));
+
+        Map<String, PostalCodeLocation> result = service.findCachedGermanLocations(Set.of("10115", "49080", "99999"));
+
+        assertThat(result).containsOnlyKeys("10115", "49080");
+        assertThat(result.get("10115")).isSameAs(berlin);
+        assertThat(result.get("49080")).isSameAs(osnabrueck);
+        assertThat(repository.findAllCount).isOne();
+        assertThat(client.lookupCount).isZero();
+    }
+
+    @Test
     void findGermanLocationRefreshesCachedLocationWithImplausibleCoordinates() {
         PostalCodeLocation cached = location("DE", "49080", "Osnabrück", "Osnabrück", "3404", "52.2491");
         repository.seed(cached);
@@ -155,6 +191,7 @@ class PostalCodeServiceTest {
         private final Map<String, PostalCodeLocation> locations = new HashMap<>();
         private PostalCodeLocation savedLocation;
         private int findCount;
+        private int findAllCount;
 
         void seed(PostalCodeLocation location) {
             locations.put(key(location.getCountryCode(), location.getPostalCode()), location);
@@ -168,6 +205,20 @@ class PostalCodeServiceTest {
                         if ("findByCountryCodeAndPostalCode".equals(method.getName())) {
                             findCount++;
                             return Optional.ofNullable(locations.get(key((String) args[0], (String) args[1])));
+                        }
+                        if ("findAllByCountryCodeAndPostalCodeIn".equals(method.getName())) {
+                            findAllCount++;
+                            String countryCode = (String) args[0];
+                            @SuppressWarnings("unchecked")
+                            Iterable<String> postalCodes = (Iterable<String>) args[1];
+                            List<PostalCodeLocation> result = new java.util.ArrayList<>();
+                            postalCodes.forEach(postalCode -> {
+                                PostalCodeLocation location = locations.get(key(countryCode, postalCode));
+                                if (location != null) {
+                                    result.add(location);
+                                }
+                            });
+                            return result;
                         }
                         if ("save".equals(method.getName())) {
                             savedLocation = (PostalCodeLocation) args[0];

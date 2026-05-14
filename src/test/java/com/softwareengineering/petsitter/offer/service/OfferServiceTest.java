@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
+import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
@@ -1096,6 +1097,93 @@ class OfferServiceTest {
         assertThat(result).extracting(OfferCardDto::distanceKm).containsExactly(null, null);
     }
 
+    @Test
+    void validateOriginPostalCodeAcceptsKnownPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of("49080", location("49080", 52.2588709, 8.0327320)))
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49080")).isEmpty();
+    }
+
+    @Test
+    void validateOriginPostalCodeRejectsUnknownPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of())
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49205"))
+                .contains("Bitte eine gültige deutsche Postleitzahl eingeben.");
+    }
+
+    @Test
+    void validateOriginPostalCodeFetchesFromApiWhenNotCached() {
+        PostalCodeLocation fetchedLocation = location("49205", 52.2, 8.1);
+        PostalCodeService serviceWithApiFallback = new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                return "49205".equals(postalCode) ? Optional.of(fetchedLocation) : Optional.empty();
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return Map.of();
+            }
+        };
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                serviceWithApiFallback
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49205")).isEmpty();
+    }
+
+    @Test
+    void validateOriginPostalCodeReturnsErrorWhenApiFails() {
+        PostalCodeService serviceWithApiError = new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                throw new PostalCodeLookupException("Nominatim nicht erreichbar.");
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return Map.of();
+            }
+        };
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                serviceWithApiError
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49205"))
+                .contains("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
+    }
+
     private OfferSearchCriteria searchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
             OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings) {
         return searchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, null, null, Set.of());
@@ -1244,7 +1332,44 @@ class OfferServiceTest {
         return new PostalCodeService(null, null) {
             @Override
             public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                throw new AssertionError("Offer search must not call the postal code API lookup path.");
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
                 return Optional.ofNullable(locations.get(postalCode));
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return postalCodes.stream()
+                        .filter(locations::containsKey)
+                        .collect(java.util.stream.Collectors.toMap(
+                                postalCode -> postalCode,
+                                locations::get));
+            }
+        };
+    }
+
+    private PostalCodeService postalCodeServiceWithLookup(Map<String, PostalCodeLocation> locations) {
+        return new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                return Optional.ofNullable(locations.get(postalCode));
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.ofNullable(locations.get(postalCode));
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return postalCodes.stream()
+                        .filter(locations::containsKey)
+                        .collect(java.util.stream.Collectors.toMap(
+                                postalCode -> postalCode,
+                                locations::get));
             }
         };
     }

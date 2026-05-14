@@ -1,7 +1,6 @@
 package com.softwareengineering.petsitter.offer.service;
 
 import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
-import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
 import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
@@ -38,10 +37,13 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * OfferService – verwaltet die Erstellung, Änderung und Suche von Offers.
@@ -187,8 +189,18 @@ public class OfferService {
             return Optional.of("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
         }
 
-        PostalCodeValidationResult result = postalCodeService.validateGermanPostalCode(postalCode, null);
-        return result.valid() ? Optional.empty() : Optional.of(result.message());
+        String normalizedPostalCode = postalCodeService.normalizePostalCode(postalCode);
+        if (!postalCodeService.isValidGermanPostalCodeFormat(normalizedPostalCode)) {
+            return Optional.of("Bitte eine gültige deutsche Postleitzahl eingeben.");
+        }
+        try {
+            if (postalCodeService.findGermanLocation(normalizedPostalCode).isEmpty()) {
+                return Optional.of("Bitte eine gültige deutsche Postleitzahl eingeben.");
+            }
+        } catch (PostalCodeLookupException ex) {
+            return Optional.of("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
+        }
+        return Optional.empty();
     }
 
     @Transactional(readOnly = true)
@@ -333,34 +345,36 @@ public class OfferService {
             return List.of();
         }
 
-        Optional<PostalCodeLocation> originLocation;
-        try {
-            originLocation = postalCodeService.findGermanLocation(criteria.originPostalCode());
-        } catch (PostalCodeLookupException ex) {
-            LOGGER.info("Distance filter origin lookup failed: originPostalCode={}, reason={}",
-                    criteria.originPostalCode(),
-                    ex.getMessage());
-            return List.of();
-        }
+        Optional<PostalCodeLocation> originLocation = postalCodeService.findCachedGermanLocation(
+                criteria.originPostalCode());
         if (originLocation.isEmpty()) {
-            LOGGER.info("Distance filter origin lookup returned no location: originPostalCode={}",
+            LOGGER.info("Distance filter origin postal code is not cached: originPostalCode={}",
                     criteria.originPostalCode());
             return List.of();
         }
 
         int maxDistanceKm = Math.max(0, criteria.distanceKm());
         PostalCodeLocation resolvedOrigin = originLocation.get();
+        Set<String> targetPostalCodes = offers.stream()
+                .map(this::creatorPostalCode)
+                .filter(postalCode -> postalCode != null && !postalCode.isBlank())
+                .map(postalCodeService::normalizePostalCode)
+                .filter(postalCodeService::isValidGermanPostalCodeFormat)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<String, PostalCodeLocation> targetLocations = postalCodeService.findCachedGermanLocations(targetPostalCodes);
         LOGGER.info("Distance filter active: originPostalCode={}, originPlace={}, originLat={}, originLon={}, "
-                        + "maxDistanceKm={}, candidates={}",
+                        + "maxDistanceKm={}, candidates={}, uniqueTargetPostalCodes={}, cachedTargetPostalCodes={}",
                 criteria.originPostalCode(),
                 resolvedOrigin.getPrimaryPlaceName(),
                 resolvedOrigin.getLatitude(),
                 resolvedOrigin.getLongitude(),
                 maxDistanceKm,
-                offers.size());
+                offers.size(),
+                targetPostalCodes.size(),
+                targetLocations.size());
 
         List<OfferCardDto> results = offers.stream()
-                .map(offer -> offerDistance(offer, originLocation.get()))
+                .map(offer -> offerDistance(offer, originLocation.get(), targetLocations))
                 .flatMap(Optional::stream)
                 .filter(offerDistance -> {
                     boolean included = offerDistance.distanceKm() <= maxDistanceKm;
@@ -388,31 +402,26 @@ public class OfferService {
         return results;
     }
 
-    private Optional<OfferDistance> offerDistance(Offer offer, PostalCodeLocation originLocation) {
+    private Optional<OfferDistance> offerDistance(
+            Offer offer,
+            PostalCodeLocation originLocation,
+            Map<String, PostalCodeLocation> targetLocations) {
         User createUser = offer.getCreateUser();
         if (createUser == null || createUser.getPostalCode() == null || createUser.getPostalCode().isBlank()) {
             LOGGER.info("Distance filter excluded offer without creator postal code: offerId={}",
                     offer.getOfferId());
             return Optional.empty();
         }
-        try {
-            Optional<PostalCodeLocation> targetLocation = postalCodeService.findGermanLocation(createUser.getPostalCode());
-            if (targetLocation.isEmpty()) {
-                LOGGER.info("Distance filter excluded offer with unresolved creator postal code: offerId={}, targetPostalCode={}",
-                        offer.getOfferId(),
-                        createUser.getPostalCode());
-                return Optional.empty();
-            }
-            double distanceKm = postalCodeService.distanceKm(originLocation, targetLocation.get());
-            return Optional.of(new OfferDistance(offer, targetLocation.get(), distanceKm));
-        } catch (PostalCodeLookupException ex) {
-            LOGGER.info("Distance filter excluded offer because target postal code lookup failed: offerId={}, "
-                            + "targetPostalCode={}, reason={}",
+        String targetPostalCode = postalCodeService.normalizePostalCode(createUser.getPostalCode());
+        PostalCodeLocation targetLocation = targetLocations.get(targetPostalCode);
+        if (targetLocation == null) {
+            LOGGER.info("Distance filter excluded offer with uncached creator postal code: offerId={}, targetPostalCode={}",
                     offer.getOfferId(),
-                    createUser.getPostalCode(),
-                    ex.getMessage());
+                    createUser.getPostalCode());
             return Optional.empty();
         }
+        double distanceKm = postalCodeService.distanceKm(originLocation, targetLocation);
+        return Optional.of(new OfferDistance(offer, targetLocation, distanceKm));
     }
 
     private List<UUID> describeOfferIds(List<Offer> offers) {

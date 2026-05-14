@@ -10,9 +10,12 @@ import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +76,48 @@ public class PostalCodeService {
             return Optional.empty();
         }
         return findLocation(GERMANY_COUNTRY_CODE, normalizedPostalCode);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+        String normalizedPostalCode = normalizePostalCode(postalCode);
+        if (!isValidGermanPostalCodeFormat(normalizedPostalCode)) {
+            return Optional.empty();
+        }
+        return findCachedLocation(GERMANY_COUNTRY_CODE, normalizedPostalCode);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<PostalCodeLocation> findCachedLocation(String countryCode, String postalCode) {
+        String normalizedCountryCode = normalizeCountryCode(countryCode);
+        String normalizedPostalCode = normalizePostalCode(postalCode);
+        return repository.findByCountryCodeAndPostalCode(normalizedCountryCode, normalizedPostalCode)
+                .filter(location -> hasPlausibleCoordinates(
+                        normalizedCountryCode,
+                        location.getLatitude(),
+                        location.getLongitude()));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+        Set<String> normalizedPostalCodes = postalCodes == null ? Set.of() : postalCodes.stream()
+                .map(this::normalizePostalCode)
+                .filter(this::isValidGermanPostalCodeFormat)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (normalizedPostalCodes.isEmpty()) {
+            return Map.of();
+        }
+
+        return repository.findAllByCountryCodeAndPostalCodeIn(GERMANY_COUNTRY_CODE, normalizedPostalCodes)
+                .stream()
+                .filter(location -> hasPlausibleCoordinates(
+                        GERMANY_COUNTRY_CODE,
+                        location.getLatitude(),
+                        location.getLongitude()))
+                .collect(Collectors.toMap(
+                        PostalCodeLocation::getPostalCode,
+                        Function.identity(),
+                        (existing, duplicate) -> existing));
     }
 
     @Transactional

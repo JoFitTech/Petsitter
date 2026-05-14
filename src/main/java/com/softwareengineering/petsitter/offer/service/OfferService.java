@@ -119,6 +119,7 @@ public class OfferService {
                 .stream()
                 .filter(offer -> matchesDateRange(offer, criteria))
                 .filter(offer -> matchesEarnings(offer, criteria.earnings(), criteria.mode().minimumEarnings()))
+                .filter(offer -> matchesAdditionalFilters(offer, criteria))
                 .map(this::toCardDto)
                 .toList();
     }
@@ -180,6 +181,47 @@ public class OfferService {
         }
         int comparison = offer.getPrice().compareTo(earnings);
         return minimumEarnings ? comparison >= 0 : comparison <= 0;
+    }
+
+    private boolean matchesAdditionalFilters(Offer offer, OfferSearchCriteria criteria) {
+        return matchesCareType(offer, criteria.careType())
+                && matchesFrequency(offer, criteria.frequency())
+                && matchesAnimalType(offer, criteria.animalType());
+    }
+
+    private boolean matchesCareType(Offer offer, OfferCareType careType) {
+        return careType == null || offer.getCareType() == careType;
+    }
+
+    private boolean matchesFrequency(Offer offer, OfferFrequency frequency) {
+        return frequency == null || offer.getFrequency() == frequency;
+    }
+
+    private boolean matchesAnimalType(Offer offer, OfferAnimalType animalType) {
+        if (animalType == null) {
+            return true;
+        }
+        if (offer.getOfferType() == OfferType.SITTER_OFFER) {
+            return offer.getAnimalType() == null || offer.getAnimalType() == animalType;
+        }
+        if (offer.getOfferType() == OfferType.OWNER_OFFER) {
+            return matchesOwnerPetSpecies(offer.getPet(), animalType);
+        }
+        return false;
+    }
+
+    private boolean matchesOwnerPetSpecies(Pet pet, OfferAnimalType animalType) {
+        if (pet == null || pet.getSpecies() == null) {
+            return false;
+        }
+        return switch (animalType) {
+            case DOG -> pet.getSpecies() == PetSpecies.DOG;
+            case CAT -> pet.getSpecies() == PetSpecies.CAT;
+            case BIRD -> pet.getSpecies() == PetSpecies.BIRD;
+            case SMALL_ANIMAL -> pet.getSpecies() == PetSpecies.RABBIT;
+            case OTHER -> pet.getSpecies() == PetSpecies.OTHER;
+            case REPTILE, FISH -> false;
+        };
     }
 
     private OfferCardDto toCardDto(Offer offer) {

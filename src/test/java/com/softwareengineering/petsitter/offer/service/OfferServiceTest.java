@@ -553,9 +553,162 @@ class OfferServiceTest {
         assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
     }
 
+    @Test
+    void searchOpenOffersFiltersByCareType() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID matchingOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(matchingOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null,
+                                OfferCareType.PET_AND_HOUSE_SITTING, null),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null,
+                                OfferCareType.PET_SITTING, null),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null, null, null)
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, null,
+                        OfferCareType.PET_AND_HOUSE_SITTING, null, null));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
+    }
+
+    @Test
+    void searchOpenOffersFiltersByFrequency() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID matchingOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), OfferFrequency.ONE_TIME, null, null),
+                        offer(matchingOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), OfferFrequency.REGULAR, null, null),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null, null, null)
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, null,
+                        null, OfferFrequency.REGULAR, null));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
+    }
+
+    @Test
+    void searchOpenOffersAnimalTypeFiltersSitterOffersAndKeepsNullPreference() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID dogOfferId = UUID.randomUUID();
+        UUID noPreferenceOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(dogOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null, null, OfferAnimalType.DOG),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null, null, OfferAnimalType.CAT),
+                        offer(noPreferenceOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), null, null, null)
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, null,
+                        null, null, OfferAnimalType.DOG));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(dogOfferId, noPreferenceOfferId);
+    }
+
+    @Test
+    void searchOpenOffersAnimalTypeFiltersOwnerOffersByPetSpecies() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID rabbitOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        ownerOffer(UUID.randomUUID(), from, to, BigDecimal.valueOf(120), PetSpecies.DOG),
+                        ownerOffer(rabbitOfferId, from, to, BigDecimal.valueOf(120), PetSpecies.RABBIT),
+                        ownerOffer(UUID.randomUUID(), from, to, BigDecimal.valueOf(120), PetSpecies.CAT),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(120), null, null, OfferAnimalType.SMALL_ANIMAL)
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERHALTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100),
+                        null, null, OfferAnimalType.SMALL_ANIMAL));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(rabbitOfferId);
+    }
+
+    @Test
+    void searchOpenOffersAdditionalFiltersAreAdditiveWithDateAndEarnings() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID matchingOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(matchingOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), OfferFrequency.REGULAR,
+                                OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), OfferFrequency.REGULAR,
+                                OfferCareType.PET_SITTING, OfferAnimalType.DOG),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), OfferFrequency.ONE_TIME,
+                                OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(80), OfferFrequency.REGULAR,
+                                OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.CAT),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                from, to, BigDecimal.valueOf(130), OfferFrequency.REGULAR,
+                                OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG),
+                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                                LocalDate.of(2026, 6, 19), LocalDate.of(2026, 6, 20), BigDecimal.valueOf(80),
+                                OfferFrequency.REGULAR, OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG)
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100),
+                        OfferCareType.PET_AND_HOUSE_SITTING,
+                        OfferFrequency.REGULAR,
+                        OfferAnimalType.DOG));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
+    }
+
     private OfferSearchCriteria searchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
             OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings) {
-        return new OfferSearchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, 5);
+        return searchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, null, null, null);
+    }
+
+    private OfferSearchCriteria searchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
+            OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings,
+            OfferCareType careType, OfferFrequency frequency, OfferAnimalType animalType) {
+        return new OfferSearchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, 5,
+                careType, frequency, animalType);
     }
 
     private void assertInvalid(OfferService offerService, CreateOfferRequest request) {
@@ -644,6 +797,23 @@ class OfferServiceTest {
         offer.setEndDate(endDate);
         offer.setPrice(price);
         offer.setTitle(offerType.name());
+        return offer;
+    }
+
+    private Offer offer(UUID offerId, OfferType offerType, OfferStatus status,
+            LocalDate startDate, LocalDate endDate, BigDecimal price,
+            OfferFrequency frequency, OfferCareType careType, OfferAnimalType animalType) {
+        Offer offer = offer(offerId, offerType, status, startDate, endDate, price);
+        offer.setFrequency(frequency);
+        offer.setCareType(careType);
+        offer.setAnimalType(animalType);
+        return offer;
+    }
+
+    private Offer ownerOffer(UUID offerId, LocalDate startDate, LocalDate endDate,
+            BigDecimal price, PetSpecies petSpecies) {
+        Offer offer = offer(offerId, OfferType.OWNER_OFFER, OfferStatus.OPEN, startDate, endDate, price);
+        offer.setPet(pet(UUID.randomUUID(), user(UUID.randomUUID()), "Testtier", petSpecies));
         return offer;
     }
 

@@ -1,6 +1,9 @@
 package com.softwareengineering.petsitter.ui.offer;
 
+import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -117,7 +120,10 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 defaultCriteria.dateFilterMode(),
                 defaultCriteria.dateFlexDays(),
                 defaultCriteria.earnings(),
-                defaultCriteria.distanceKm());
+                defaultCriteria.distanceKm(),
+                null,
+                null,
+                null);
         }
 
         return new OfferSearchCriteria(
@@ -127,7 +133,10 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 OfferDateFilterMode.fromQueryValue(firstValue(parameters, "dateMode")),
                 parseFlexDays(firstValue(parameters, "dateFlexDays")),
                 parseAmount(firstValue(parameters, "earnings")),
-                parseDistance(firstValue(parameters, "distanceKm"), defaultCriteria.distanceKm()));
+                parseDistance(firstValue(parameters, "distanceKm"), defaultCriteria.distanceKm()),
+                OfferCareType.fromQueryValue(firstValue(parameters, "careType")),
+                OfferFrequency.fromQueryValue(firstValue(parameters, "frequency")),
+                OfferAnimalType.fromQueryValue(firstValue(parameters, "animalType")));
     }
 
     private boolean containsAnyFilterParameter(Map<String, List<String>> parameters) {
@@ -136,7 +145,10 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 || parameters.containsKey("dateMode")
                 || parameters.containsKey("dateFlexDays")
                 || parameters.containsKey("earnings")
-                || parameters.containsKey("distanceKm");
+                || parameters.containsKey("distanceKm")
+                || parameters.containsKey("careType")
+                || parameters.containsKey("frequency")
+                || parameters.containsKey("animalType");
     }
 
     private String firstValue(Map<String, List<String>> parameters, String key) {
@@ -295,14 +307,58 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 .set("box-shadow", "0 6px 18px rgba(74,52,40,0.25)")
                 .set("cursor", "pointer")
                 .set("gap", "8px");
-        filterBtn.addClickListener(e -> new FilterPopUp().open());
+        filterBtn.addClickListener(e -> new FilterPopUp(
+                currentCriteria,
+                this::onAdditionalFiltersApplied,
+                this::onAdditionalFiltersReset).open());
 
         row.add(searchBar, filterBtn);
         filterBarContainer.add(row);
     }
 
     private void onSearchClicked(FilterSearchBar.SearchCriteria criteria) {
-        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(currentCriteria.mode(), criteria));
+        OfferSearchCriteria nextCriteria = new OfferSearchCriteria(
+                currentCriteria.mode(),
+                criteria.from(),
+                criteria.to(),
+                criteria.dateFilterMode(),
+                criteria.dateFlexDays(),
+                criteria.earnings(),
+                criteria.distanceKm(),
+                currentCriteria.careType(),
+                currentCriteria.frequency(),
+                currentCriteria.animalType());
+        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(nextCriteria));
+    }
+
+    private void onAdditionalFiltersApplied(FilterPopUp.AdditionalFilters filters) {
+        OfferSearchCriteria nextCriteria = new OfferSearchCriteria(
+                currentCriteria.mode(),
+                currentCriteria.from(),
+                currentCriteria.to(),
+                currentCriteria.dateFilterMode(),
+                currentCriteria.dateFlexDays(),
+                currentCriteria.earnings(),
+                currentCriteria.distanceKm(),
+                filters.careType(),
+                filters.frequency(),
+                filters.animalType());
+        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(nextCriteria));
+    }
+
+    private void onAdditionalFiltersReset() {
+        OfferSearchCriteria nextCriteria = new OfferSearchCriteria(
+                currentCriteria.mode(),
+                currentCriteria.from(),
+                currentCriteria.to(),
+                currentCriteria.dateFilterMode(),
+                currentCriteria.dateFlexDays(),
+                currentCriteria.earnings(),
+                currentCriteria.distanceKm(),
+                null,
+                null,
+                null);
+        UI.getCurrent().navigate("petsitter-suche", queryParametersFor(nextCriteria));
     }
 
     private FilterSearchBar.SearchCriteria toFilterCriteria(OfferSearchCriteria criteria) {
@@ -315,9 +371,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 criteria.distanceKm());
     }
 
-    private QueryParameters queryParametersFor(OfferSearchMode mode, FilterSearchBar.SearchCriteria criteria) {
+    private QueryParameters queryParametersFor(OfferSearchCriteria criteria) {
         Map<String, List<String>> parameters = new LinkedHashMap<>();
-        parameters.put("mode", List.of(mode.queryValue()));
+        parameters.put("mode", List.of(criteria.mode().queryValue()));
         if (criteria.from() != null) {
             parameters.put("from", List.of(criteria.from().toString()));
         }
@@ -330,6 +386,15 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
             parameters.put("earnings", List.of(criteria.earnings().stripTrailingZeros().toPlainString()));
         }
         parameters.put("distanceKm", List.of(String.valueOf(criteria.distanceKm())));
+        if (criteria.careType() != null) {
+            parameters.put("careType", List.of(criteria.careType().queryValue()));
+        }
+        if (criteria.frequency() != null) {
+            parameters.put("frequency", List.of(criteria.frequency().queryValue()));
+        }
+        if (criteria.animalType() != null) {
+            parameters.put("animalType", List.of(criteria.animalType().queryValue()));
+        }
         return new QueryParameters(parameters);
     }
 
@@ -654,7 +719,10 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 defaultCriteria.dateFilterMode(),
                 defaultCriteria.dateFlexDays(),
                 defaultCriteria.earnings(),
-                defaultCriteria.distanceKm());
+                defaultCriteria.distanceKm(),
+                null,
+                null,
+                null);
     }
 
     private SearchDisplay displayFor(OfferSearchMode mode) {

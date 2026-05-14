@@ -1,5 +1,9 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferCareType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -9,16 +13,15 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 
-import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * FilterPopUp – Popup-Dialog für Filteroptionen in der PetsitterFilterView.
  *
  * <p>Verwendung:</p>
  * <pre>
- *   new FilterPopUp().open();
+ *   new FilterPopUp(criteria, onApply, onReset).open();
  * </pre>
  */
 public class FilterPopUp extends Dialog {
@@ -33,7 +36,17 @@ public class FilterPopUp extends Dialog {
     /** Currently selected minimum star rating (1–5). */
     private int selectedStarRating = 1;
 
+    private final Consumer<AdditionalFilters> onApply;
+    private final Runnable onReset;
+
     public FilterPopUp() {
+        this(null, filters -> { }, () -> { });
+    }
+
+    public FilterPopUp(OfferSearchCriteria initialCriteria, Consumer<AdditionalFilters> onApply, Runnable onReset) {
+        this.onApply = onApply != null ? onApply : filters -> { };
+        this.onReset = onReset != null ? onReset : () -> { };
+
         setWidth("520px");
         setCloseOnOutsideClick(true);
         getElement().getStyle().set("border-radius", "24px");
@@ -79,34 +92,34 @@ public class FilterPopUp extends Dialog {
 
         Span betreuungLabel = sectionLabel("Art der Betreuung");
 
-        RadioButtonGroup<String> betreuungGroup = new RadioButtonGroup<>();
-        betreuungGroup.setItems("Tiersitting", "Haussitting");
-        betreuungGroup.setValue("Tiersitting");
-        applyRadioStyle(betreuungGroup);
-        betreuungGroup.getStyle().set("display", "flex").set("flex-direction", "row").set("gap", "32px");
-        betreuungGroup.addValueChangeListener(e -> {
-            System.out.println("Art der Betreuung gewählt: " + e.getValue());
-            // TODO: filterService.setBetreuungsart(e.getValue());
-        });
+        ComboBox<OfferCareType> betreuungBox = new ComboBox<>();
+        betreuungBox.setItems(OfferCareType.values());
+        betreuungBox.setItemLabelGenerator(OfferCareType::label);
+        betreuungBox.setPlaceholder("Egal");
+        betreuungBox.setClearButtonVisible(true);
+        betreuungBox.setWidthFull();
+        applyComboStyle(betreuungBox);
+        if (initialCriteria != null && initialCriteria.careType() != null) {
+            betreuungBox.setValue(initialCriteria.careType());
+        }
 
-        betreuungSection.add(betreuungLabel, betreuungGroup);
+        betreuungSection.add(betreuungLabel, betreuungBox);
 
         // ── Section 2: Tierarten ──────────────────────────────────────────
         Div tierartenSection = buildCard();
 
         Span tierartenLabel = sectionLabel("Tierarten");
 
-        ComboBox<String> tierartenBox = new ComboBox<>();
-        tierartenBox.setItems(List.of("Hunde", "Katzen", "Kleintiere", "Vögel", "Reptilien"));
-        tierartenBox.setPlaceholder("");
+        ComboBox<OfferAnimalType> tierartenBox = new ComboBox<>();
+        tierartenBox.setItems(OfferAnimalType.values());
+        tierartenBox.setItemLabelGenerator(OfferAnimalType::label);
+        tierartenBox.setPlaceholder("Egal");
+        tierartenBox.setClearButtonVisible(true);
         tierartenBox.setWidthFull();
-        tierartenBox.getStyle()
-                .set("font-family", "Inter, Arial, sans-serif")
-                .set("background", CARD_BG);
-        tierartenBox.addValueChangeListener(e -> {
-            System.out.println("Tierart gewählt: " + e.getValue());
-            // TODO: filterService.setTierart(e.getValue());
-        });
+        applyComboStyle(tierartenBox);
+        if (initialCriteria != null && initialCriteria.animalType() != null) {
+            tierartenBox.setValue(initialCriteria.animalType());
+        }
 
         tierartenSection.add(tierartenLabel, tierartenBox);
 
@@ -115,17 +128,18 @@ public class FilterPopUp extends Dialog {
 
         Span dienstleistungLabel = sectionLabel("Dienstleistung");
 
-        RadioButtonGroup<String> dienstleistungGroup = new RadioButtonGroup<>();
-        dienstleistungGroup.setItems("einmalig", "regelmäßig");
-        dienstleistungGroup.setValue("einmalig");
-        applyRadioStyle(dienstleistungGroup);
-        dienstleistungGroup.getStyle().set("display", "flex").set("flex-direction", "row").set("gap", "32px");
-        dienstleistungGroup.addValueChangeListener(e -> {
-            System.out.println("Dienstleistung gewählt: " + e.getValue());
-            // TODO: filterService.setDienstleistungstyp(e.getValue());
-        });
+        ComboBox<OfferFrequency> dienstleistungBox = new ComboBox<>();
+        dienstleistungBox.setItems(OfferFrequency.values());
+        dienstleistungBox.setItemLabelGenerator(OfferFrequency::label);
+        dienstleistungBox.setPlaceholder("Egal");
+        dienstleistungBox.setClearButtonVisible(true);
+        dienstleistungBox.setWidthFull();
+        applyComboStyle(dienstleistungBox);
+        if (initialCriteria != null && initialCriteria.frequency() != null) {
+            dienstleistungBox.setValue(initialCriteria.frequency());
+        }
 
-        dienstleistungSection.add(dienstleistungLabel, dienstleistungGroup);
+        dienstleistungSection.add(dienstleistungLabel, dienstleistungBox);
 
         // ── Section 4: Bewertung (min.) ───────────────────────────────────
         Div bewertungSection = buildCard();
@@ -157,13 +171,13 @@ public class FilterPopUp extends Dialog {
                 .set("box-shadow", "none")
                 .set("cursor", "pointer");
         resetBtn.addClickListener(e -> {
-            System.out.println("Alle Filter zurückgesetzt");
-            // TODO: filterService.resetAllFilters();
-            betreuungGroup.setValue("Tiersitting");
+            betreuungBox.clear();
             tierartenBox.clear();
-            dienstleistungGroup.setValue("einmalig");
+            dienstleistungBox.clear();
             selectedStarRating = 1;
             refreshStarRow(starRow);
+            close();
+            this.onReset.run();
         });
 
         Button applyBtn = new Button("Filter anwenden");
@@ -178,15 +192,11 @@ public class FilterPopUp extends Dialog {
                 .set("box-shadow", "none")
                 .set("cursor", "pointer");
         applyBtn.addClickListener(e -> {
-            System.out.println("Filter anwenden geklickt");
-            System.out.println("  Art der Betreuung: " + betreuungGroup.getValue());
-            System.out.println("  Tierart:           " + tierartenBox.getValue());
-            System.out.println("  Dienstleistung:    " + dienstleistungGroup.getValue());
-            System.out.println("  Bewertung min.:    " + selectedStarRating + " Sterne");
-            // TODO: filterService.applyFilters(betreuungGroup.getValue(),
-            //           tierartenBox.getValue(), dienstleistungGroup.getValue(),
-            //           selectedStarRating);
             close();
+            this.onApply.accept(new AdditionalFilters(
+                    betreuungBox.getValue(),
+                    dienstleistungBox.getValue(),
+                    tierartenBox.getValue()));
         });
 
         footer.add(resetBtn, applyBtn);
@@ -227,8 +237,6 @@ public class FilterPopUp extends Dialog {
                     .set("color", i <= selectedStarRating ? STAR_COLOR : "#d9c8b0");
             starBtn.addClickListener(e -> {
                 selectedStarRating = starValue;
-                System.out.println("Mindest-Bewertung gewählt: " + selectedStarRating + " Sterne");
-                // TODO: filterService.setMinRating(selectedStarRating);
                 refreshStarRow(row);
             });
             row.add(starBtn);
@@ -259,10 +267,19 @@ public class FilterPopUp extends Dialog {
         return label;
     }
 
-    private void applyRadioStyle(RadioButtonGroup<String> group) {
-        group.getStyle()
+    private void applyComboStyle(ComboBox<?> comboBox) {
+        comboBox.getStyle()
+                .set("font-family", "Inter, Arial, sans-serif")
                 .set("font-weight", "700")
                 .set("color", BROWN)
-                .set("font-size", "14px");
+                .set("font-size", "14px")
+                .set("background", CARD_BG);
+    }
+
+    public record AdditionalFilters(
+            OfferCareType careType,
+            OfferFrequency frequency,
+            OfferAnimalType animalType
+    ) {
     }
 }

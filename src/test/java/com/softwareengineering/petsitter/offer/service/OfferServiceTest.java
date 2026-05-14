@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -348,6 +349,57 @@ class OfferServiceTest {
                 .isInstanceOf(ForbiddenOperationException.class);
 
         assertThat(saveCount).hasValue(0);
+    }
+
+    @Test
+    void getCurrentUserOffersLoadsAllOffersCreatedByAuthenticatedUser() {
+        User currentUser = user(UUID.randomUUID());
+        AtomicReference<UUID> requestedUserId = new AtomicReference<>();
+        Offer ownerOpen = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 6, 20), LocalDate.of(2026, 6, 22), BigDecimal.valueOf(145));
+        ownerOpen.setTitle("Katzenbetreuung");
+        ownerOpen.setPet(pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT));
+        Offer sitterBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), BigDecimal.valueOf(250));
+        sitterBooked.setAnimalType(OfferAnimalType.DOG);
+        Offer ownerCancelled = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.CANCELLED,
+                LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 11), null);
+        ownerCancelled.setTitle(null);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningCurrentUserOffers(List.of(ownerOpen, sitterBooked, ownerCancelled), requestedUserId),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser)
+        );
+
+        List<MyOfferCardDto> result = offerService.getCurrentUserOffers();
+
+        assertThat(requestedUserId).hasValue(currentUser.getId());
+        assertThat(result).extracting(MyOfferCardDto::id)
+                .containsExactly(ownerOpen.getOfferId(), sitterBooked.getOfferId(), ownerCancelled.getOfferId());
+        assertThat(result).extracting(MyOfferCardDto::offerType)
+                .containsExactly(OfferType.OWNER_OFFER, OfferType.SITTER_OFFER, OfferType.OWNER_OFFER);
+        assertThat(result).extracting(MyOfferCardDto::status)
+                .containsExactly(OfferStatus.OPEN, OfferStatus.BOOKED, OfferStatus.CANCELLED);
+        assertThat(result.get(0).title()).isEqualTo("Katzenbetreuung");
+        assertThat(result.get(0).petName()).isEqualTo("Mila");
+        assertThat(result.get(0).petSpecies()).isEqualTo("Katze");
+        assertThat(result.get(1).animalType()).isEqualTo(OfferAnimalType.DOG);
+        assertThat(result.get(2).title()).isEqualTo("Auftrag");
+    }
+
+    @Test
+    void getCurrentUserOffersReturnsEmptyListWithoutAuthenticatedUser() {
+        AtomicReference<UUID> requestedUserId = new AtomicReference<>();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningCurrentUserOffers(List.of(), requestedUserId),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<MyOfferCardDto> result = offerService.getCurrentUserOffers();
+
+        assertThat(result).isEmpty();
+        assertThat(requestedUserId).hasValue(null);
     }
 
     @Test
@@ -864,6 +916,24 @@ class OfferServiceTest {
                     }
                     if ("toString".equals(method.getName())) {
                         return "OfferRepositorySearchTestDouble";
+                    }
+                    throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
+                }
+        );
+    }
+
+    private OfferRepository offerRepositoryReturningCurrentUserOffers(List<Offer> offers,
+            AtomicReference<UUID> requestedUserId) {
+        return (OfferRepository) Proxy.newProxyInstance(
+                OfferRepository.class.getClassLoader(),
+                new Class<?>[] {OfferRepository.class},
+                (proxy, method, args) -> {
+                    if ("findAllByCreateUserIdOrderByCreateDateDesc".equals(method.getName())) {
+                        requestedUserId.set((UUID) args[0]);
+                        return offers;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "OfferRepositoryCurrentUserOffersTestDouble";
                     }
                     throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
                 }

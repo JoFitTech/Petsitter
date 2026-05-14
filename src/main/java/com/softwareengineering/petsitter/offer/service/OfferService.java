@@ -11,6 +11,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -123,6 +124,16 @@ public class OfferService {
                 .filter(offer -> matchesAdditionalFilters(offer, criteria))
                 .map(this::toCardDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MyOfferCardDto> getCurrentUserOffers() {
+        return authenticatedUser.get()
+                .map(user -> offerRepository.findAllByCreateUserIdOrderByCreateDateDesc(user.getId())
+                        .stream()
+                        .map(this::toMyOfferCardDto)
+                        .toList())
+                .orElseGet(List::of);
     }
 
     private boolean hasInvalidSearchRange(OfferSearchCriteria criteria) {
@@ -245,6 +256,29 @@ public class OfferService {
                 pet != null ? petSpeciesLabel(pet) : null,
                 pet != null ? pet.getBreed() : null
         );
+    }
+
+    private MyOfferCardDto toMyOfferCardDto(Offer offer) {
+        Pet pet = offer.getPet();
+        return new MyOfferCardDto(
+                offer.getOfferId(),
+                titleOrFallback(offer),
+                offer.getStartDate(),
+                offer.getEndDate(),
+                offer.getPrice(),
+                offer.getOfferType(),
+                offer.getStatus(),
+                pet != null ? pet.getName() : null,
+                pet != null ? petSpeciesLabel(pet) : null,
+                offer.getAnimalType()
+        );
+    }
+
+    private String titleOrFallback(Offer offer) {
+        if (offer.getTitle() != null && !offer.getTitle().isBlank()) {
+            return offer.getTitle();
+        }
+        return offer.getOfferType() == OfferType.OWNER_OFFER ? "Auftrag" : "Angebot";
     }
 
     private String petSpeciesLabel(Pet pet) {

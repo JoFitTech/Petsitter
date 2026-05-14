@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
@@ -44,6 +45,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private final UserService userService;
     private final PetService petService;
+    private final OfferService offerService;
     private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
@@ -54,9 +56,10 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnLogout;
     private Div contentPanel;
 
-    public UserView(UserService userService, PetService petService) {
+    public UserView(UserService userService, PetService petService, OfferService offerService) {
         this.userService = userService;
         this.petService = petService;
+        this.offerService = offerService;
         reloadProfile();
 
         setSizeFull();
@@ -577,7 +580,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineAuftraege() {
         contentPanel.removeAll();
-        contentPanel.add(new MyOffers());
+        contentPanel.add(new MyOffers(offerService));
     }
 
     private void showMeineFavoriten() {

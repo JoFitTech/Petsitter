@@ -83,6 +83,11 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             showMeineFavoriten();
             return;
         }
+        if ("offers".equals(tab)) {
+            setActiveStyle(btnMeineAuftraege);
+            showMeineAuftraege();
+            return;
+        }
         setActiveStyle(btnUeberMich);
         showUeberMich();
     }

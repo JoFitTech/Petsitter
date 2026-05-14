@@ -48,8 +48,24 @@ public class MyOffers extends Div {
                 .set("box-sizing", "border-box");
 
         List<MyOfferCardDto> offers = offerService.getCurrentUserOffers();
+        List<MyOfferCardDto> expiredOpenOffers = offers.stream()
+                .filter(this::isExpiredOpenOffer)
+                .toList();
+        List<MyOfferCardDto> regularOffers = offers.stream()
+                .filter(offer -> !isExpiredOpenOffer(offer))
+                .toList();
+
         add(buildHeader());
-        add(offers.isEmpty() ? buildEmptyState() : buildCardsGrid(offers));
+        if (offers.isEmpty()) {
+            add(buildEmptyState());
+        } else {
+            if (!regularOffers.isEmpty()) {
+                add(buildCardsGrid(regularOffers));
+            }
+            if (!expiredOpenOffers.isEmpty()) {
+                add(buildExpiredSection(expiredOpenOffers));
+            }
+        }
     }
 
     private Component buildHeader() {
@@ -95,6 +111,29 @@ public class MyOffers extends Div {
 
         offers.forEach(offer -> grid.add(buildOfferCard(offer)));
         return grid;
+    }
+
+    private Component buildExpiredSection(List<MyOfferCardDto> offers) {
+        Div section = new Div();
+        section.setWidthFull();
+        section.getStyle()
+                .set("margin-top", "34px");
+
+        H3 heading = new H3("Abgelaufene offene Angebote");
+        heading.getStyle()
+                .set("margin", "0 0 6px 0")
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Paragraph copy = new Paragraph("Diese offenen Einträge haben ein Startdatum in der Vergangenheit.");
+        copy.getStyle()
+                .set("margin", "0 0 18px 0")
+                .set("font-size", "14px")
+                .set("color", MUTED);
+
+        section.add(heading, copy, buildCardsGrid(offers));
+        return section;
     }
 
     private Component buildEmptyState() {
@@ -255,6 +294,12 @@ public class MyOffers extends Div {
 
     private void openOfferDialog(MyOfferCardDto offer) {
         new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4, offerService).open();
+    }
+
+    private boolean isExpiredOpenOffer(MyOfferCardDto offer) {
+        return offer.status() == OfferStatus.OPEN
+                && offer.startDate() != null
+                && offer.startDate().isBefore(LocalDate.now());
     }
 
     private OfferCardDto toOfferCardDto(MyOfferCardDto offer) {

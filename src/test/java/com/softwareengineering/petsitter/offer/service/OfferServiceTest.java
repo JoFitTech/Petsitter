@@ -280,6 +280,45 @@ class OfferServiceTest {
     }
 
     @Test
+    void createOfferUsesSpecificDateValidationMessages() {
+        User owner = user(UUID.randomUUID());
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(owner),
+                fixedCreateOfferFormRules()
+        );
+
+        assertThatThrownBy(() -> offerService.createOffer(new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                LocalDate.of(2026, 5, 9),
+                LocalDate.of(2026, 5, 11),
+                null,
+                null,
+                "Betreuung")))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessage("Das Startdatum darf nicht in der Vergangenheit liegen.");
+        assertThatThrownBy(() -> offerService.createOffer(new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                LocalDate.of(2026, 5, 10),
+                LocalDate.of(2026, 5, 10),
+                null,
+                null,
+                "Betreuung")))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessage("Das Enddatum ist ungueltig.");
+        assertThatThrownBy(() -> offerService.createOffer(new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                LocalDate.of(2026, 5, 13),
+                LocalDate.of(2026, 5, 12),
+                null,
+                null,
+                "Betreuung")))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessage("Das Enddatum muss am oder nach dem Startdatum liegen.");
+    }
+
+    @Test
     void createOfferRejectsPetOnSitterOfferAndAnimalTypeOnOwnerOffer() {
         User owner = user(UUID.randomUUID());
         Pet selectedPet = pet(UUID.randomUUID(), owner, "Mila", PetSpecies.CAT);
@@ -588,6 +627,82 @@ class OfferServiceTest {
     }
 
     @Test
+    void getOpenOffersByTypeExcludesCurrentUsersOffersAndExpiredOpenOffers() {
+        User currentUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        UUID visibleOfferId = UUID.randomUUID();
+        Offer ownOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        ownOffer.setCreateUser(currentUser);
+        Offer visibleOffer = offer(visibleOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        visibleOffer.setCreateUser(otherUser);
+        Offer expiredOpenOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 9), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        expiredOpenOffer.setCreateUser(otherUser);
+        AtomicReference<OfferType> requestedType = new AtomicReference<>();
+        AtomicReference<OfferStatus> requestedStatus = new AtomicReference<>();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(ownOffer, visibleOffer, expiredOpenOffer),
+                        requestedType, requestedStatus),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser),
+                fixedCreateOfferFormRules()
+        );
+
+        List<OfferCardDto> result = offerService.getOpenOffersByType(OfferType.SITTER_OFFER);
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(visibleOfferId);
+        assertThat(requestedType).hasValue(OfferType.SITTER_OFFER);
+        assertThat(requestedStatus).hasValue(OfferStatus.OPEN);
+    }
+
+    @Test
+    void searchOpenOffersExcludesCurrentUsersOffersAndExpiredOpenOffers() {
+        User currentUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        UUID visibleOfferId = UUID.randomUUID();
+        Offer ownOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        ownOffer.setCreateUser(currentUser);
+        Offer visibleOffer = offer(visibleOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        visibleOffer.setCreateUser(otherUser);
+        Offer expiredOpenOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 9), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        expiredOpenOffer.setCreateUser(otherUser);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(ownOffer, visibleOffer, expiredOpenOffer),
+                        new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser),
+                fixedCreateOfferFormRules()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER, null, null, OfferDateFilterMode.ANY, 0, null));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(visibleOfferId);
+    }
+
+    @Test
+    void getOpenOffersByTypeKeepsCurrentOffersForAnonymousUsers() {
+        UUID visibleOfferId = UUID.randomUUID();
+        Offer visibleOffer = offer(visibleOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(visibleOffer), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                fixedCreateOfferFormRules()
+        );
+
+        List<OfferCardDto> result = offerService.getOpenOffersByType(OfferType.SITTER_OFFER);
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(visibleOfferId);
+    }
+
+    @Test
     void searchOpenOffersForTiersitterUsesMaximumEarnings() {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 18);
@@ -637,10 +752,11 @@ class OfferServiceTest {
     @Test
     void searchOpenOffersDateModeAnyIgnoresDates() {
         UUID matchingOfferId = UUID.randomUUID();
+        LocalDate startDate = LocalDate.now().plusDays(10);
         OfferService offerService = serviceWithAuthenticatedUser(
                 offerRepositoryReturningOffers(List.of(
                         offer(matchingOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
-                                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 5), BigDecimal.valueOf(80))
+                                startDate, startDate.plusDays(4), BigDecimal.valueOf(80))
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.empty()

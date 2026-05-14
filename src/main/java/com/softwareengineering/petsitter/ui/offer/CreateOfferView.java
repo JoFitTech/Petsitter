@@ -15,6 +15,7 @@ import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.softwareengineering.petsitter.ui.user.UserView;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.*;
@@ -34,9 +35,11 @@ import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -672,8 +675,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             CreateOfferResult result;
             if (isEditMode()) {
                 result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPet, selectedAnimalType));
-                editOfferData = offerService.getCurrentUserOfferForEdit(editingOfferId);
                 showSuccess("Änderungen wurden gespeichert: " + result.offerId());
+                navigateToProfileOffers();
                 return;
             }
 
@@ -796,8 +799,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             petSelect.setValue(findPetOption(editOfferData.petId()));
         }
         frequencyGroup.setValue(editOfferData.frequency() != null ? editOfferData.frequency() : OfferFrequency.ONE_TIME);
-        fromDatePicker.setValue(editOfferData.startDate());
-        toDatePicker.setValue(editOfferData.endDate());
+        fromDatePicker.setValue(editableDateOrNull(editOfferData.startDate()));
+        toDatePicker.setValue(editableDateOrNull(editOfferData.endDate()));
         applyDateSelection(offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
         careTypeGroup.setValue(editOfferData.careType() != null ? editOfferData.careType() : OfferCareType.PET_SITTING);
         priceField.setValue(editOfferData.price());
@@ -813,6 +816,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .filter(option -> petId.equals(option.id()))
                 .findFirst()
                 .orElse(null);
+    }
+
+    private LocalDate editableDateOrNull(LocalDate value) {
+        return value != null && value.isBefore(formData.minimumStartDate()) ? null : value;
     }
 
     private String valueOrEmpty(String value) {
@@ -831,5 +838,12 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private void showSuccess(String message) {
         Notification.show(message, 4000, Notification.Position.TOP_CENTER)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+    }
+
+    private void navigateToProfileOffers() {
+        UI ui = UI.getCurrent();
+        if (ui != null) {
+            ui.navigate("profile", QueryParameters.of("tab", "offers"));
+        }
     }
 }

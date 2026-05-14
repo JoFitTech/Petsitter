@@ -103,9 +103,12 @@ public class OfferService {
 
     @Transactional(readOnly = true)
     public List<OfferCardDto> getOpenOffersByType(OfferType offerType) {
+        User currentUser = authenticatedUser.get().orElse(null);
+
         return offerRepository
                 .findAllByOfferTypeAndStatus(offerType, OfferStatus.OPEN)
                 .stream()
+                .filter(offer -> isVisibleInPublicLists(offer, currentUser))
                 .map(this::toCardDto)
                 .toList();
     }
@@ -115,10 +118,12 @@ public class OfferService {
         if (criteria == null || hasInvalidSearchRange(criteria)) {
             return List.of();
         }
+        User currentUser = authenticatedUser.get().orElse(null);
 
         return offerRepository
                 .findAllByOfferTypeAndStatus(criteria.mode().targetOfferType(), OfferStatus.OPEN)
                 .stream()
+                .filter(offer -> isVisibleInPublicLists(offer, currentUser))
                 .filter(offer -> matchesDateRange(offer, criteria))
                 .filter(offer -> matchesEarnings(offer, criteria.earnings(), criteria.mode().minimumEarnings()))
                 .filter(offer -> matchesAdditionalFilters(offer, criteria))
@@ -609,6 +614,16 @@ public class OfferService {
                 && user.getId().equals(offer.getCreateUser().getId());
     }
 
+    private boolean isVisibleInPublicLists(Offer offer, User currentUser) {
+        return !isExpiredOpenOffer(offer) && !isCreatedBy(offer, currentUser);
+    }
+
+    private boolean isExpiredOpenOffer(Offer offer) {
+        return offer.getStatus() == OfferStatus.OPEN
+                && offer.getStartDate() != null
+                && offer.getStartDate().isBefore(createOfferFormRules.minimumStartDate());
+    }
+
     private CreateOfferRequest toCreateOfferRequest(Offer offer) {
         return new CreateOfferRequest(
                 offer.getOfferType(),
@@ -628,10 +643,16 @@ public class OfferService {
             throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
         }
 
-        if (request.startDate().isBefore(createOfferFormRules.minimumStartDate())
-                || request.endDate().isBefore(createOfferFormRules.minimumEndDate(null))
-                || request.startDate().isAfter(request.endDate())) {
-            throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
+        if (request.startDate().isBefore(createOfferFormRules.minimumStartDate())) {
+            throw new BusinessRuleViolationException("Das Startdatum darf nicht in der Vergangenheit liegen.");
+        }
+
+        if (request.endDate().isBefore(createOfferFormRules.minimumEndDate(null))) {
+            throw new BusinessRuleViolationException("Das Enddatum ist ungueltig.");
+        }
+
+        if (request.startDate().isAfter(request.endDate())) {
+            throw new BusinessRuleViolationException("Das Enddatum muss am oder nach dem Startdatum liegen.");
         }
 
         if (request.offerType() == OfferType.OWNER_OFFER && request.petId() == null) {

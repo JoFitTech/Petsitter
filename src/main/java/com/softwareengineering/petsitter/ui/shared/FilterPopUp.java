@@ -6,6 +6,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
@@ -14,6 +15,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
+import java.util.Set;
 import java.util.function.Consumer;
 
 /**
@@ -21,7 +23,7 @@ import java.util.function.Consumer;
  *
  * <p>Verwendung:</p>
  * <pre>
- *   new FilterPopUp(criteria, onApply, onReset).open();
+ *   new FilterPopUp(criteria, onApply).open();
  * </pre>
  */
 public class FilterPopUp extends Dialog {
@@ -33,19 +35,17 @@ public class FilterPopUp extends Dialog {
     private static final String BORDER    = "#e8d8bf";
     private static final String STAR_COLOR = "#f5a623";
 
-    /** Currently selected minimum star rating (1–5). */
-    private int selectedStarRating = 1;
+    /** Currently selected minimum star rating (0-5); 0 means no local rating selection. */
+    private int selectedStarRating = 0;
 
     private final Consumer<AdditionalFilters> onApply;
-    private final Runnable onReset;
 
     public FilterPopUp() {
-        this(null, filters -> { }, () -> { });
+        this(null, filters -> { });
     }
 
-    public FilterPopUp(OfferSearchCriteria initialCriteria, Consumer<AdditionalFilters> onApply, Runnable onReset) {
+    public FilterPopUp(OfferSearchCriteria initialCriteria, Consumer<AdditionalFilters> onApply) {
         this.onApply = onApply != null ? onApply : filters -> { };
-        this.onReset = onReset != null ? onReset : () -> { };
 
         setWidth("520px");
         setCloseOnOutsideClick(true);
@@ -110,15 +110,15 @@ public class FilterPopUp extends Dialog {
 
         Span tierartenLabel = sectionLabel("Tierarten");
 
-        ComboBox<OfferAnimalType> tierartenBox = new ComboBox<>();
+        MultiSelectComboBox<OfferAnimalType> tierartenBox = new MultiSelectComboBox<>();
         tierartenBox.setItems(OfferAnimalType.values());
         tierartenBox.setItemLabelGenerator(OfferAnimalType::label);
         tierartenBox.setPlaceholder("Egal");
         tierartenBox.setClearButtonVisible(true);
         tierartenBox.setWidthFull();
-        applyComboStyle(tierartenBox);
-        if (initialCriteria != null && initialCriteria.animalType() != null) {
-            tierartenBox.setValue(initialCriteria.animalType());
+        applyMultiSelectComboStyle(tierartenBox);
+        if (initialCriteria != null && !initialCriteria.animalTypes().isEmpty()) {
+            tierartenBox.setValue(initialCriteria.animalTypes());
         }
 
         tierartenSection.add(tierartenLabel, tierartenBox);
@@ -174,10 +174,8 @@ public class FilterPopUp extends Dialog {
             betreuungBox.clear();
             tierartenBox.clear();
             dienstleistungBox.clear();
-            selectedStarRating = 1;
+            selectedStarRating = 0;
             refreshStarRow(starRow);
-            close();
-            this.onReset.run();
         });
 
         Button applyBtn = new Button("Filter anwenden");
@@ -276,10 +274,22 @@ public class FilterPopUp extends Dialog {
                 .set("background", CARD_BG);
     }
 
+    private void applyMultiSelectComboStyle(MultiSelectComboBox<?> comboBox) {
+        comboBox.getStyle()
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("font-weight", "700")
+                .set("color", BROWN)
+                .set("font-size", "14px")
+                .set("background", CARD_BG);
+    }
+
     public record AdditionalFilters(
             OfferCareType careType,
             OfferFrequency frequency,
-            OfferAnimalType animalType
+            Set<OfferAnimalType> animalTypes
     ) {
+        public AdditionalFilters {
+            animalTypes = animalTypes == null ? Set.of() : Set.copyOf(animalTypes);
+        }
     }
 }

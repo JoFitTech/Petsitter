@@ -31,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -186,7 +187,7 @@ public class OfferService {
     private boolean matchesAdditionalFilters(Offer offer, OfferSearchCriteria criteria) {
         return matchesCareType(offer, criteria.careType())
                 && matchesFrequency(offer, criteria.frequency())
-                && matchesAnimalType(offer, criteria.animalType());
+                && matchesAnimalTypes(offer, criteria.animalTypes());
     }
 
     private boolean matchesCareType(Offer offer, OfferCareType careType) {
@@ -197,15 +198,16 @@ public class OfferService {
         return frequency == null || offer.getFrequency() == frequency;
     }
 
-    private boolean matchesAnimalType(Offer offer, OfferAnimalType animalType) {
-        if (animalType == null) {
+    private boolean matchesAnimalTypes(Offer offer, Set<OfferAnimalType> animalTypes) {
+        if (animalTypes == null || animalTypes.isEmpty()) {
             return true;
         }
         if (offer.getOfferType() == OfferType.SITTER_OFFER) {
-            return offer.getAnimalType() == null || offer.getAnimalType() == animalType;
+            return offer.getAnimalType() != null && animalTypes.contains(offer.getAnimalType());
         }
         if (offer.getOfferType() == OfferType.OWNER_OFFER) {
-            return matchesOwnerPetSpecies(offer.getPet(), animalType);
+            return animalTypes.stream()
+                    .anyMatch(animalType -> matchesOwnerPetSpecies(offer.getPet(), animalType));
         }
         return false;
     }

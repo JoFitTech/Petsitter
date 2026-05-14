@@ -8,6 +8,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Set;
 
 public record OfferSearchCriteria(
         OfferSearchMode mode,
@@ -19,7 +20,7 @@ public record OfferSearchCriteria(
         int distanceKm,
         OfferCareType careType,
         OfferFrequency frequency,
-        OfferAnimalType animalType
+        Set<OfferAnimalType> animalTypes
 ) {
     public OfferSearchCriteria {
         if (mode == null) {
@@ -31,5 +32,6 @@ public record OfferSearchCriteria(
         if (dateFlexDays < 0) {
             dateFlexDays = 0;
         }
+        animalTypes = animalTypes == null ? Set.of() : Set.copyOf(animalTypes);
     }
 }

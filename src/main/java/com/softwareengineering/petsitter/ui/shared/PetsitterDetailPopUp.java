@@ -1,9 +1,12 @@
 package com.softwareengineering.petsitter.ui.shared;
 
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.router.QueryParameters;
 
 import java.util.UUID;
 import com.vaadin.flow.component.icon.Icon;
@@ -19,7 +22,11 @@ public class PetsitterDetailPopUp extends Dialog {
     private static final String DARK  = "#4a3428";
     private static final String BROWN = "#7b5236";
 
-    public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars) {
+    private final OfferService offerService;
+
+    public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars, OfferService offerService) {
+        this.offerService = offerService;
+
         setWidth("520px");
         setCloseOnOutsideClick(true);
         this.getElement().getThemeList().add("no-padding");
@@ -172,10 +179,18 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("font-family", "Inter, Arial, sans-serif");
         content.add(zusatzField);
 
-        // ── "Auftrag anfragen" button ─────────────────────────────────────
-        Button anfragenBtn = new Button("Auftrag anfragen");
-        anfragenBtn.setWidthFull();
-        anfragenBtn.getStyle()
+        Button actionButton = createActionButton(dto);
+        content.add(actionButton);
+
+        add(content);
+    }
+
+    private Button createActionButton(OfferCardDto dto) {
+        boolean ownOffer = offerService.isCurrentUserOffer(dto.id());
+        boolean editable = offerService.canCurrentUserEditOffer(dto.id());
+        Button actionButton = new Button(editable ? "Auftrag bearbeiten" : ownOffer ? "Nicht bearbeitbar" : "Auftrag anfragen");
+        actionButton.setWidthFull();
+        actionButton.getStyle()
                 .set("background", DARK)
                 .set("color", "white")
                 .set("height", "52px")
@@ -185,13 +200,32 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
                 .set("margin-top", "8px");
-        anfragenBtn.addClickListener(e -> {
+
+        if (editable) {
+            actionButton.addClickListener(e -> {
+                close();
+                UI ui = UI.getCurrent();
+                if (ui != null) {
+                    ui.navigate("auftrag-erstellen", QueryParameters.of("edit", dto.id().toString()));
+                }
+            });
+            return actionButton;
+        }
+
+        if (ownOffer) {
+            actionButton.setEnabled(false);
+            actionButton.getStyle()
+                    .set("background", "#d8cec6")
+                    .set("color", "#7a6050")
+                    .set("cursor", "default");
+            return actionButton;
+        }
+
+        actionButton.addClickListener(e -> {
             onAuftragAnfragenClicked(dto.id());
             close();
         });
-        content.add(anfragenBtn);
-
-        add(content);
+        return actionButton;
     }
 
     // ── Backend-Interface hook ────────────────────────────────────────────

@@ -7,12 +7,15 @@ import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
+import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.user.LoginView;
+import com.softwareengineering.petsitter.ui.user.UserView;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.html.*;
@@ -32,11 +35,14 @@ import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
 @PageTitle("Auftrag erstellen | Pawsitter")
@@ -60,6 +66,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private CreateOfferFormData formData;
     private OfferType currentOfferType;
+    private UUID editingOfferId;
+    private CreateOfferRequest editOfferData;
     private TextField titleField;
     private Select<OfferAnimalType> animalTypeSelect;
     private ComboBox<OfferPetOptionDto> petSelect;
@@ -93,18 +101,31 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         }
 
         removeAll();
-        java.util.List<String> modes = event.getLocation().getQueryParameters().getParameters().get("mode");
-        String mode = (modes != null && !modes.isEmpty()) ? modes.get(0) : "offer";
-        currentOfferType = "request".equals(mode) ? OfferType.OWNER_OFFER : OfferType.SITTER_OFFER;
+        java.util.Map<String, java.util.List<String>> parameters =
+                event.getLocation().getQueryParameters().getParameters();
+        if (!loadEditState(parameters, event)) {
+            return;
+        }
+
+        if (!isEditMode()) {
+            java.util.List<String> modes = parameters.get("mode");
+            String mode = (modes != null && !modes.isEmpty()) ? modes.get(0) : "offer";
+            currentOfferType = "request".equals(mode) ? OfferType.OWNER_OFFER : OfferType.SITTER_OFFER;
+        }
+
         formData = offerService.getCreateOfferFormData();
         animalTypeSelect = null;
         petSelect = null;
         uploadedFileNames.clear();
 
-        String pageBg = "request".equals(mode) ? "#ebf6f0" : LIGHT_BG;
+        String mode = modeForCurrentOfferType();
+        String pageBg = isOwnerOffer() ? "#ebf6f0" : LIGHT_BG;
         getStyle().set("background", pageBg);
 
         add(createPageWrapper(mode, pageBg));
+        if (isEditMode()) {
+            populateEditForm();
+        }
     }
 
     // ── Page wrapper with background blobs ────────────────────────────────
@@ -172,15 +193,19 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         titleLayout.setPadding(false);
         titleLayout.setSpacing(false);
 
-        String headlineText = "request".equals(mode) ? "Neuen Auftrag erstellen" : "Neues Angebot erstellen";
+        String headlineText = isEditMode()
+                ? (isOwnerOffer() ? "Auftrag bearbeiten" : "Angebot bearbeiten")
+                : ("request".equals(mode) ? "Neuen Auftrag erstellen" : "Neues Angebot erstellen");
         H1 headline = new H1(headlineText);
         headline.getStyle()
                 .set("font-size", "28px")
                 .set("color", DARK)
                 .set("margin", "0 0 4px 0");
 
-        String subtitleText = "request".equals(mode) ? "Details für deine Haustierbetreuung angeben"
-                : "Details für dein Betreuungsangebot angeben";
+        String subtitleText = isEditMode()
+                ? "Passe die gespeicherten Details an."
+                : ("request".equals(mode) ? "Details für deine Haustierbetreuung angeben"
+                : "Details für dein Betreuungsangebot angeben");
         Paragraph subtitle = new Paragraph(subtitleText);
         subtitle.getStyle()
                 .set("font-size", "15px")
@@ -202,7 +227,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("cursor", "pointer");
         draftsButton.addClickListener(e -> onDraftsClicked());
 
-        topRow.add(titleLayout, draftsButton);
+        if (isEditMode()) {
+            topRow.add(titleLayout);
+        } else {
+            topRow.add(titleLayout, draftsButton);
+        }
 
         // ── Card ─────────────────────────────────────────────────────────
         Div card = new Div();
@@ -563,7 +592,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("cursor", "pointer");
         saveDraftButton.addClickListener(e -> onSaveDraftClicked());
 
-        Button publishButton = new Button("Hochladen");
+        Button publishButton = new Button(isEditMode() ? "Änderungen speichern" : "Hochladen");
         publishButton.getStyle()
                 .set("background", BROWN)
                 .set("color", "white")
@@ -575,7 +604,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("cursor", "pointer");
         publishButton.addClickListener(e -> onPublishClicked());
 
-        row.add(saveDraftButton, publishButton);
+        if (isEditMode()) {
+            row.add(publishButton);
+        } else {
+            row.add(saveDraftButton, publishButton);
+        }
         return row;
     }
 
@@ -639,22 +672,34 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 return;
             }
 
-            CreateOfferResult result = offerService.createOffer(
-                    currentOfferType,
-                    fromDatePicker.getValue(),
-                    toDatePicker.getValue(),
-                    selectedPet,
-                    priceField.getValue(),
-                    titleField.getValue(),
-                    frequencyGroup.getValue(),
-                    careTypeGroup.getValue(),
-                    selectedAnimalType,
-                    additionalInfoArea.getValue());
+            CreateOfferResult result;
+            if (isEditMode()) {
+                result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPet, selectedAnimalType));
+                showSuccess("Änderungen wurden gespeichert: " + result.offerId());
+                navigateToProfileOffers();
+                return;
+            }
+
+            result = offerService.createOffer(buildRequest(selectedPet, selectedAnimalType));
             showSuccess("Eintrag wurde gespeichert: " + result.offerId());
             clearForm();
         } catch (RuntimeException exception) {
             showError("Eintrag konnte nicht gespeichert werden: " + exception.getMessage());
         }
+    }
+
+    private CreateOfferRequest buildRequest(OfferPetOptionDto selectedPet, OfferAnimalType selectedAnimalType) {
+        return new CreateOfferRequest(
+                currentOfferType,
+                fromDatePicker.getValue(),
+                toDatePicker.getValue(),
+                selectedPet == null ? null : selectedPet.id(),
+                priceField.getValue(),
+                titleField.getValue(),
+                frequencyGroup.getValue(),
+                careTypeGroup.getValue(),
+                selectedAnimalType,
+                additionalInfoArea.getValue());
     }
 
     private void applyDateSelection(CreateOfferDateSelection dateSelection) {
@@ -714,6 +759,73 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         return currentOfferType == OfferType.SITTER_OFFER;
     }
 
+    private boolean isEditMode() {
+        return editingOfferId != null && editOfferData != null;
+    }
+
+    private String modeForCurrentOfferType() {
+        return isOwnerOffer() ? "request" : "offer";
+    }
+
+    private boolean loadEditState(java.util.Map<String, java.util.List<String>> parameters, BeforeEnterEvent event) {
+        editingOfferId = null;
+        editOfferData = null;
+
+        java.util.List<String> editIds = parameters.get("edit");
+        if (editIds == null || editIds.isEmpty() || editIds.get(0) == null || editIds.get(0).isBlank()) {
+            return true;
+        }
+
+        try {
+            editingOfferId = UUID.fromString(editIds.get(0));
+            editOfferData = offerService.getCurrentUserOfferForEdit(editingOfferId);
+            currentOfferType = editOfferData.offerType();
+            return true;
+        } catch (RuntimeException exception) {
+            Notification.show("Offer kann nicht bearbeitet werden: " + exception.getMessage(),
+                    5000,
+                    Notification.Position.TOP_CENTER).addThemeVariants(NotificationVariant.LUMO_ERROR);
+            event.rerouteTo(UserView.class);
+            return false;
+        }
+    }
+
+    private void populateEditForm() {
+        titleField.setValue(valueOrEmpty(editOfferData.title()));
+        if (animalTypeSelect != null) {
+            animalTypeSelect.setValue(editOfferData.animalType());
+        }
+        if (petSelect != null) {
+            petSelect.setValue(findPetOption(editOfferData.petId()));
+        }
+        frequencyGroup.setValue(editOfferData.frequency() != null ? editOfferData.frequency() : OfferFrequency.ONE_TIME);
+        fromDatePicker.setValue(editableDateOrNull(editOfferData.startDate()));
+        toDatePicker.setValue(editableDateOrNull(editOfferData.endDate()));
+        applyDateSelection(offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
+        careTypeGroup.setValue(editOfferData.careType() != null ? editOfferData.careType() : OfferCareType.PET_SITTING);
+        priceField.setValue(editOfferData.price());
+        additionalInfoArea.setValue(valueOrEmpty(editOfferData.description()));
+        updatePriceSummary();
+    }
+
+    private OfferPetOptionDto findPetOption(UUID petId) {
+        if (petId == null) {
+            return null;
+        }
+        return formData.pets().stream()
+                .filter(option -> petId.equals(option.id()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private LocalDate editableDateOrNull(LocalDate value) {
+        return value != null && value.isBefore(formData.minimumStartDate()) ? null : value;
+    }
+
+    private String valueOrEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
     private String imagePreviewPlaceholderText() {
         return isOwnerOffer() ? "Vorschau deiner Haustierbilder" : "Vorschau deiner Bilder";
     }
@@ -726,5 +838,12 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private void showSuccess(String message) {
         Notification.show(message, 4000, Notification.Position.TOP_CENTER)
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+    }
+
+    private void navigateToProfileOffers() {
+        UI ui = UI.getCurrent();
+        if (ui != null) {
+            ui.navigate("profile", QueryParameters.of("tab", "offers"));
+        }
     }
 }

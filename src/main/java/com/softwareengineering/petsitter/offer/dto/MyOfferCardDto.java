@@ -1,6 +1,8 @@
 package com.softwareengineering.petsitter.offer.dto;
 
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferCareType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import java.math.BigDecimal;
@@ -15,7 +17,11 @@ public record MyOfferCardDto(
         BigDecimal price,
         OfferType offerType,
         OfferStatus status,
+        String description,
+        OfferFrequency frequency,
+        OfferCareType careType,
         String petName,
         String petSpecies,
+        String petBreed,
         OfferAnimalType animalType
 ) {}

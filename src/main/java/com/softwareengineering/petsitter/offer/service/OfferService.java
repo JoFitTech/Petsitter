@@ -268,8 +268,12 @@ public class OfferService {
                 offer.getPrice(),
                 offer.getOfferType(),
                 offer.getStatus(),
+                offer.getDescription(),
+                offer.getFrequency(),
+                offer.getCareType(),
                 pet != null ? pet.getName() : null,
                 pet != null ? petSpeciesLabel(pet) : null,
+                pet != null ? pet.getBreed() : null,
                 offer.getAnimalType()
         );
     }

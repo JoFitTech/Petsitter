@@ -3,7 +3,9 @@ package com.softwareengineering.petsitter.ui.user;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -136,7 +138,9 @@ public class MyOffers extends Div {
                 .set("border-radius", "20px")
                 .set("box-shadow", "0 8px 24px rgba(74,52,40,0.06)")
                 .set("padding", "20px")
-                .set("box-sizing", "border-box");
+                .set("box-sizing", "border-box")
+                .set("cursor", "pointer");
+        card.addClickListener(event -> openOfferDialog(offer));
 
         Div imagePlaceholder = new Div();
         imagePlaceholder.getStyle()
@@ -247,6 +251,28 @@ public class MyOffers extends Div {
 
         dialog.add(content);
         dialog.open();
+    }
+
+    private void openOfferDialog(MyOfferCardDto offer) {
+        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4).open();
+    }
+
+    private OfferCardDto toOfferCardDto(MyOfferCardDto offer) {
+        return new OfferCardDto(
+                offer.id(),
+                offer.title(),
+                offer.startDate(),
+                offer.endDate(),
+                offer.price(),
+                offer.animalType(),
+                false,
+                offer.description(),
+                offer.frequency(),
+                offer.careType(),
+                offer.petName(),
+                offer.petSpecies(),
+                offer.petBreed()
+        );
     }
 
     private Component createDialogOption(Dialog dialog, VaadinIcon iconType, String titleText, String description,

@@ -358,6 +358,9 @@ class OfferServiceTest {
         Offer ownerOpen = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
                 LocalDate.of(2026, 6, 20), LocalDate.of(2026, 6, 22), BigDecimal.valueOf(145));
         ownerOpen.setTitle("Katzenbetreuung");
+        ownerOpen.setDescription("Füttern und spielen");
+        ownerOpen.setFrequency(OfferFrequency.ONE_TIME);
+        ownerOpen.setCareType(OfferCareType.PET_SITTING);
         ownerOpen.setPet(pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT));
         Offer sitterBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), BigDecimal.valueOf(250));
@@ -381,6 +384,9 @@ class OfferServiceTest {
         assertThat(result).extracting(MyOfferCardDto::status)
                 .containsExactly(OfferStatus.OPEN, OfferStatus.BOOKED, OfferStatus.CANCELLED);
         assertThat(result.get(0).title()).isEqualTo("Katzenbetreuung");
+        assertThat(result.get(0).description()).isEqualTo("Füttern und spielen");
+        assertThat(result.get(0).frequency()).isEqualTo(OfferFrequency.ONE_TIME);
+        assertThat(result.get(0).careType()).isEqualTo(OfferCareType.PET_SITTING);
         assertThat(result.get(0).petName()).isEqualTo("Mila");
         assertThat(result.get(0).petSpecies()).isEqualTo("Katze");
         assertThat(result.get(1).animalType()).isEqualTo(OfferAnimalType.DOG);

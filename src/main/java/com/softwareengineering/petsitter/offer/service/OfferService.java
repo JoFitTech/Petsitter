@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.offer.service;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
+import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
@@ -12,6 +13,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
+import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
@@ -29,6 +31,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -104,6 +107,123 @@ public class OfferService {
                 .stream()
                 .map(this::toCardDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OfferCardDto> searchOpenOffers(OfferSearchCriteria criteria) {
+        if (criteria == null || hasInvalidSearchRange(criteria)) {
+            return List.of();
+        }
+
+        return offerRepository
+                .findAllByOfferTypeAndStatus(criteria.mode().targetOfferType(), OfferStatus.OPEN)
+                .stream()
+                .filter(offer -> matchesDateRange(offer, criteria))
+                .filter(offer -> matchesEarnings(offer, criteria.earnings(), criteria.mode().minimumEarnings()))
+                .filter(offer -> matchesAdditionalFilters(offer, criteria))
+                .map(this::toCardDto)
+                .toList();
+    }
+
+    private boolean hasInvalidSearchRange(OfferSearchCriteria criteria) {
+        return criteria.dateFilterMode() != OfferDateFilterMode.ANY
+                && criteria.from() != null
+                && criteria.to() != null
+                && criteria.to().isBefore(criteria.from());
+    }
+
+    private boolean matchesDateRange(Offer offer, OfferSearchCriteria criteria) {
+        return switch (criteria.dateFilterMode()) {
+            case ANY -> true;
+            case EXACT -> matchesExactDateRange(offer, criteria.from(), criteria.to());
+            case CONTAINED -> matchesContainedDateRange(offer, criteria.from(), criteria.to());
+            case OVERLAP -> matchesFlexibleDateRange(offer, criteria.from(), criteria.to(), criteria.dateFlexDays());
+        };
+    }
+
+    private boolean matchesExactDateRange(Offer offer, LocalDate from, LocalDate to) {
+        return from != null
+                && to != null
+                && offer.getStartDate().equals(from)
+                && offer.getEndDate().equals(to);
+    }
+
+    private boolean matchesContainedDateRange(Offer offer, LocalDate from, LocalDate to) {
+        return from != null
+                && to != null
+                && !offer.getStartDate().isBefore(from)
+                && !offer.getEndDate().isAfter(to);
+    }
+
+    private boolean matchesFlexibleDateRange(Offer offer, LocalDate from, LocalDate to, int flexDays) {
+        int normalizedFlexDays = Math.max(0, flexDays);
+        if (from != null) {
+            from = from.minusDays(normalizedFlexDays);
+        }
+        if (to != null) {
+            to = to.plusDays(normalizedFlexDays);
+        }
+
+        if (from != null && offer.getStartDate().isBefore(from)) {
+            return false;
+        }
+        if (to != null && offer.getEndDate().isAfter(to)) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean matchesEarnings(Offer offer, BigDecimal earnings, boolean minimumEarnings) {
+        if (earnings == null) {
+            return true;
+        }
+        if (offer.getPrice() == null) {
+            return false;
+        }
+        int comparison = offer.getPrice().compareTo(earnings);
+        return minimumEarnings ? comparison >= 0 : comparison <= 0;
+    }
+
+    private boolean matchesAdditionalFilters(Offer offer, OfferSearchCriteria criteria) {
+        return matchesCareType(offer, criteria.careType())
+                && matchesFrequency(offer, criteria.frequency())
+                && matchesAnimalTypes(offer, criteria.animalTypes());
+    }
+
+    private boolean matchesCareType(Offer offer, OfferCareType careType) {
+        return careType == null || offer.getCareType() == careType;
+    }
+
+    private boolean matchesFrequency(Offer offer, OfferFrequency frequency) {
+        return frequency == null || offer.getFrequency() == frequency;
+    }
+
+    private boolean matchesAnimalTypes(Offer offer, Set<OfferAnimalType> animalTypes) {
+        if (animalTypes == null || animalTypes.isEmpty()) {
+            return true;
+        }
+        if (offer.getOfferType() == OfferType.SITTER_OFFER) {
+            return offer.getAnimalType() != null && animalTypes.contains(offer.getAnimalType());
+        }
+        if (offer.getOfferType() == OfferType.OWNER_OFFER) {
+            return animalTypes.stream()
+                    .anyMatch(animalType -> matchesOwnerPetSpecies(offer.getPet(), animalType));
+        }
+        return false;
+    }
+
+    private boolean matchesOwnerPetSpecies(Pet pet, OfferAnimalType animalType) {
+        if (pet == null || pet.getSpecies() == null) {
+            return false;
+        }
+        return switch (animalType) {
+            case DOG -> pet.getSpecies() == PetSpecies.DOG;
+            case CAT -> pet.getSpecies() == PetSpecies.CAT;
+            case BIRD -> pet.getSpecies() == PetSpecies.BIRD;
+            case SMALL_ANIMAL -> pet.getSpecies() == PetSpecies.RABBIT;
+            case OTHER -> pet.getSpecies() == PetSpecies.OTHER;
+            case REPTILE, FISH -> false;
+        };
     }
 
     private OfferCardDto toCardDto(Offer offer) {

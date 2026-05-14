@@ -1,0 +1,9 @@
+:host([theme~="filter-search-popover"]) [part="overlay"] {
+  border-radius: 32px;
+  overflow: hidden;
+}
+
+:host([theme~="filter-search-popover"]) [part="content"] {
+  border-radius: 32px;
+  padding: 0;
+}

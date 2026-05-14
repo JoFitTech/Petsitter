@@ -409,6 +409,152 @@ class OfferServiceTest {
     }
 
     @Test
+    void canCurrentUserEditOfferOnlyAllowsOwnOpenOffers() {
+        User currentUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        Offer ownOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownOpen.setCreateUser(currentUser);
+        Offer ownBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownBooked.setCreateUser(currentUser);
+        Offer ownCancelled = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.CANCELLED,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownCancelled.setCreateUser(currentUser);
+        Offer foreignOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        foreignOpen.setCreateUser(otherUser);
+
+        assertThat(serviceWithEditableOffer(ownOpen, Optional.of(currentUser))
+                .canCurrentUserEditOffer(ownOpen.getOfferId())).isTrue();
+        assertThat(serviceWithEditableOffer(ownBooked, Optional.of(currentUser))
+                .canCurrentUserEditOffer(ownBooked.getOfferId())).isFalse();
+        assertThat(serviceWithEditableOffer(ownCancelled, Optional.of(currentUser))
+                .canCurrentUserEditOffer(ownCancelled.getOfferId())).isFalse();
+        assertThat(serviceWithEditableOffer(foreignOpen, Optional.of(currentUser))
+                .canCurrentUserEditOffer(foreignOpen.getOfferId())).isFalse();
+        assertThat(serviceWithEditableOffer(null, Optional.of(currentUser))
+                .canCurrentUserEditOffer(UUID.randomUUID())).isFalse();
+        assertThat(serviceWithEditableOffer(ownOpen, Optional.empty())
+                .canCurrentUserEditOffer(ownOpen.getOfferId())).isFalse();
+    }
+
+    @Test
+    void getCurrentUserOfferForEditMapsEditableOfferIntoCreateRequest() {
+        User currentUser = user(UUID.randomUUID());
+        Pet selectedPet = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
+        Offer offer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(2), BigDecimal.valueOf(42));
+        offer.setCreateUser(currentUser);
+        offer.setPet(selectedPet);
+        offer.setTitle("Katzenbetreuung");
+        offer.setFrequency(OfferFrequency.REGULAR);
+        offer.setCareType(OfferCareType.PET_AND_HOUSE_SITTING);
+        offer.setDescription("Bitte viel spielen");
+        OfferService offerService = serviceWithEditableOffer(offer, Optional.of(currentUser));
+
+        CreateOfferRequest result = offerService.getCurrentUserOfferForEdit(offer.getOfferId());
+
+        assertThat(result.offerType()).isEqualTo(OfferType.OWNER_OFFER);
+        assertThat(result.startDate()).isEqualTo(offer.getStartDate());
+        assertThat(result.endDate()).isEqualTo(offer.getEndDate());
+        assertThat(result.petId()).isEqualTo(selectedPet.getId());
+        assertThat(result.price()).isEqualByComparingTo("42");
+        assertThat(result.title()).isEqualTo("Katzenbetreuung");
+        assertThat(result.frequency()).isEqualTo(OfferFrequency.REGULAR);
+        assertThat(result.careType()).isEqualTo(OfferCareType.PET_AND_HOUSE_SITTING);
+        assertThat(result.animalType()).isNull();
+        assertThat(result.description()).isEqualTo("Bitte viel spielen");
+    }
+
+    @Test
+    void updateCurrentUserOfferUpdatesOwnOpenOffer() {
+        User currentUser = user(UUID.randomUUID());
+        Pet selectedPet = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
+        Offer offer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(2), BigDecimal.valueOf(20));
+        offer.setCreateUser(currentUser);
+        offer.setUpdateUser(currentUser);
+        AtomicReference<Offer> savedOffer = new AtomicReference<>();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryForEdit(offer, savedOffer, saveCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>(selectedPet)),
+                Optional.of(currentUser)
+        );
+        LocalDate newStart = LocalDate.now().plusDays(1);
+        LocalDate newEnd = newStart.plusDays(3);
+
+        CreateOfferResult result = offerService.updateCurrentUserOffer(offer.getOfferId(), new CreateOfferRequest(
+                OfferType.OWNER_OFFER,
+                newStart,
+                newEnd,
+                selectedPet.getId(),
+                BigDecimal.valueOf(55),
+                "Neuer Titel",
+                OfferFrequency.ONE_TIME,
+                OfferCareType.PET_SITTING,
+                null,
+                "Neue Beschreibung"));
+
+        assertThat(result.offerId()).isEqualTo(offer.getOfferId());
+        assertThat(saveCount).hasValue(1);
+        assertThat(savedOffer.get()).isSameAs(offer);
+        assertThat(offer.getStartDate()).isEqualTo(newStart);
+        assertThat(offer.getEndDate()).isEqualTo(newEnd);
+        assertThat(offer.getPet()).isSameAs(selectedPet);
+        assertThat(offer.getTitle()).isEqualTo("Neuer Titel");
+        assertThat(offer.getFrequency()).isEqualTo(OfferFrequency.ONE_TIME);
+        assertThat(offer.getCareType()).isEqualTo(OfferCareType.PET_SITTING);
+        assertThat(offer.getPrice()).isEqualByComparingTo("55");
+        assertThat(offer.getDescription()).isEqualTo("Neue Beschreibung");
+        assertThat(offer.getStatus()).isEqualTo(OfferStatus.OPEN);
+    }
+
+    @Test
+    void updateCurrentUserOfferRejectsForbiddenNonOpenAndInvalidUpdates() {
+        User currentUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        LocalDate start = LocalDate.now();
+        CreateOfferRequest validUpdate = new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                start,
+                start.plusDays(1),
+                null,
+                BigDecimal.TEN,
+                "Titel",
+                OfferFrequency.ONE_TIME,
+                OfferCareType.PET_SITTING,
+                OfferAnimalType.DOG,
+                "Beschreibung");
+        Offer foreignOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                start, start.plusDays(1), BigDecimal.TEN);
+        foreignOpen.setCreateUser(otherUser);
+        Offer ownBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
+                start, start.plusDays(1), BigDecimal.TEN);
+        ownBooked.setCreateUser(currentUser);
+        Offer ownOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                start, start.plusDays(1), BigDecimal.TEN);
+        ownOpen.setCreateUser(currentUser);
+
+        assertThatThrownBy(() -> serviceWithEditableOffer(foreignOpen, Optional.of(currentUser))
+                .updateCurrentUserOffer(foreignOpen.getOfferId(), validUpdate))
+                .isInstanceOf(ForbiddenOperationException.class);
+        assertThatThrownBy(() -> serviceWithEditableOffer(ownBooked, Optional.of(currentUser))
+                .updateCurrentUserOffer(ownBooked.getOfferId(), validUpdate))
+                .isInstanceOf(BusinessRuleViolationException.class);
+        assertThatThrownBy(() -> serviceWithEditableOffer(ownOpen, Optional.of(currentUser))
+                .updateCurrentUserOffer(ownOpen.getOfferId(), new CreateOfferRequest(
+                        OfferType.OWNER_OFFER,
+                        start,
+                        start.plusDays(1),
+                        null,
+                        BigDecimal.TEN,
+                        "Falscher Typ")))
+                .isInstanceOf(BusinessRuleViolationException.class);
+    }
+
+    @Test
     void searchOpenOffersForTierhalterUsesMinimumEarningsAndFlexibleDateWindow() {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 18);
@@ -813,6 +959,14 @@ class OfferServiceTest {
         return new OfferService(offerRepository, petRepository, authenticatedUser(user), createOfferFormRules);
     }
 
+    private OfferService serviceWithEditableOffer(Offer offer, Optional<User> user) {
+        return serviceWithAuthenticatedUser(
+                offerRepositoryForEdit(offer, new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                user
+        );
+    }
+
     private CreateOfferFormRules fixedCreateOfferFormRules() {
         return new CreateOfferFormRules(Clock.fixed(Instant.parse("2026-05-10T10:00:00Z"), ZoneOffset.UTC));
     }
@@ -940,6 +1094,33 @@ class OfferServiceTest {
                     }
                     if ("toString".equals(method.getName())) {
                         return "OfferRepositoryCurrentUserOffersTestDouble";
+                    }
+                    throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
+                }
+        );
+    }
+
+    private OfferRepository offerRepositoryForEdit(Offer offer, AtomicReference<Offer> savedOffer,
+            AtomicInteger saveCount) {
+        return (OfferRepository) Proxy.newProxyInstance(
+                OfferRepository.class.getClassLoader(),
+                new Class<?>[] {OfferRepository.class},
+                (proxy, method, args) -> {
+                    if ("findById".equals(method.getName())) {
+                        UUID requestedOfferId = (UUID) args[0];
+                        if (offer != null && offer.getOfferId().equals(requestedOfferId)) {
+                            return Optional.of(offer);
+                        }
+                        return Optional.empty();
+                    }
+                    if ("save".equals(method.getName())) {
+                        Offer updatedOffer = (Offer) args[0];
+                        savedOffer.set(updatedOffer);
+                        saveCount.incrementAndGet();
+                        return updatedOffer;
+                    }
+                    if ("toString".equals(method.getName())) {
+                        return "OfferRepositoryEditTestDouble";
                     }
                     throw new UnsupportedOperationException("Unsupported repository method: " + method.getName());
                 }

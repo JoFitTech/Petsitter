@@ -510,7 +510,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, "–", 4).open();
+        new PetsitterDetailPopUp(dto, "–", 4, offerService).open();
     }
 
     private void onFavoriteClicked(OfferCardDto dto) {

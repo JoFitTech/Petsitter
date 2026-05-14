@@ -254,7 +254,7 @@ public class MyOffers extends Div {
     }
 
     private void openOfferDialog(MyOfferCardDto offer) {
-        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4).open();
+        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4, offerService).open();
     }
 
     private OfferCardDto toOfferCardDto(MyOfferCardDto offer) {

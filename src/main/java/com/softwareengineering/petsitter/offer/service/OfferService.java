@@ -136,6 +136,22 @@ public class OfferService {
                 .orElseGet(List::of);
     }
 
+    @Transactional(readOnly = true)
+    public boolean isCurrentUserOffer(UUID offerId) {
+        return authenticatedUser.get()
+                .flatMap(user -> findOfferById(offerId)
+                        .map(offer -> isCreatedBy(offer, user)))
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean canCurrentUserEditOffer(UUID offerId) {
+        return authenticatedUser.get()
+                .flatMap(user -> findOfferById(offerId)
+                        .map(offer -> isCreatedBy(offer, user) && offer.getStatus() == OfferStatus.OPEN))
+                .orElse(false);
+    }
+
     private boolean hasInvalidSearchRange(OfferSearchCriteria criteria) {
         return criteria.dateFilterMode() != OfferDateFilterMode.ANY
                 && criteria.from() != null
@@ -384,6 +400,36 @@ public class OfferService {
         return new CreateOfferResult(savedOffer.getOfferId());
     }
 
+    @Transactional(readOnly = true)
+    public CreateOfferRequest getCurrentUserOfferForEdit(UUID offerId) {
+        Offer offer = loadEditableCurrentUserOffer(offerId, currentUserOrThrow());
+        return toCreateOfferRequest(offer);
+    }
+
+    @Transactional
+    public CreateOfferResult updateCurrentUserOffer(UUID offerId, CreateOfferRequest request) {
+        User currentUser = currentUserOrThrow();
+        Offer offer = loadEditableCurrentUserOffer(offerId, currentUser);
+        validateCreateOfferRequest(request);
+        if (request.offerType() != offer.getOfferType()) {
+            throw new BusinessRuleViolationException("Der Angebotstyp kann nicht geaendert werden.");
+        }
+
+        offer.setStartDate(request.startDate());
+        offer.setEndDate(request.endDate());
+        offer.setUpdateUser(currentUser);
+        offer.setPet(resolvePet(request.petId(), currentUser));
+        offer.setTitle(cleanText(request.title()));
+        offer.setFrequency(request.frequency());
+        offer.setCareType(request.careType());
+        offer.setAnimalType(request.animalType());
+        offer.setPrice(request.price());
+        offer.setDescription(cleanText(request.description()));
+
+        Offer savedOffer = offerRepository.save(offer);
+        return new CreateOfferResult(savedOffer.getOfferId());
+    }
+
     /**
      * Erstellt ein OWNER_OFFER: Der Tierhalter sucht einen Sitter für sein Haustier.
      *
@@ -529,6 +575,52 @@ public class OfferService {
 
     private UUID selectedPetId(OfferPetOptionDto selectedPet) {
         return selectedPet == null ? null : selectedPet.id();
+    }
+
+    private User currentUserOrThrow() {
+        return authenticatedUser.get()
+                .orElseThrow(() -> new BusinessRuleViolationException(
+                        "Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden."));
+    }
+
+    private java.util.Optional<Offer> findOfferById(UUID offerId) {
+        if (offerId == null) {
+            return java.util.Optional.empty();
+        }
+        return offerRepository.findById(offerId);
+    }
+
+    private Offer loadEditableCurrentUserOffer(UUID offerId, User currentUser) {
+        Offer offer = findOfferById(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden."));
+        if (!isCreatedBy(offer, currentUser)) {
+            throw new ForbiddenOperationException("Offer gehoert nicht dem aktuellen User.");
+        }
+        if (offer.getStatus() != OfferStatus.OPEN) {
+            throw new BusinessRuleViolationException("Nur offene Offers koennen bearbeitet werden.");
+        }
+        return offer;
+    }
+
+    private boolean isCreatedBy(Offer offer, User user) {
+        return offer.getCreateUser() != null
+                && user != null
+                && user.getId() != null
+                && user.getId().equals(offer.getCreateUser().getId());
+    }
+
+    private CreateOfferRequest toCreateOfferRequest(Offer offer) {
+        return new CreateOfferRequest(
+                offer.getOfferType(),
+                offer.getStartDate(),
+                offer.getEndDate(),
+                offer.getPet() != null ? offer.getPet().getId() : null,
+                offer.getPrice(),
+                offer.getTitle(),
+                offer.getFrequency(),
+                offer.getCareType(),
+                offer.getAnimalType(),
+                offer.getDescription());
     }
 
     private void validateCreateOfferRequest(CreateOfferRequest request) {

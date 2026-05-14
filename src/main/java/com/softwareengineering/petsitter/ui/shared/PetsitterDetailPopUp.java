@@ -34,6 +34,7 @@ public class PetsitterDetailPopUp extends Dialog {
         String topColor = OfferCardComponent.colorFor(dto.animalType());
         String date     = OfferCardComponent.formatDateRange(dto.startDate(), dto.endDate());
         String price    = OfferCardComponent.formatPrice(dto.price());
+        String location = OfferCardComponent.formatLocation(dto.postalCode(), dto.city());
 
         // ── Outer container ───────────────────────────────────────────────
         VerticalLayout content = new VerticalLayout();
@@ -165,6 +166,10 @@ public class PetsitterDetailPopUp extends Dialog {
         } else if (dto.animalType() != null) {
             // SITTER_OFFER: zeige bevorzugte Tierart
             content.add(readOnlyTextField("Bevorzugte Tierart", dto.animalType().label()));
+        }
+
+        if (!location.isBlank()) {
+            content.add(readOnlyTextField("Standort", location));
         }
 
         // ── Beschreibung ──────────────────────────────────────────────────

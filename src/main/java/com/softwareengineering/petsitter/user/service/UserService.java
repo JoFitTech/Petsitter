@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.user.service;
 
+import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
@@ -36,19 +38,22 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final LoginCodeService loginCodeService;
     private final PetService petService;
+    private final PostalCodeService postalCodeService;
 
     public UserService(
             UserRepository userRepository,
             AuthenticatedUser authenticatedUser,
             PasswordEncoder passwordEncoder,
             LoginCodeService loginCodeService,
-            PetService petService
+            PetService petService,
+            PostalCodeService postalCodeService
     ) {
         this.userRepository = userRepository;
         this.authenticatedUser = authenticatedUser;
         this.passwordEncoder = passwordEncoder;
         this.loginCodeService = loginCodeService;
         this.petService = petService;
+        this.postalCodeService = postalCodeService;
     }
 
     public Optional<User> findUserById(UUID userId) {
@@ -286,6 +291,13 @@ public class UserService {
                 || isBlank(request.country())) {
             return Optional.of("Bitte alle Pflichtfelder ausfüllen.");
         }
+        if (!isGermany(request.country())) {
+            return Optional.of("Aktuell werden nur deutsche Adressen unterstützt.");
+        }
+        Optional<String> postalCodeError = validateGermanPostalCode(request.postalCode(), request.city());
+        if (postalCodeError.isPresent()) {
+            return postalCodeError;
+        }
         return Optional.empty();
     }
 
@@ -328,7 +340,19 @@ public class UserService {
                 || isBlank(request.city())) {
             return Optional.of("Bitte alle Pflichtfelder ausfüllen.");
         }
+        Optional<String> postalCodeError = validateGermanPostalCode(request.postalCode(), request.city());
+        if (postalCodeError.isPresent()) {
+            return postalCodeError;
+        }
         return Optional.empty();
+    }
+
+    private Optional<String> validateGermanPostalCode(String postalCode, String city) {
+        if (postalCodeService == null) {
+            return Optional.empty();
+        }
+        PostalCodeValidationResult validation = postalCodeService.validateGermanPostalCode(postalCode, city);
+        return validation.valid() ? Optional.empty() : Optional.of(validation.message());
     }
 
     private void updatePendingUser(User user, UserRegistrationRequest request, String normalizedEmail) {
@@ -378,6 +402,17 @@ public class UserService {
 
     private String defaultIfBlank(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private boolean isGermany(String country) {
+        if (country == null) {
+            return false;
+        }
+        String normalized = country.trim().toLowerCase(Locale.GERMANY);
+        return normalized.equals("deutschland")
+                || normalized.equals("germany")
+                || normalized.equals("de")
+                || normalized.equals("deu");
     }
 
     private boolean isBlank(String value) {

@@ -21,5 +21,27 @@ public record OfferCardDto(
         OfferCareType careType,
         String petName,
         String petSpecies,
-        String petBreed
-) {}
+        String petBreed,
+        String postalCode,
+        String city,
+        Integer distanceKm
+) {
+    public OfferCardDto(
+            UUID id,
+            String title,
+            LocalDate startDate,
+            LocalDate endDate,
+            BigDecimal price,
+            OfferAnimalType animalType,
+            boolean creatorVerified,
+            String description,
+            OfferFrequency frequency,
+            OfferCareType careType,
+            String petName,
+            String petSpecies,
+            String petBreed
+    ) {
+        this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
+                frequency, careType, petName, petSpecies, petBreed, null, null, null);
+    }
+}

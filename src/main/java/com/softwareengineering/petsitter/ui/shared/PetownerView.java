@@ -190,7 +190,11 @@ public class PetownerView extends VerticalLayout {
         statBox.add(available, statHeadline, rating);
         heroTop.add(copy, statBox);
 
-        FilterSearchBar searchBar = new FilterSearchBar(FilterSearchBar.EarningsMode.MAXIMUM, this::onSearchClicked);
+        FilterSearchBar searchBar = new FilterSearchBar(
+                FilterSearchBar.EarningsMode.MAXIMUM,
+                FilterSearchBar.defaultCriteria(offerService.getCurrentUserPostalCode().orElse(null)),
+                offerService::validateOriginPostalCode,
+                this::onSearchClicked);
 
         Hr line = new Hr();
         line.getStyle()
@@ -258,6 +262,9 @@ public class PetownerView extends VerticalLayout {
             parameters.put("earnings", List.of(formatQueryAmount(criteria.earnings())));
         }
         parameters.put("distanceKm", List.of(String.valueOf(criteria.distanceKm())));
+        if (criteria.originPostalCode() != null) {
+            parameters.put("originPostalCode", List.of(criteria.originPostalCode()));
+        }
         return new QueryParameters(parameters);
     }
 
@@ -266,7 +273,7 @@ public class PetownerView extends VerticalLayout {
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, "–", 4, offerService).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
     }
 
     private void onFavoriteClicked(OfferCardDto dto) {

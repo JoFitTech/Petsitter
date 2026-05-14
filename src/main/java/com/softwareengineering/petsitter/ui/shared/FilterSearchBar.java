@@ -2,6 +2,7 @@ package com.softwareengineering.petsitter.ui.shared;
 
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dependency.CssImport;
@@ -25,7 +26,9 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 @CssImport(value = "./styles/filter-search-popover.css", themeFor = "vaadin-popover-overlay")
 @CssImport(value = "./styles/filter-search-slider-bubble.css", themeFor = "vaadin-slider-bubble-overlay")
@@ -54,13 +57,16 @@ public class FilterSearchBar extends Div {
     private final Popover distancePopover;
     private final EarningsMode earningsMode;
     private final Consumer<SearchCriteria> onSearch;
+    private final Function<String, Optional<String>> originPostalCodeValidator;
 
+    private TextField originPostalCodeField;
     private LocalDate selectedFrom;
     private LocalDate selectedTo;
     private OfferDateFilterMode selectedDateFilterMode;
     private int selectedDateFlexDays;
     private BigDecimal selectedEarnings;
     private int selectedDistance;
+    private String selectedOriginPostalCode;
 
     public FilterSearchBar(EarningsMode earningsMode, Consumer<SearchCriteria> onSearch) {
         this(earningsMode, defaultCriteria(), onSearch);
@@ -68,8 +74,17 @@ public class FilterSearchBar extends Div {
 
     public FilterSearchBar(EarningsMode earningsMode, SearchCriteria initialCriteria,
             Consumer<SearchCriteria> onSearch) {
+        this(earningsMode, initialCriteria, postalCode -> Optional.empty(), onSearch);
+    }
+
+    public FilterSearchBar(EarningsMode earningsMode, SearchCriteria initialCriteria,
+            Function<String, Optional<String>> originPostalCodeValidator,
+            Consumer<SearchCriteria> onSearch) {
         this.earningsMode = earningsMode;
         this.onSearch = onSearch;
+        this.originPostalCodeValidator = originPostalCodeValidator != null
+                ? originPostalCodeValidator
+                : postalCode -> Optional.empty();
         SearchCriteria criteria = initialCriteria != null ? initialCriteria : defaultCriteria();
         selectedFrom = criteria.from();
         selectedTo = criteria.to();
@@ -77,6 +92,7 @@ public class FilterSearchBar extends Div {
         selectedDateFlexDays = normalizeDateFlexDays(criteria.dateFlexDays());
         selectedEarnings = criteria.earnings();
         selectedDistance = normalizeDistance(criteria.distanceKm());
+        selectedOriginPostalCode = normalizePostalCode(criteria.originPostalCode());
 
         getStyle()
                 .set("display", "flex")
@@ -112,7 +128,7 @@ public class FilterSearchBar extends Div {
                 .set("margin-left", "16px")
                 .set("flex-shrink", "0");
         searchBtn.addClickListener(e -> {
-            if (!hasInvalidDateRange()) {
+            if (!hasInvalidDateRange() && !hasInvalidOriginPostalCode()) {
                 this.onSearch.accept(getCriteria());
             }
         });
@@ -145,10 +161,15 @@ public class FilterSearchBar extends Div {
                 selectedDateFilterMode,
                 selectedDateFlexDays,
                 selectedEarnings,
-                selectedDistance);
+                selectedDistance,
+                selectedOriginPostalCode);
     }
 
     public static SearchCriteria defaultCriteria() {
+        return defaultCriteria(null);
+    }
+
+    public static SearchCriteria defaultCriteria(String originPostalCode) {
         int currentYear = LocalDate.now().getYear();
         return new SearchCriteria(
                 LocalDate.of(currentYear, 6, 15),
@@ -156,7 +177,8 @@ public class FilterSearchBar extends Div {
                 OfferDateFilterMode.OVERLAP,
                 0,
                 new BigDecimal("80"),
-                5);
+                5,
+                originPostalCode);
     }
 
     private FilterPill filterPill(String icon, String label, String value, boolean first) {
@@ -412,6 +434,26 @@ public class FilterSearchBar extends Div {
 
     private Component buildDistancePopover() {
         VerticalLayout content = popoverContent();
+        originPostalCodeField = new TextField("Ausgangs-PLZ");
+        originPostalCodeField.setValue(selectedOriginPostalCode == null ? "" : selectedOriginPostalCode);
+        originPostalCodeField.setPlaceholder("z. B. 10115");
+        originPostalCodeField.setAllowedCharPattern("[0-9]");
+        originPostalCodeField.setPattern("\\d{5}");
+        originPostalCodeField.setMaxLength(5);
+        originPostalCodeField.setManualValidation(true);
+        originPostalCodeField.setErrorMessage("Bitte eine gültige deutsche Postleitzahl eingeben.");
+        originPostalCodeField.setValueChangeMode(ValueChangeMode.EAGER);
+        originPostalCodeField.setWidthFull();
+        originPostalCodeField.getStyle()
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("font-weight", "700");
+        originPostalCodeField.addValueChangeListener(event -> {
+            selectedOriginPostalCode = normalizePostalCode(event.getValue());
+            if (selectedOriginPostalCode == null || selectedOriginPostalCode.length() <= 5) {
+                originPostalCodeField.setInvalid(false);
+            }
+        });
+
         Span currentValue = new Span(selectedDistance + " km");
         currentValue.getStyle()
                 .set("font-size", "24px")
@@ -444,8 +486,37 @@ public class FilterSearchBar extends Div {
                 .set("font-weight", "700")
                 .set("color", LABEL);
 
-        content.add(popoverTitle("Entfernung"), currentValue, slider, scale);
+        Anchor attribution = new Anchor("https://www.openstreetmap.org/copyright", "Geodaten © OpenStreetMap-Mitwirkende");
+        attribution.setTarget("_blank");
+        attribution.getStyle()
+                .set("font-size", "11px")
+                .set("font-weight", "700")
+                .set("color", LABEL)
+                .set("text-decoration", "none");
+
+        content.add(popoverTitle("Entfernung"), originPostalCodeField, currentValue, slider, scale, attribution);
         return content;
+    }
+
+    private boolean hasInvalidOriginPostalCode() {
+        if (originPostalCodeField != null) {
+            selectedOriginPostalCode = normalizePostalCode(originPostalCodeField.getValue());
+        }
+        Optional<String> validationError = originPostalCodeValidator.apply(selectedOriginPostalCode);
+        if (validationError.isPresent()) {
+            if (originPostalCodeField != null) {
+                originPostalCodeField.setErrorMessage(validationError.get());
+                originPostalCodeField.setInvalid(true);
+            }
+            if (!distancePopover.isOpened()) {
+                openOnly(distancePopover);
+            }
+            return true;
+        }
+        if (originPostalCodeField != null) {
+            originPostalCodeField.setInvalid(false);
+        }
+        return false;
     }
 
     private int distanceIndex(int distance) {
@@ -461,6 +532,14 @@ public class FilterSearchBar extends Div {
 
     private static int normalizeDateFlexDays(int dateFlexDays) {
         return DATE_FLEX_VALUES.contains(dateFlexDays) ? dateFlexDays : 0;
+    }
+
+    private static String normalizePostalCode(String postalCode) {
+        if (postalCode == null) {
+            return null;
+        }
+        String normalized = postalCode.trim().replace(" ", "");
+        return normalized.isBlank() ? null : normalized;
     }
 
     private void openOnly(Popover popover) {
@@ -566,8 +645,14 @@ public class FilterSearchBar extends Div {
             OfferDateFilterMode dateFilterMode,
             int dateFlexDays,
             BigDecimal earnings,
-            int distanceKm
+            int distanceKm,
+            String originPostalCode
     ) {
+        public SearchCriteria(LocalDate from, LocalDate to, OfferDateFilterMode dateFilterMode,
+                int dateFlexDays, BigDecimal earnings, int distanceKm) {
+            this(from, to, dateFilterMode, dateFlexDays, earnings, distanceKm, null);
+        }
+
         public SearchCriteria {
             if (dateFilterMode == null) {
                 dateFilterMode = OfferDateFilterMode.OVERLAP;
@@ -575,6 +660,7 @@ public class FilterSearchBar extends Div {
             if (dateFlexDays < 0) {
                 dateFlexDays = 0;
             }
+            originPostalCode = normalizePostalCode(originPostalCode);
         }
     }
 

@@ -73,11 +73,12 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private Div filterBarContainer;
     private Div offerGrid;
     private Div mapMarkerLayer;
-    private OfferSearchCriteria currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
+    private OfferSearchCriteria currentCriteria;
 
     @Autowired
     public PetsitterFilterView(OfferService offerService) {
         this.offerService = offerService;
+        this.currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
 
         setSizeFull();
         setPadding(false);
@@ -113,7 +114,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
 
     private OfferSearchCriteria parseCriteria(Map<String, List<String>> parameters) {
         OfferSearchMode mode = OfferSearchMode.fromQueryValue(firstValue(parameters, "mode"));
-        FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria();
+        FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria(
+                offerService.getCurrentUserPostalCode().orElse(null));
         if (!containsAnyFilterParameter(parameters)) {
             return new OfferSearchCriteria(
                 mode,
@@ -123,6 +125,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 defaultCriteria.dateFlexDays(),
                 defaultCriteria.earnings(),
                 defaultCriteria.distanceKm(),
+                defaultCriteria.originPostalCode(),
                 null,
                 null,
                 Set.of());
@@ -136,6 +139,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 parseFlexDays(firstValue(parameters, "dateFlexDays")),
                 parseAmount(firstValue(parameters, "earnings")),
                 parseDistance(firstValue(parameters, "distanceKm"), defaultCriteria.distanceKm()),
+                parseOriginPostalCode(firstValue(parameters, "originPostalCode")),
                 OfferCareType.fromQueryValue(firstValue(parameters, "careType")),
                 OfferFrequency.fromQueryValue(firstValue(parameters, "frequency")),
                 parseAnimalTypes(parameters.get("animalType")));
@@ -148,6 +152,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 || parameters.containsKey("dateFlexDays")
                 || parameters.containsKey("earnings")
                 || parameters.containsKey("distanceKm")
+                || parameters.containsKey("originPostalCode")
                 || parameters.containsKey("careType")
                 || parameters.containsKey("frequency")
                 || parameters.containsKey("animalType");
@@ -204,6 +209,13 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         } catch (NumberFormatException ignored) {
             return defaultDistance;
         }
+    }
+
+    private String parseOriginPostalCode(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().replace(" ", "");
     }
 
     private int parseFlexDays(String value) {
@@ -301,6 +313,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         FilterSearchBar searchBar = new FilterSearchBar(
                 display.earningsMode,
                 toFilterCriteria(currentCriteria),
+                offerService::validateOriginPostalCode,
                 this::onSearchClicked);
         searchBar.getStyle()
                 .set("margin", "0")
@@ -340,6 +353,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 criteria.dateFlexDays(),
                 criteria.earnings(),
                 criteria.distanceKm(),
+                criteria.originPostalCode(),
                 currentCriteria.careType(),
                 currentCriteria.frequency(),
                 currentCriteria.animalTypes());
@@ -355,6 +369,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 currentCriteria.dateFlexDays(),
                 currentCriteria.earnings(),
                 currentCriteria.distanceKm(),
+                currentCriteria.originPostalCode(),
                 filters.careType(),
                 filters.frequency(),
                 filters.animalTypes());
@@ -368,7 +383,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 criteria.dateFilterMode(),
                 criteria.dateFlexDays(),
                 criteria.earnings(),
-                criteria.distanceKm());
+                criteria.distanceKm(),
+                criteria.originPostalCode());
     }
 
     private QueryParameters queryParametersFor(OfferSearchCriteria criteria) {
@@ -386,6 +402,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
             parameters.put("earnings", List.of(criteria.earnings().stripTrailingZeros().toPlainString()));
         }
         parameters.put("distanceKm", List.of(String.valueOf(criteria.distanceKm())));
+        if (criteria.originPostalCode() != null) {
+            parameters.put("originPostalCode", List.of(criteria.originPostalCode()));
+        }
         if (criteria.careType() != null) {
             parameters.put("careType", List.of(criteria.careType().queryValue()));
         }
@@ -510,7 +529,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, "–", 4, offerService).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
     }
 
     private void onFavoriteClicked(OfferCardDto dto) {
@@ -713,7 +732,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private OfferSearchCriteria defaultCriteria(OfferSearchMode mode) {
-        FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria();
+        FilterSearchBar.SearchCriteria defaultCriteria = FilterSearchBar.defaultCriteria(
+                offerService.getCurrentUserPostalCode().orElse(null));
         return new OfferSearchCriteria(
                 mode,
                 defaultCriteria.from(),
@@ -722,6 +742,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 defaultCriteria.dateFlexDays(),
                 defaultCriteria.earnings(),
                 defaultCriteria.distanceKm(),
+                defaultCriteria.originPostalCode(),
                 null,
                 null,
                 Set.of());

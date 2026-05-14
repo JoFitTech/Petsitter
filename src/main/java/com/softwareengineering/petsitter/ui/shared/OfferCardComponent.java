@@ -131,6 +131,14 @@ public class OfferCardComponent extends Div {
 
         titleRow.add(cardTitle, heartBtn);
 
+        Span location = new Span(formatLocation(dto.postalCode(), dto.city()));
+        location.getStyle()
+                .set("display", "block")
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("color", "#7b7069")
+                .set("margin", "-2px 0 12px 0");
+
         HorizontalLayout facts = new HorizontalLayout();
         facts.setWidthFull();
         facts.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
@@ -140,10 +148,14 @@ public class OfferCardComponent extends Div {
         facts.add(
                 factItem("Zeitraum",   formatDateRange(dto.startDate(), dto.endDate())),
                 factItem("Verdienst",  formatPrice(dto.price())),
-                factItem("Entfernung", "–")
+                factItem("Entfernung", formatDistance(dto.distanceKm()))
         );
 
-        body.add(titleRow, facts);
+        body.add(titleRow);
+        if (!location.getText().isBlank()) {
+            body.add(location);
+        }
+        body.add(facts);
         add(imageArea, body);
 
         addClickListener(e -> onCardClick.accept(dto));
@@ -190,6 +202,18 @@ public class OfferCardComponent extends Div {
     static String formatPrice(BigDecimal price) {
         if (price == null) return "–";
         return price.stripTrailingZeros().toPlainString() + " €";
+    }
+
+    public static String formatDistance(Integer distanceKm) {
+        if (distanceKm == null) return "–";
+        if (distanceKm <= 0) return "< 1 km";
+        return "ca. " + distanceKm + " km";
+    }
+
+    public static String formatLocation(String postalCode, String city) {
+        String location = ((postalCode == null ? "" : postalCode.trim()) + " "
+                + (city == null ? "" : city.trim())).trim();
+        return location;
     }
 
     private static String buildStars(int filled) {

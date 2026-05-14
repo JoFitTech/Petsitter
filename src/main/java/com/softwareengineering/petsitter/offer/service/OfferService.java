@@ -1,5 +1,9 @@
 package com.softwareengineering.petsitter.offer.service;
 
+import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
+import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
+import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
@@ -25,13 +29,17 @@ import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationE
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -78,23 +86,33 @@ import java.util.UUID;
 @Service
 public class OfferService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(OfferService.class);
+
     private final OfferRepository offerRepository;
     private final PetRepository petRepository;
     private final AuthenticatedUser authenticatedUser;
     private final CreateOfferFormRules createOfferFormRules;
+    private final PostalCodeService postalCodeService;
 
     @Autowired
     public OfferService(OfferRepository offerRepository, PetRepository petRepository,
-            AuthenticatedUser authenticatedUser) {
-        this(offerRepository, petRepository, authenticatedUser, new CreateOfferFormRules());
+            AuthenticatedUser authenticatedUser, PostalCodeService postalCodeService) {
+        this(offerRepository, petRepository, authenticatedUser, new CreateOfferFormRules(), postalCodeService);
     }
 
     OfferService(OfferRepository offerRepository, PetRepository petRepository,
             AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules) {
+        this(offerRepository, petRepository, authenticatedUser, createOfferFormRules, null);
+    }
+
+    OfferService(OfferRepository offerRepository, PetRepository petRepository,
+            AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules,
+            PostalCodeService postalCodeService) {
         this.offerRepository = offerRepository;
         this.petRepository = petRepository;
         this.authenticatedUser = authenticatedUser;
         this.createOfferFormRules = createOfferFormRules;
+        this.postalCodeService = postalCodeService;
     }
 
     public boolean hasAuthenticatedUser() {
@@ -116,19 +134,61 @@ public class OfferService {
     @Transactional(readOnly = true)
     public List<OfferCardDto> searchOpenOffers(OfferSearchCriteria criteria) {
         if (criteria == null || hasInvalidSearchRange(criteria)) {
+            LOGGER.info("Offer search skipped: criteria missing or invalid date range.");
             return List.of();
         }
+        LOGGER.info("Offer search started: mode={}, originPostalCode={}, maxDistanceKm={}, earnings={}",
+                criteria.mode(),
+                criteria.originPostalCode(),
+                criteria.distanceKm(),
+                criteria.earnings());
         User currentUser = authenticatedUser.get().orElse(null);
 
-        return offerRepository
-                .findAllByOfferTypeAndStatus(criteria.mode().targetOfferType(), OfferStatus.OPEN)
+        List<Offer> openOffers = offerRepository
+                .findAllByOfferTypeAndStatus(criteria.mode().targetOfferType(), OfferStatus.OPEN);
+
+        List<Offer> filteredOffers = openOffers
                 .stream()
-                .filter(offer -> isVisibleInPublicLists(offer, currentUser))
-                .filter(offer -> matchesDateRange(offer, criteria))
-                .filter(offer -> matchesEarnings(offer, criteria.earnings(), criteria.mode().minimumEarnings()))
-                .filter(offer -> matchesAdditionalFilters(offer, criteria))
-                .map(this::toCardDto)
+                .filter(offer -> matchesNonDistanceFilters(offer, criteria, currentUser))
                 .toList();
+        LOGGER.info("Offer search candidates: openCount={}, afterBaseFilters={}, candidateIds={}",
+                openOffers.size(),
+                filteredOffers.size(),
+                describeOfferIds(filteredOffers));
+
+        List<OfferCardDto> results = toDistanceAwareCardDtos(filteredOffers, criteria);
+        LOGGER.info("Offer search finished: resultCount={}, resultIds={}",
+                results.size(),
+                describeOfferCardIds(results));
+        return results;
+    }
+
+    private boolean matchesNonDistanceFilters(Offer offer, OfferSearchCriteria criteria, User currentUser) {
+        boolean visible = isVisibleInPublicLists(offer, currentUser);
+        boolean date = matchesDateRange(offer, criteria);
+        boolean earnings = matchesEarnings(offer, criteria.earnings(), criteria.mode().minimumEarnings());
+        boolean additional = matchesAdditionalFilters(offer, criteria);
+        return visible && date && earnings && additional;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<String> getCurrentUserPostalCode() {
+        return authenticatedUser.get()
+                .map(User::getPostalCode)
+                .filter(postalCode -> postalCode != null && !postalCode.isBlank());
+    }
+
+    @Transactional
+    public Optional<String> validateOriginPostalCode(String postalCode) {
+        if (postalCode == null || postalCode.isBlank()) {
+            return Optional.empty();
+        }
+        if (postalCodeService == null) {
+            return Optional.of("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
+        }
+
+        PostalCodeValidationResult result = postalCodeService.validateGermanPostalCode(postalCode, null);
+        return result.valid() ? Optional.empty() : Optional.of(result.message());
     }
 
     @Transactional(readOnly = true)
@@ -258,10 +318,132 @@ public class OfferService {
         };
     }
 
+    private List<OfferCardDto> toDistanceAwareCardDtos(List<Offer> offers, OfferSearchCriteria criteria) {
+        if (criteria.originPostalCode() == null || criteria.originPostalCode().isBlank()) {
+            List<OfferCardDto> results = offers.stream()
+                    .map(this::toCardDto)
+                    .toList();
+            LOGGER.info("Distance filter inactive: resultCount={}, resultIds={}",
+                    results.size(),
+                    describeOfferCardIds(results));
+            return results;
+        }
+        if (postalCodeService == null) {
+            LOGGER.info("Distance filter active but PostalCodeService is unavailable. Returning no offers.");
+            return List.of();
+        }
+
+        Optional<PostalCodeLocation> originLocation;
+        try {
+            originLocation = postalCodeService.findGermanLocation(criteria.originPostalCode());
+        } catch (PostalCodeLookupException ex) {
+            LOGGER.info("Distance filter origin lookup failed: originPostalCode={}, reason={}",
+                    criteria.originPostalCode(),
+                    ex.getMessage());
+            return List.of();
+        }
+        if (originLocation.isEmpty()) {
+            LOGGER.info("Distance filter origin lookup returned no location: originPostalCode={}",
+                    criteria.originPostalCode());
+            return List.of();
+        }
+
+        int maxDistanceKm = Math.max(0, criteria.distanceKm());
+        PostalCodeLocation resolvedOrigin = originLocation.get();
+        LOGGER.info("Distance filter active: originPostalCode={}, originPlace={}, originLat={}, originLon={}, "
+                        + "maxDistanceKm={}, candidates={}",
+                criteria.originPostalCode(),
+                resolvedOrigin.getPrimaryPlaceName(),
+                resolvedOrigin.getLatitude(),
+                resolvedOrigin.getLongitude(),
+                maxDistanceKm,
+                offers.size());
+
+        List<OfferCardDto> results = offers.stream()
+                .map(offer -> offerDistance(offer, originLocation.get()))
+                .flatMap(Optional::stream)
+                .filter(offerDistance -> {
+                    boolean included = offerDistance.distanceKm() <= maxDistanceKm;
+                    LOGGER.info(
+                            "Distance filter decision: offerId={}, targetPostalCode={}, targetCity={}, "
+                                    + "targetLat={}, targetLon={}, distanceKm={}, maxDistanceKm={}, included={}",
+                            offerDistance.offer().getOfferId(),
+                            creatorPostalCode(offerDistance.offer()),
+                            creatorCity(offerDistance.offer()),
+                            offerDistance.targetLocation().getLatitude(),
+                            offerDistance.targetLocation().getLongitude(),
+                            postalCodeService.roundedDistanceKm(offerDistance.distanceKm()),
+                            maxDistanceKm,
+                            included);
+                    return included;
+                })
+                .sorted(Comparator.comparingDouble(OfferDistance::distanceKm))
+                .map(offerDistance -> toCardDto(
+                        offerDistance.offer(),
+                        postalCodeService.roundedDistanceKm(offerDistance.distanceKm())))
+                .toList();
+        LOGGER.info("Distance filter results: resultCount={}, resultIds={}",
+                results.size(),
+                describeOfferCardIds(results));
+        return results;
+    }
+
+    private Optional<OfferDistance> offerDistance(Offer offer, PostalCodeLocation originLocation) {
+        User createUser = offer.getCreateUser();
+        if (createUser == null || createUser.getPostalCode() == null || createUser.getPostalCode().isBlank()) {
+            LOGGER.info("Distance filter excluded offer without creator postal code: offerId={}",
+                    offer.getOfferId());
+            return Optional.empty();
+        }
+        try {
+            Optional<PostalCodeLocation> targetLocation = postalCodeService.findGermanLocation(createUser.getPostalCode());
+            if (targetLocation.isEmpty()) {
+                LOGGER.info("Distance filter excluded offer with unresolved creator postal code: offerId={}, targetPostalCode={}",
+                        offer.getOfferId(),
+                        createUser.getPostalCode());
+                return Optional.empty();
+            }
+            double distanceKm = postalCodeService.distanceKm(originLocation, targetLocation.get());
+            return Optional.of(new OfferDistance(offer, targetLocation.get(), distanceKm));
+        } catch (PostalCodeLookupException ex) {
+            LOGGER.info("Distance filter excluded offer because target postal code lookup failed: offerId={}, "
+                            + "targetPostalCode={}, reason={}",
+                    offer.getOfferId(),
+                    createUser.getPostalCode(),
+                    ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private List<UUID> describeOfferIds(List<Offer> offers) {
+        return offers.stream()
+                .map(Offer::getOfferId)
+                .toList();
+    }
+
+    private List<UUID> describeOfferCardIds(List<OfferCardDto> offers) {
+        return offers.stream()
+                .map(OfferCardDto::id)
+                .toList();
+    }
+
+    private String creatorPostalCode(Offer offer) {
+        return offer.getCreateUser() != null ? offer.getCreateUser().getPostalCode() : null;
+    }
+
+    private String creatorCity(Offer offer) {
+        return offer.getCreateUser() != null ? offer.getCreateUser().getCity() : null;
+    }
+
     private OfferCardDto toCardDto(Offer offer) {
+        return toCardDto(offer, null);
+    }
+
+    private OfferCardDto toCardDto(Offer offer, Integer distanceKm) {
         boolean verified = offer.getCreateUser() != null
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
         Pet pet = offer.getPet();
+        User createUser = offer.getCreateUser();
         return new OfferCardDto(
                 offer.getOfferId(),
                 offer.getTitle() != null ? offer.getTitle() : "Angebot",
@@ -275,7 +457,10 @@ public class OfferService {
                 offer.getCareType(),
                 pet != null ? pet.getName() : null,
                 pet != null ? petSpeciesLabel(pet) : null,
-                pet != null ? pet.getBreed() : null
+                pet != null ? pet.getBreed() : null,
+                createUser != null ? createUser.getPostalCode() : null,
+                createUser != null ? createUser.getCity() : null,
+                distanceKm
         );
     }
 
@@ -622,6 +807,9 @@ public class OfferService {
         return offer.getStatus() == OfferStatus.OPEN
                 && offer.getStartDate() != null
                 && offer.getStartDate().isBefore(createOfferFormRules.minimumStartDate());
+    }
+
+    private record OfferDistance(Offer offer, PostalCodeLocation targetLocation, double distanceKm) {
     }
 
     private CreateOfferRequest toCreateOfferRequest(Offer offer) {

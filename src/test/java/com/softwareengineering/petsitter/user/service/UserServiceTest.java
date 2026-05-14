@@ -2,6 +2,8 @@ package com.softwareengineering.petsitter.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
@@ -322,6 +324,47 @@ class UserServiceTest {
     }
 
     @Test
+    void startRegistrationRejectsInvalidPostalCode() {
+        UserRepositoryFake userRepository = new UserRepositoryFake();
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+        PostalCodeService postalCodeService = postalCodeServiceReturning(
+                PostalCodeValidationResult.invalid("Bitte eine gültige deutsche Postleitzahl eingeben."));
+
+        UserAuthResult result = service(
+                userRepository.repository(),
+                authenticatedUser(Optional.empty()),
+                loginCodeService,
+                petService("Keine Haustiere"),
+                postalCodeService
+        ).startRegistration(registrationRequest("new.user@petsitter.local"), "127.0.0.1");
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).isEqualTo("Bitte eine gültige deutsche Postleitzahl eingeben.");
+        assertThat(userRepository.savedUser).isNull();
+        assertThat(loginCodeService.requestedEmail).isNull();
+    }
+
+    @Test
+    void updateCurrentUserProfileRejectsInvalidPostalCode() {
+        User domainUser = user(UUID.randomUUID());
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser);
+        PostalCodeService postalCodeService = postalCodeServiceReturning(
+                PostalCodeValidationResult.invalid("Die Postleitzahl passt nicht zum angegebenen Ort."));
+
+        UserAuthResult result = service(
+                userRepository.repository(),
+                authenticatedUser(Optional.of(domainUser)),
+                new LoginCodeServiceFake(),
+                petService("Keine Haustiere"),
+                postalCodeService
+        ).updateCurrentUserProfile(profileUpdateRequest());
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).isEqualTo("Die Postleitzahl passt nicht zum angegebenen Ort.");
+        assertThat(userRepository.saveCount).isZero();
+    }
+
+    @Test
     void completeRegistrationVerifiesPendingUser() {
         User pending = user(UUID.randomUUID());
         pending.setAccountStatus(AccountStatus.PENDING);
@@ -446,7 +489,28 @@ class UserServiceTest {
             LoginCodeService loginCodeService,
             PetService petService
     ) {
-        return new UserService(userRepository, authenticatedUser, passwordEncoder, loginCodeService, petService);
+        return service(userRepository, authenticatedUser, loginCodeService, petService,
+                postalCodeServiceReturning(PostalCodeValidationResult.success()));
+    }
+
+    private UserService service(
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            LoginCodeService loginCodeService,
+            PetService petService,
+            PostalCodeService postalCodeService
+    ) {
+        return new UserService(userRepository, authenticatedUser, passwordEncoder, loginCodeService,
+                petService, postalCodeService);
+    }
+
+    private PostalCodeService postalCodeServiceReturning(PostalCodeValidationResult validationResult) {
+        return new PostalCodeService(null, null) {
+            @Override
+            public PostalCodeValidationResult validateGermanPostalCode(String postalCode, String city) {
+                return validationResult;
+            }
+        };
     }
 
     private PetService petService(String summary) {

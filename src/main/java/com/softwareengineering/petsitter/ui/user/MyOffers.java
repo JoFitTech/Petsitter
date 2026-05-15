@@ -17,6 +17,8 @@ import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -35,6 +37,7 @@ public class MyOffers extends Div {
     private static final String BORDER = "#ead5ae";
 
     private final OfferService offerService;
+    private final Div offersContainer = new Div();
 
     public MyOffers(OfferService offerService) {
         this.offerService = offerService;
@@ -47,6 +50,13 @@ public class MyOffers extends Div {
                 .set("box-shadow", "0 8px 32px rgba(74,52,40,0.09)")
                 .set("box-sizing", "border-box");
 
+        offersContainer.setWidthFull();
+        add(buildHeader(), offersContainer);
+        renderOffers();
+    }
+
+    private void renderOffers() {
+        offersContainer.removeAll();
         List<MyOfferCardDto> offers = offerService.getCurrentUserOffers();
         List<MyOfferCardDto> expiredOpenOffers = offers.stream()
                 .filter(this::isExpiredOpenOffer)
@@ -55,15 +65,14 @@ public class MyOffers extends Div {
                 .filter(offer -> !isExpiredOpenOffer(offer))
                 .toList();
 
-        add(buildHeader());
         if (offers.isEmpty()) {
-            add(buildEmptyState());
+            offersContainer.add(buildEmptyState());
         } else {
             if (!regularOffers.isEmpty()) {
-                add(buildCardsGrid(regularOffers));
+                offersContainer.add(buildCardsGrid(regularOffers));
             }
             if (!expiredOpenOffers.isEmpty()) {
-                add(buildExpiredSection(expiredOpenOffers));
+                offersContainer.add(buildExpiredSection(expiredOpenOffers));
             }
         }
     }
@@ -204,13 +213,25 @@ public class MyOffers extends Div {
 
         imagePlaceholder.add(typeBadge, statusBadge);
 
+        HorizontalLayout titleRow = new HorizontalLayout();
+        titleRow.setWidthFull();
+        titleRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        titleRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        titleRow.getStyle().set("gap", "12px").set("margin", "0 0 16px 0");
+
         H3 title = new H3(offer.title());
         title.getStyle()
-                .set("margin", "0 0 16px 0")
+                .set("margin", "0")
                 .set("font-size", "20px")
                 .set("line-height", "1.2")
                 .set("font-weight", "800")
-                .set("color", DARK);
+                .set("color", DARK)
+                .set("min-width", "0");
+        titleRow.add(title);
+
+        if (offer.status() == OfferStatus.OPEN) {
+            titleRow.add(createDeleteButton(offer));
+        }
 
         Span subtitle = new Span(subtitleFor(offer));
         subtitle.getStyle()
@@ -230,8 +251,107 @@ public class MyOffers extends Div {
                 buildDetailColumn("Status", statusLabel(offer.status()), DARK)
         );
 
-        card.add(imagePlaceholder, title, subtitle, detailsRow);
+        card.add(imagePlaceholder, titleRow, subtitle, detailsRow);
         return card;
+    }
+
+    private Button createDeleteButton(MyOfferCardDto offer) {
+        Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH));
+        deleteBtn.setAriaLabel("Offer löschen");
+        deleteBtn.getStyle()
+                .set("border-radius", "50%")
+                .set("background", "#f4e0d8")
+                .set("color", "#9a4f36")
+                .set("box-shadow", "none")
+                .set("height", "36px")
+                .set("width", "36px")
+                .set("min-width", "36px")
+                .set("padding", "0")
+                .set("cursor", "pointer")
+                .set("flex-shrink", "0");
+        deleteBtn.getElement().executeJs("this.addEventListener('click', event => event.stopPropagation());");
+        deleteBtn.addClickListener(event -> openDeleteConfirmDialog(offer));
+        return deleteBtn;
+    }
+
+    private void openDeleteConfirmDialog(MyOfferCardDto offer) {
+        Dialog confirm = new Dialog();
+        confirm.setWidth("380px");
+        confirm.setCloseOnEsc(true);
+        confirm.setCloseOnOutsideClick(false);
+
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.getStyle().set("gap", "18px");
+
+        H3 title = new H3("Offer löschen?");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "20px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Paragraph message = new Paragraph("Möchtest du \"" + offer.title()
+                + "\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.");
+        message.getStyle()
+                .set("margin", "0")
+                .set("font-size", "14px")
+                .set("color", MUTED)
+                .set("line-height", "1.5");
+
+        Button cancel = styledCancelButton("Abbrechen");
+        cancel.addClickListener(event -> confirm.close());
+
+        Button delete = styledDeleteButton("Löschen");
+        delete.addClickListener(event -> {
+            try {
+                offerService.deleteCurrentUserOffer(offer.id());
+                confirm.close();
+                Notification.show("Offer wurde gelöscht.", 2500, Notification.Position.TOP_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                renderOffers();
+            } catch (RuntimeException exception) {
+                Notification.show("Offer konnte nicht gelöscht werden: " + exception.getMessage(),
+                        4000,
+                        Notification.Position.TOP_CENTER).addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+
+        HorizontalLayout buttons = new HorizontalLayout(cancel, delete);
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.getStyle().set("gap", "10px");
+
+        layout.add(title, message, buttons);
+        confirm.add(layout);
+        confirm.open();
+    }
+
+    private Button styledDeleteButton(String label) {
+        Button button = new Button(label);
+        button.getStyle()
+                .set("border-radius", "24px")
+                .set("background", "#9a4f36")
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("font-weight", "700")
+                .set("height", "40px")
+                .set("cursor", "pointer");
+        return button;
+    }
+
+    private Button styledCancelButton(String label) {
+        Button button = new Button(label);
+        button.getStyle()
+                .set("border-radius", "24px")
+                .set("background", "#e8ddd4")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("font-weight", "700")
+                .set("height", "40px")
+                .set("cursor", "pointer");
+        return button;
     }
 
     private Component buildDetailColumn(String labelText, String valueText, String valueColor) {

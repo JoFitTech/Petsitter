@@ -748,6 +748,12 @@ public class OfferService {
         return new CreateOfferResult(savedOffer.getOfferId());
     }
 
+    @Transactional
+    public void deleteCurrentUserOffer(UUID offerId) {
+        Offer offer = loadEditableCurrentUserOffer(offerId, currentUserOrThrow());
+        offerRepository.delete(offer);
+    }
+
     /**
      * Erstellt ein OWNER_OFFER: Der Tierhalter sucht einen Sitter für sein Haustier.
      *

@@ -646,6 +646,52 @@ class OfferServiceTest {
     }
 
     @Test
+    void deleteCurrentUserOfferDeletesOwnOpenOffer() {
+        User currentUser = user(UUID.randomUUID());
+        Offer ownOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownOpen.setCreateUser(currentUser);
+        AtomicReference<Offer> deletedOffer = new AtomicReference<>();
+        AtomicInteger deleteCount = new AtomicInteger();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryForEditAndDelete(ownOpen, new AtomicReference<>(), saveCount,
+                        deletedOffer, deleteCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser)
+        );
+
+        offerService.deleteCurrentUserOffer(ownOpen.getOfferId());
+
+        assertThat(deleteCount).hasValue(1);
+        assertThat(deletedOffer).hasValue(ownOpen);
+        assertThat(saveCount).hasValue(0);
+    }
+
+    @Test
+    void deleteCurrentUserOfferRejectsForeignNonOpenAndAnonymousUser() {
+        User currentUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        Offer foreignOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        foreignOpen.setCreateUser(otherUser);
+        Offer ownBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownBooked.setCreateUser(currentUser);
+        Offer ownCancelled = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.CANCELLED,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownCancelled.setCreateUser(currentUser);
+        Offer ownOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
+        ownOpen.setCreateUser(currentUser);
+
+        assertDeleteRejected(foreignOpen, Optional.of(currentUser), ForbiddenOperationException.class);
+        assertDeleteRejected(ownBooked, Optional.of(currentUser), BusinessRuleViolationException.class);
+        assertDeleteRejected(ownCancelled, Optional.of(currentUser), BusinessRuleViolationException.class);
+        assertDeleteRejected(ownOpen, Optional.empty(), BusinessRuleViolationException.class);
+    }
+
+    @Test
     void searchOpenOffersForTierhalterUsesMinimumEarningsAndFlexibleDateWindow() {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 18);
@@ -1316,6 +1362,21 @@ class OfferServiceTest {
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 
+    private void assertDeleteRejected(Offer offer, Optional<User> user,
+            Class<? extends RuntimeException> expectedException) {
+        AtomicInteger deleteCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryForEditAndDelete(offer, new AtomicReference<>(), new AtomicInteger(),
+                        new AtomicReference<>(), deleteCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                user
+        );
+
+        assertThatThrownBy(() -> offerService.deleteCurrentUserOffer(offer.getOfferId()))
+                .isInstanceOf(expectedException);
+        assertThat(deleteCount).hasValue(0);
+    }
+
     private CreateOfferRequest validRequest(UUID petId) {
         LocalDate startDate = LocalDate.now();
         return new CreateOfferRequest(
@@ -1586,6 +1647,12 @@ class OfferServiceTest {
 
     private OfferRepository offerRepositoryForEdit(Offer offer, AtomicReference<Offer> savedOffer,
             AtomicInteger saveCount) {
+        return offerRepositoryForEditAndDelete(offer, savedOffer, saveCount,
+                new AtomicReference<>(), new AtomicInteger());
+    }
+
+    private OfferRepository offerRepositoryForEditAndDelete(Offer offer, AtomicReference<Offer> savedOffer,
+            AtomicInteger saveCount, AtomicReference<Offer> deletedOffer, AtomicInteger deleteCount) {
         return (OfferRepository) Proxy.newProxyInstance(
                 OfferRepository.class.getClassLoader(),
                 new Class<?>[] {OfferRepository.class},
@@ -1602,6 +1669,12 @@ class OfferServiceTest {
                         savedOffer.set(updatedOffer);
                         saveCount.incrementAndGet();
                         return updatedOffer;
+                    }
+                    if ("delete".equals(method.getName())) {
+                        Offer removedOffer = (Offer) args[0];
+                        deletedOffer.set(removedOffer);
+                        deleteCount.incrementAndGet();
+                        return null;
                     }
                     if ("toString".equals(method.getName())) {
                         return "OfferRepositoryEditTestDouble";

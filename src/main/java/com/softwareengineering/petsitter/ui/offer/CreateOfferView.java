@@ -18,6 +18,7 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -623,11 +624,96 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         publishButton.addClickListener(e -> onPublishClicked());
 
         if (isEditMode()) {
-            row.add(publishButton);
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+            row.add(createDeleteOfferButton(), publishButton);
         } else {
             row.add(saveDraftButton, publishButton);
         }
         return row;
+    }
+
+    private Button createDeleteOfferButton() {
+        Button deleteButton = new Button("Löschen");
+        deleteButton.getStyle()
+                .set("background", "#f4e0d8")
+                .set("color", "#9a4f36")
+                .set("border", "1px solid #e2b5a5")
+                .set("border-radius", "22px")
+                .set("padding", "0 28px")
+                .set("height", "44px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        deleteButton.addClickListener(event -> openDeleteConfirmDialog());
+        return deleteButton;
+    }
+
+    private void openDeleteConfirmDialog() {
+        Dialog confirm = new Dialog();
+        confirm.setWidth("380px");
+        confirm.setCloseOnEsc(true);
+        confirm.setCloseOnOutsideClick(false);
+
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.getStyle().set("gap", "18px");
+
+        H3 title = new H3("Offer löschen?");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "20px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Paragraph message = new Paragraph("Möchtest du \"" + currentOfferTitle()
+                + "\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.");
+        message.getStyle()
+                .set("margin", "0")
+                .set("font-size", "14px")
+                .set("color", "#7b7069")
+                .set("line-height", "1.5");
+
+        Button cancel = new Button("Abbrechen");
+        cancel.getStyle()
+                .set("background", BEIGE)
+                .set("color", BROWN)
+                .set("border", "1px solid " + BORDER)
+                .set("border-radius", "22px")
+                .set("height", "40px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        cancel.addClickListener(event -> confirm.close());
+
+        Button delete = new Button("Löschen");
+        delete.getStyle()
+                .set("background", "#9a4f36")
+                .set("color", "white")
+                .set("border-radius", "22px")
+                .set("height", "40px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        delete.addClickListener(event -> {
+            try {
+                offerService.deleteCurrentUserOffer(editingOfferId);
+                confirm.close();
+                showSuccess("Offer wurde gelöscht.");
+                navigateAfterSuccessfulSave();
+            } catch (RuntimeException exception) {
+                showError("Offer konnte nicht gelöscht werden: " + exception.getMessage());
+            }
+        });
+
+        HorizontalLayout buttons = new HorizontalLayout(cancel, delete);
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.getStyle().set("gap", "10px");
+
+        layout.add(title, message, buttons);
+        confirm.add(layout);
+        confirm.open();
     }
 
     private void onDraftsClicked() {
@@ -903,6 +989,16 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private String imagePreviewPlaceholderText() {
         return isOwnerOffer() ? "Vorschau deiner Haustierbilder" : "Vorschau deiner Bilder";
+    }
+
+    private String currentOfferTitle() {
+        if (titleField != null && !titleField.getValue().isBlank()) {
+            return titleField.getValue();
+        }
+        if (editOfferData != null && editOfferData.title() != null && !editOfferData.title().isBlank()) {
+            return editOfferData.title();
+        }
+        return isOwnerOffer() ? "Auftrag" : "Angebot";
     }
 
     private void showError(String message) {

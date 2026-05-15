@@ -3,6 +3,9 @@ package com.softwareengineering.petsitter.offer.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
+import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
@@ -36,6 +39,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -1024,6 +1028,177 @@ class OfferServiceTest {
         assertThat(result).extracting(OfferCardDto::id).containsExactly(matchingOfferId);
     }
 
+    @Test
+    void searchOpenOffersFiltersByPostalCodeDistanceAndSortsNearestFirst() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        User nearUser = user(UUID.randomUUID());
+        nearUser.setPostalCode("20000");
+        nearUser.setCity("Nahstadt");
+        User farUser = user(UUID.randomUUID());
+        farUser.setPostalCode("30000");
+        farUser.setCity("Fernstadt");
+        User outsideUser = user(UUID.randomUUID());
+        outsideUser.setPostalCode("40000");
+        outsideUser.setCity("Zuweitstadt");
+        UUID nearOfferId = UUID.randomUUID();
+        UUID farOfferId = UUID.randomUUID();
+        Offer farOffer = offer(farOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80));
+        farOffer.setCreateUser(farUser);
+        Offer nearOffer = offer(nearOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80));
+        nearOffer.setCreateUser(nearUser);
+        Offer outsideOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80));
+        outsideOffer.setCreateUser(outsideUser);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(farOffer, outsideOffer, nearOffer),
+                        new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeService(Map.of(
+                        "10000", location("10000", 0, 0),
+                        "20000", location("20000", 0, 0.05),
+                        "30000", location("30000", 0, 0.15),
+                        "40000", location("40000", 0, 1.0)
+                ))
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                new OfferSearchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100), 20,
+                        "10000", null, null, Set.of()));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(nearOfferId, farOfferId);
+        assertThat(result).extracting(OfferCardDto::distanceKm).containsExactly(6, 17);
+        assertThat(result.getFirst().postalCode()).isEqualTo("20000");
+        assertThat(result.getFirst().city()).isEqualTo("Nahstadt");
+    }
+
+    @Test
+    void searchOpenOffersIgnoresDistanceWhenOriginPostalCodeIsMissing() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        UUID firstOfferId = UUID.randomUUID();
+        UUID secondOfferId = UUID.randomUUID();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(
+                        offer(firstOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80)),
+                        offer(secondOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80))
+                ), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100)));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(firstOfferId, secondOfferId);
+        assertThat(result).extracting(OfferCardDto::distanceKm).containsExactly(null, null);
+    }
+
+    @Test
+    void validateOriginPostalCodeRejectsBlankPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of())
+        );
+
+        assertThat(offerService.validateOriginPostalCode(null)).contains("Bitte eine Ausgangs-PLZ eingeben.");
+        assertThat(offerService.validateOriginPostalCode("")).contains("Bitte eine Ausgangs-PLZ eingeben.");
+        assertThat(offerService.validateOriginPostalCode("   ")).contains("Bitte eine Ausgangs-PLZ eingeben.");
+    }
+
+    @Test
+    void validateOriginPostalCodeAcceptsKnownPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of("49080", location("49080", 52.2588709, 8.0327320)))
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49080")).isEmpty();
+    }
+
+    @Test
+    void validateOriginPostalCodeRejectsUnknownPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of())
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49205"))
+                .contains("Bitte eine gültige deutsche Postleitzahl eingeben.");
+    }
+
+    @Test
+    void validateOriginPostalCodeFetchesFromApiWhenNotCached() {
+        PostalCodeLocation fetchedLocation = location("49205", 52.2, 8.1);
+        PostalCodeService serviceWithApiFallback = new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                return "49205".equals(postalCode) ? Optional.of(fetchedLocation) : Optional.empty();
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return Map.of();
+            }
+        };
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                serviceWithApiFallback
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49205")).isEmpty();
+    }
+
+    @Test
+    void validateOriginPostalCodeReturnsErrorWhenApiFails() {
+        PostalCodeService serviceWithApiError = new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                throw new PostalCodeLookupException("Nominatim nicht erreichbar.");
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.empty();
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return Map.of();
+            }
+        };
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                serviceWithApiError
+        );
+
+        assertThat(offerService.validateOriginPostalCode("49205"))
+                .contains("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
+    }
+
     private OfferSearchCriteria searchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
             OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings) {
         return searchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, null, null, Set.of());
@@ -1072,7 +1247,14 @@ class OfferServiceTest {
 
     private OfferService serviceWithAuthenticatedUser(OfferRepository offerRepository, PetRepository petRepository,
             Optional<User> user, CreateOfferFormRules createOfferFormRules) {
-        return new OfferService(offerRepository, petRepository, authenticatedUser(user), createOfferFormRules);
+        return serviceWithAuthenticatedUser(offerRepository, petRepository, user, createOfferFormRules,
+                postalCodeService(Map.of()));
+    }
+
+    private OfferService serviceWithAuthenticatedUser(OfferRepository offerRepository, PetRepository petRepository,
+            Optional<User> user, CreateOfferFormRules createOfferFormRules, PostalCodeService postalCodeService) {
+        return new OfferService(offerRepository, petRepository, authenticatedUser(user),
+                createOfferFormRules, postalCodeService);
     }
 
     private OfferService serviceWithEditableOffer(Offer offer, Optional<User> user) {
@@ -1148,6 +1330,63 @@ class OfferServiceTest {
         Offer offer = offer(offerId, OfferType.OWNER_OFFER, OfferStatus.OPEN, startDate, endDate, price);
         offer.setPet(pet(UUID.randomUUID(), user(UUID.randomUUID()), "Testtier", petSpecies));
         return offer;
+    }
+
+    private PostalCodeLocation location(String postalCode, double latitude, double longitude) {
+        return new PostalCodeLocation(
+                "DE",
+                postalCode,
+                postalCode,
+                postalCode,
+                BigDecimal.valueOf(latitude),
+                BigDecimal.valueOf(longitude),
+                java.time.LocalDateTime.now());
+    }
+
+    private PostalCodeService postalCodeService(Map<String, PostalCodeLocation> locations) {
+        return new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                throw new AssertionError("Offer search must not call the postal code API lookup path.");
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.ofNullable(locations.get(postalCode));
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return postalCodes.stream()
+                        .filter(locations::containsKey)
+                        .collect(java.util.stream.Collectors.toMap(
+                                postalCode -> postalCode,
+                                locations::get));
+            }
+        };
+    }
+
+    private PostalCodeService postalCodeServiceWithLookup(Map<String, PostalCodeLocation> locations) {
+        return new PostalCodeService(null, null) {
+            @Override
+            public Optional<PostalCodeLocation> findGermanLocation(String postalCode) {
+                return Optional.ofNullable(locations.get(postalCode));
+            }
+
+            @Override
+            public Optional<PostalCodeLocation> findCachedGermanLocation(String postalCode) {
+                return Optional.ofNullable(locations.get(postalCode));
+            }
+
+            @Override
+            public Map<String, PostalCodeLocation> findCachedGermanLocations(Set<String> postalCodes) {
+                return postalCodes.stream()
+                        .filter(locations::containsKey)
+                        .collect(java.util.stream.Collectors.toMap(
+                                postalCode -> postalCode,
+                                locations::get));
+            }
+        };
     }
 
     private OfferRepository offerRepository(AtomicReference<Offer> savedOffer, AtomicInteger saveCount) {

@@ -1,5 +1,8 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import java.time.LocalDate;
+
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
@@ -33,6 +36,7 @@ public class RegistrateView extends VerticalLayout {
     private static final String DANGER    = "#c73e1d";
 
     private final UserService userService;
+    private final PostalCodeService postalCodeService;
     private final Paragraph errorMessage = new Paragraph();
     private final Paragraph statusMessage = new Paragraph();
 
@@ -40,8 +44,9 @@ public class RegistrateView extends VerticalLayout {
     private TextField cityField;
     private String currentRegistrationEmail = "";
 
-    public RegistrateView(UserService userService) {
+    public RegistrateView(UserService userService, PostalCodeService postalCodeService) {
         this.userService = userService;
+        this.postalCodeService = postalCodeService;
 
         setSizeFull();
         setPadding(false);
@@ -199,8 +204,12 @@ public class RegistrateView extends VerticalLayout {
         passwortConfirmField.setWidthFull();
         stylePasswordField(passwortConfirmField);
 
+        emailField.addValueChangeListener(e -> emailField.setInvalid(false));
+        passwortField.addValueChangeListener(e -> passwortField.setInvalid(false));
+        passwortConfirmField.addValueChangeListener(e -> passwortConfirmField.setInvalid(false));
+
         HorizontalLayout rowPass = twoColRow(passwortField, passwortConfirmField);
-        
+
         kontoLayout.add(emailField, rowPass);
 
         // ── Daten Fields ──────────────────────────────────────────────────
@@ -208,6 +217,8 @@ public class RegistrateView extends VerticalLayout {
 
         TextField vornameField = pillTextField("Vorname");
         TextField nachnameField = pillTextField("Nachname");
+        vornameField.addValueChangeListener(e -> vornameField.setInvalid(false));
+        nachnameField.addValueChangeListener(e -> nachnameField.setInvalid(false));
         HorizontalLayout rowVorNach = twoColRow(vornameField, nachnameField);
 
         TextField telefonField = pillTextField("Telefonnummer");
@@ -215,6 +226,7 @@ public class RegistrateView extends VerticalLayout {
         geburtstagsField.setPlaceholder("Geburtstag");
         geburtstagsField.setWidthFull();
         styleDateField(geburtstagsField.getElement());
+        geburtstagsField.addValueChangeListener(e -> geburtstagsField.setInvalid(false));
         HorizontalLayout rowTelGeb = twoColRow(telefonField, geburtstagsField);
 
         TextField nationalitaetField = pillTextField("Nationalität");
@@ -227,10 +239,35 @@ public class RegistrateView extends VerticalLayout {
 
         TextField strasseField = pillTextField("Straße");
         TextField hausnummerField = pillTextField("Hausnummer");
+        strasseField.addValueChangeListener(e -> strasseField.setInvalid(false));
+        hausnummerField.addValueChangeListener(e -> hausnummerField.setInvalid(false));
         HorizontalLayout rowStrasseHaus = twoColRow(strasseField, hausnummerField);
 
         postalCodeField = pillTextField("Postleitzahl");
         cityField = pillTextField("Ort");
+        boolean[] cityAutoFilled = {false};
+        postalCodeField.addValueChangeListener(e -> {
+            postalCodeField.setInvalid(false);
+            String plz = e.getValue();
+            if (plz != null && plz.matches("\\d{5}")) {
+                postalCodeService.findGermanLocation(plz)
+                        .map(loc -> loc.getPlaceNamesList())
+                        .filter(names -> !names.isEmpty())
+                        .ifPresent(names -> {
+                            if (cityField.getValue().isBlank() || cityAutoFilled[0]) {
+                                cityField.setValue(names.get(0));
+                                cityAutoFilled[0] = true;
+                            }
+                        });
+            } else if (cityAutoFilled[0]) {
+                cityField.setValue("");
+                cityAutoFilled[0] = false;
+            }
+        });
+        cityField.addValueChangeListener(e -> {
+            cityField.setInvalid(false);
+            if (e.isFromClient()) cityAutoFilled[0] = false;
+        });
         HorizontalLayout rowPlzOrt = twoColRow(postalCodeField, cityField);
 
         TextField landField = pillTextField("Land");
@@ -315,8 +352,41 @@ public class RegistrateView extends VerticalLayout {
                 .set("letter-spacing", "0.3px");
         registerBtn.addClickListener(e -> {
             if ("Weiter".equals(registerBtn.getText())) {
-                datenTab.click();
+                boolean valid = true;
+                if (emailField.getValue().isBlank() || !emailField.getValue().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                    emailField.setInvalid(true);
+                    emailField.setErrorMessage("Gültige E-Mail eingeben");
+                    valid = false;
+                }
+                if (passwortField.getValue().length() < 8) {
+                    passwortField.setInvalid(true);
+                    passwortField.setErrorMessage("Mindestens 8 Zeichen");
+                    valid = false;
+                }
+                if (!passwortConfirmField.getValue().equals(passwortField.getValue())) {
+                    passwortConfirmField.setInvalid(true);
+                    passwortConfirmField.setErrorMessage("Passwörter stimmen nicht überein");
+                    valid = false;
+                }
+                if (valid) datenTab.click();
             } else {
+                boolean valid = true;
+                if (vornameField.getValue().isBlank()) { vornameField.setInvalid(true); vornameField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (nachnameField.getValue().isBlank()) { nachnameField.setInvalid(true); nachnameField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (strasseField.getValue().isBlank()) { strasseField.setInvalid(true); strasseField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (hausnummerField.getValue().isBlank()) { hausnummerField.setInvalid(true); hausnummerField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (postalCodeField.getValue().isBlank()) { postalCodeField.setInvalid(true); postalCodeField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (cityField.getValue().isBlank()) { cityField.setInvalid(true); cityField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (geburtstagsField.getValue() == null) {
+                    geburtstagsField.setInvalid(true);
+                    geburtstagsField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                } else if (geburtstagsField.getValue().isAfter(LocalDate.now().minusYears(18))) {
+                    geburtstagsField.setInvalid(true);
+                    geburtstagsField.setErrorMessage("Mindestalter 18 Jahre");
+                    valid = false;
+                }
+                if (!valid) return;
                 clearMessages();
                 currentRegistrationEmail = emailField.getValue();
                 UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(

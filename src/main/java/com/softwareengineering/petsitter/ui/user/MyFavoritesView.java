@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.ui.user;
 
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
@@ -25,7 +26,7 @@ public class MyFavoritesView extends Div {
 
     private final FavoriteService favoriteService;
     private final OfferService offerService;
-    private final Div cardsContainer = new Div();
+    private final Div favoritesContainer = new Div();
 
     public MyFavoritesView(FavoriteService favoriteService, OfferService offerService) {
         this.favoriteService = favoriteService;
@@ -39,8 +40,8 @@ public class MyFavoritesView extends Div {
             .set("box-shadow", "0 8px 32px rgba(74,52,40,0.09)")
             .set("box-sizing", "border-box");
 
-        configureCardsContainer();
-        add(buildHeader(), cardsContainer);
+        configureFavoritesContainer();
+        add(buildHeader(), favoritesContainer);
         renderFavorites();
     }
 
@@ -62,31 +63,70 @@ public class MyFavoritesView extends Div {
         return row;
     }
 
-    private void configureCardsContainer() {
-        cardsContainer.setWidthFull();
-        cardsContainer.getStyle()
-                .set("display", "grid")
-                .set("grid-template-columns", "repeat(auto-fit, minmax(280px, 1fr))")
-                .set("gap", "24px");
+    private void configureFavoritesContainer() {
+        favoritesContainer.setWidthFull();
+        favoritesContainer.getStyle()
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "32px");
     }
 
     private void renderFavorites() {
-        cardsContainer.removeAll();
+        favoritesContainer.removeAll();
         List<OfferCardDto> favorites = favoriteService.getCurrentUserFavoriteOffers();
         if (favorites.isEmpty()) {
-            cardsContainer.add(buildEmptyState());
+            favoritesContainer.add(buildEmptyState());
             return;
         }
-        favorites.forEach(dto -> cardsContainer.add(new OfferCardComponent(
+        List<OfferCardDto> sitterOffers = favorites.stream()
+                .filter(dto -> dto.offerType() == OfferType.SITTER_OFFER)
+                .toList();
+        List<OfferCardDto> ownerOffers = favorites.stream()
+                .filter(dto -> dto.offerType() == OfferType.OWNER_OFFER)
+                .toList();
+
+        if (!sitterOffers.isEmpty()) {
+            favoritesContainer.add(buildOfferSection("Sitter-Angebote", sitterOffers));
+        }
+        if (!ownerOffers.isEmpty()) {
+            favoritesContainer.add(buildOfferSection("Tierhalter-Aufträge", ownerOffers));
+        }
+    }
+
+    private Component buildOfferSection(String title, List<OfferCardDto> offers) {
+        Div section = new Div();
+        section.setWidthFull();
+        section.getStyle()
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px");
+
+        H3 heading = new H3(title);
+        heading.getStyle()
+                .set("margin", "0")
+                .set("font-size", "20px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Div grid = new Div();
+        grid.setWidthFull();
+        grid.getStyle()
+                .set("display", "grid")
+                .set("grid-template-columns", "repeat(auto-fit, minmax(280px, 1fr))")
+                .set("gap", "24px");
+
+        offers.forEach(dto -> grid.add(new OfferCardComponent(
                 dto,
                 this::openOfferDialog,
                 this::onFavoriteClicked)));
+
+        section.add(heading, grid);
+        return section;
     }
 
     private Component buildEmptyState() {
         Div empty = new Div();
         empty.getStyle()
-                .set("grid-column", "1 / -1")
                 .set("background", "#fbf8f1")
                 .set("border", "1px solid #ead5ae")
                 .set("border-radius", "18px")

@@ -316,7 +316,12 @@ public class MyOffers extends Div {
                 offer.careType(),
                 offer.petName(),
                 offer.petSpecies(),
-                offer.petBreed()
+                offer.petBreed(),
+                null,
+                null,
+                null,
+                false,
+                offer.offerType()
         );
     }
 

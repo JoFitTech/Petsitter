@@ -164,7 +164,8 @@ public class FavoriteService {
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
                 null,
-                true
+                true,
+                offer.getOfferType()
         );
     }
 

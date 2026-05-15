@@ -466,7 +466,9 @@ public class OfferService {
                 petBreeds(pets),
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
-                distanceKm
+                distanceKm,
+                false,
+                offer.getOfferType()
         );
     }
 

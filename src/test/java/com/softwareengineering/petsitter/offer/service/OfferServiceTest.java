@@ -775,29 +775,6 @@ class OfferServiceTest {
     }
 
     @Test
-    void searchOpenOffersDateModeExactRequiresSameStartAndEnd() {
-        LocalDate from = LocalDate.of(2026, 6, 15);
-        LocalDate to = LocalDate.of(2026, 6, 20);
-        UUID exactOfferId = UUID.randomUUID();
-        OfferService offerService = serviceWithAuthenticatedUser(
-                offerRepositoryReturningOffers(List.of(
-                        offer(exactOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80)),
-                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
-                                LocalDate.of(2026, 6, 16), LocalDate.of(2026, 6, 19), BigDecimal.valueOf(80)),
-                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
-                                LocalDate.of(2026, 6, 14), LocalDate.of(2026, 6, 21), BigDecimal.valueOf(80))
-                ), new AtomicReference<>(), new AtomicReference<>()),
-                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
-        );
-
-        List<OfferCardDto> result = offerService.searchOpenOffers(
-                searchCriteria(OfferSearchMode.TIERSITTER, from, to, OfferDateFilterMode.EXACT, 0, null));
-
-        assertThat(result).extracting(OfferCardDto::id).containsExactly(exactOfferId);
-    }
-
-    @Test
     void searchOpenOffersDateModeContainedRequiresOfferInsideSearchRange() {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 20);

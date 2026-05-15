@@ -452,7 +452,10 @@ class UserServiceTest {
                 "14",
                 "50667",
                 "Koeln",
-                "2. OG links"
+                "2. OG links",
+                java.time.LocalDate.of(1990, 1, 1),
+                "Deutsch",
+                "Deutschland"
         );
     }
 

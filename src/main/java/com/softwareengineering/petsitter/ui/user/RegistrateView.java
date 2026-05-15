@@ -426,7 +426,10 @@ public class RegistrateView extends VerticalLayout {
                         hausnummerField.getValue(),
                         postalCodeField.getValue(),
                         cityField.getValue(),
-                        null), currentRequestIp());
+                        null,
+                        geburtstagsField.getValue(),
+                        nationalitaetField.getValue(),
+                        landField.getValue()), currentRequestIp());
                 if (result.success()) {
                     tabs.setVisible(false);
                     datenLayout.setVisible(false);

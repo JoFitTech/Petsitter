@@ -368,6 +368,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         titleField = new TextField();
         titleField.setWidthFull();
         titleField.setMaxLength(formData.titleMaxLength());
+        titleField.addValueChangeListener(event -> titleField.setInvalid(false));
         titleField.getStyle()
                 .set("border-radius", "12px")
                 .set("border", "1px solid " + BORDER);
@@ -423,6 +424,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         petSelect.setPlaceholder("Wähle ein Haustier");
         petSelect.setClearButtonVisible(true);
         petSelect.setWidthFull();
+        petSelect.addValueChangeListener(event -> petSelect.setInvalid(false));
 
         section.add(label, petSelect);
         return section;
@@ -459,14 +461,20 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         fromDatePicker.setWidthFull();
         fromDatePicker.setMin(formData.minimumStartDate());
         fromDatePicker.getStyle().set("border-radius", "12px");
-        fromDatePicker.addValueChangeListener(event -> applyDateSelection(
-                offerService.updateCreateOfferDateSelection(event.getValue(), toDatePicker.getValue())));
+        fromDatePicker.addValueChangeListener(event -> {
+            fromDatePicker.setInvalid(false);
+            applyDateSelection(
+                    offerService.updateCreateOfferDateSelection(event.getValue(), toDatePicker.getValue()));
+        });
 
         toDatePicker = new DatePicker("bis");
         toDatePicker.setWidthFull();
         toDatePicker.getStyle().set("border-radius", "12px");
-        toDatePicker.addValueChangeListener(event -> applyDateSelection(
-                offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), event.getValue())));
+        toDatePicker.addValueChangeListener(event -> {
+            toDatePicker.setInvalid(false);
+            applyDateSelection(
+                    offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), event.getValue()));
+        });
 
         dateSummary = new Span();
         dateSummary.getStyle()
@@ -526,7 +534,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         priceField.setPrefixComponent(new Span("EUR"));
         priceField.setClearButtonVisible(true);
         priceField.setWidthFull();
-        priceField.addValueChangeListener(event -> updatePriceSummary());
+        priceField.addValueChangeListener(event -> {
+            priceField.setInvalid(false);
+            updatePriceSummary();
+        });
 
         priceSummary = new Span();
         priceSummary.getStyle()
@@ -666,11 +677,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private void onPublishClicked() {
         try {
             OfferPetOptionDto selectedPet = isOwnerOffer() ? petSelect.getValue() : null;
-            OfferAnimalType selectedAnimalType = isSitterOffer() ? animalTypeSelect.getValue() : null;
-            if (isOwnerOffer() && selectedPet == null) {
-                showError("Bitte wähle ein Haustier für deinen Auftrag aus.");
+            if (!validatePublishForm(selectedPet)) {
                 return;
             }
+
+            OfferAnimalType selectedAnimalType = isSitterOffer() ? animalTypeSelect.getValue() : null;
 
             CreateOfferResult result;
             if (isEditMode()) {
@@ -686,6 +697,49 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         } catch (RuntimeException exception) {
             showError("Eintrag konnte nicht gespeichert werden: " + exception.getMessage());
         }
+    }
+
+    private boolean validatePublishForm(OfferPetOptionDto selectedPet) {
+        boolean valid = true;
+
+        if (titleField.getValue().isBlank()) {
+            titleField.setInvalid(true);
+            titleField.setErrorMessage("Pflichtfeld");
+            valid = false;
+        }
+
+        if (isOwnerOffer() && selectedPet == null && petSelect != null) {
+            petSelect.setInvalid(true);
+            petSelect.setErrorMessage("Pflichtfeld");
+            valid = false;
+        }
+
+        LocalDate startDate = fromDatePicker.getValue();
+        LocalDate endDate = toDatePicker.getValue();
+
+        if (startDate == null) {
+            fromDatePicker.setInvalid(true);
+            fromDatePicker.setErrorMessage("Pflichtfeld");
+            valid = false;
+        }
+
+        if (endDate == null) {
+            toDatePicker.setInvalid(true);
+            toDatePicker.setErrorMessage("Pflichtfeld");
+            valid = false;
+        } else if (startDate != null && startDate.isAfter(endDate)) {
+            toDatePicker.setInvalid(true);
+            toDatePicker.setErrorMessage("Enddatum muss am oder nach dem Startdatum liegen");
+            valid = false;
+        }
+
+        if (priceField.getValue() == null) {
+            priceField.setInvalid(true);
+            priceField.setErrorMessage("Pflichtfeld");
+            valid = false;
+        }
+
+        return valid;
     }
 
     private CreateOfferRequest buildRequest(OfferPetOptionDto selectedPet, OfferAnimalType selectedAnimalType) {
@@ -724,19 +778,24 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private void clearForm() {
         titleField.clear();
+        titleField.setInvalid(false);
         if (animalTypeSelect != null) {
             animalTypeSelect.clear();
         }
         if (petSelect != null) {
             petSelect.clear();
+            petSelect.setInvalid(false);
         }
         frequencyGroup.setValue(OfferFrequency.ONE_TIME);
         fromDatePicker.clear();
+        fromDatePicker.setInvalid(false);
         toDatePicker.clear();
+        toDatePicker.setInvalid(false);
         applyDateSelection(
                 offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
         careTypeGroup.setValue(OfferCareType.PET_SITTING);
         priceField.clear();
+        priceField.setInvalid(false);
         additionalInfoArea.clear();
         uploadedFileNames.clear();
         if (imagePreviewArea != null) {

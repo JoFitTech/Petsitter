@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.ui.offer;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
@@ -8,6 +10,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.FilterPopUp;
@@ -37,6 +40,8 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
@@ -46,6 +51,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -54,6 +60,9 @@ import java.util.UUID;
 @PermitAll
 @JsModule("./maps/pawsitter-map.ts")
 public class PetsitterFilterView extends VerticalLayout implements BeforeEnterObserver {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PetsitterFilterView.class);
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final String DARK       = "#4a3428";
     private static final String CREAM      = "#fbf8f1";
@@ -102,7 +111,6 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
 
         applyModeChrome();
         renderFilterBar();
-        renderMapLocation();
         renderOffers();
     }
 
@@ -463,7 +471,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void renderOffers() {
+        Optional<PostalCodeMapLocation> originLocation = resolveMapOriginLocation();
         List<OfferCardDto> offers = withFavoriteState(offerService.searchOpenOffers(currentCriteria));
+        renderMap(originLocation, offers);
 
         resultsLabel.setText(resultText(offers.size()));
         offerGrid.removeAll();
@@ -478,39 +488,60 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 this::onFavoriteClicked)));
     }
 
-    private void renderMapLocation() {
+    private Optional<PostalCodeMapLocation> resolveMapOriginLocation() {
+        String originPostalCode = currentCriteria.originPostalCode();
+        if (originPostalCode == null || originPostalCode.isBlank()) {
+            return Optional.empty();
+        }
+        return offerService.resolveSearchOriginLocation(originPostalCode);
+    }
+
+    private void renderMap(Optional<PostalCodeMapLocation> originLocation, List<OfferCardDto> offers) {
         if (mapContainer == null) {
             return;
         }
 
         String originPostalCode = currentCriteria.originPostalCode();
-        if (originPostalCode == null || originPostalCode.isBlank()) {
-            showDefaultMap("Deutschland", "Keine Ausgangs-PLZ gefiltert.");
+        List<OfferMapLocation> offerLocations = offerService.resolveOfferMapLocations(offers);
+        if (originLocation.isPresent() || !offerLocations.isEmpty()) {
+            showSearchMap(originLocation.orElse(null), offerLocations, offers.size());
             return;
         }
 
-        offerService.resolveSearchOriginLocation(originPostalCode)
-                .ifPresentOrElse(
-                        this::showMapLocation,
-                        () -> showDefaultMap("Standort nicht verfügbar", "Die gefilterte PLZ konnte nicht aufgelöst werden."));
+        if (originPostalCode == null || originPostalCode.isBlank()) {
+            showDefaultMap(
+                    "Deutschland",
+                    offers.isEmpty()
+                            ? "Keine Ausgangs-PLZ gefiltert."
+                            : "Keine Angebotskoordinaten verfügbar.");
+        } else {
+            showDefaultMap("Standort nicht verfügbar", "Die gefilterte PLZ konnte nicht aufgelöst werden.");
+        }
     }
 
-    private void showMapLocation(PostalCodeMapLocation location) {
-        String label = formatMapLocation(location);
-        mapLocationLabel.setText(label);
-        mapStatusLabel.setText("Gefilterte Ausgangs-PLZ");
-        mapContainer.getElement().executeJs(
-                """
-                const element = this;
-                const showLocation = () => window.PawsitterMap.showLocation(element, $0, $1, $2);
-                const run = (attempts) => window.PawsitterMap
-                    ? showLocation()
-                    : attempts > 0 && window.requestAnimationFrame(() => run(attempts - 1));
-                run(20);
-                """,
-                location.latitude().doubleValue(),
-                location.longitude().doubleValue(),
-                label);
+    private void showSearchMap(
+            PostalCodeMapLocation originLocation,
+            List<OfferMapLocation> offerLocations,
+            int filteredOfferCount) {
+        mapLocationLabel.setText(mapTitle(originLocation, offerLocations));
+        mapStatusLabel.setText(mapStatus(originLocation, offerLocations, filteredOfferCount));
+        try {
+            String payload = JSON.writeValueAsString(new SearchMapPayload(originLocation, offerLocations));
+            mapContainer.getElement().executeJs(
+                    """
+                    const element = this;
+                    const payload = JSON.parse($0);
+                    const showResults = () => window.PawsitterMap.showSearchResults(element, payload);
+                    const run = (attempts) => window.PawsitterMap
+                        ? showResults()
+                        : attempts > 0 && window.requestAnimationFrame(() => run(attempts - 1));
+                    run(20);
+                    """,
+                    payload);
+        } catch (JsonProcessingException ex) {
+            LOGGER.info("Search map payload could not be serialized.", ex);
+            showDefaultMap("Karte nicht verfügbar", "Die Angebotsstandorte konnten nicht angezeigt werden.");
+        }
     }
 
     private void showDefaultMap(String title, String status) {
@@ -525,6 +556,32 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                     : attempts > 0 && window.requestAnimationFrame(() => run(attempts - 1));
                 run(20);
                 """);
+    }
+
+    private String mapTitle(PostalCodeMapLocation originLocation, List<OfferMapLocation> offerLocations) {
+        if (originLocation != null) {
+            return formatMapLocation(originLocation);
+        }
+        int offerCount = offerLocations.size();
+        return offerCount == 1 ? "1 Angebot auf der Karte" : offerCount + " Angebote auf der Karte";
+    }
+
+    private String mapStatus(
+            PostalCodeMapLocation originLocation,
+            List<OfferMapLocation> offerLocations,
+            int filteredOfferCount) {
+        int offerCount = offerLocations.size();
+        String offerText = offerCount == 1 ? "1 gefiltertes Angebot" : offerCount + " gefilterte Angebote";
+        if (originLocation != null && offerCount > 0) {
+            return "Ausgangs-PLZ und " + offerText;
+        }
+        if (originLocation != null && filteredOfferCount > 0) {
+            return "Gefilterte Ausgangs-PLZ; keine Angebotskoordinaten verfügbar.";
+        }
+        if (originLocation != null) {
+            return "Gefilterte Ausgangs-PLZ";
+        }
+        return offerText;
     }
 
     private String formatMapLocation(PostalCodeMapLocation location) {
@@ -681,6 +738,12 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
             String pageTitle,
             String resultNoun,
             String leftBlobColor
+    ) {
+    }
+
+    private record SearchMapPayload(
+            PostalCodeMapLocation origin,
+            List<OfferMapLocation> offers
     ) {
     }
 }

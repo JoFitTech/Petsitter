@@ -17,6 +17,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
@@ -38,6 +39,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -221,6 +223,71 @@ public class OfferService {
             LOGGER.info("Search map location lookup failed: originPostalCode={}", normalizedPostalCode, ex);
             return Optional.empty();
         }
+    }
+
+    @Transactional
+    public List<OfferMapLocation> resolveOfferMapLocations(List<OfferCardDto> offers) {
+        if (offers == null || offers.isEmpty() || postalCodeService == null) {
+            return List.of();
+        }
+
+        Set<String> postalCodes = offers.stream()
+                .map(OfferCardDto::postalCode)
+                .filter(postalCode -> postalCode != null && !postalCode.isBlank())
+                .map(postalCodeService::normalizePostalCode)
+                .filter(postalCodeService::isValidGermanPostalCodeFormat)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (postalCodes.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, PostalCodeLocation> locations = new LinkedHashMap<>(
+                postalCodeService.findCachedGermanLocations(postalCodes));
+        postalCodes.stream()
+                .filter(postalCode -> !locations.containsKey(postalCode))
+                .forEach(postalCode -> resolveGermanLocation(postalCode)
+                        .ifPresent(location -> locations.put(postalCode, location)));
+
+        return offers.stream()
+                .map(offer -> toOfferMapLocation(offer, locations))
+                .flatMap(Optional::stream)
+                .toList();
+    }
+
+    private Optional<PostalCodeLocation> resolveGermanLocation(String postalCode) {
+        try {
+            return postalCodeService.findGermanLocation(postalCode);
+        } catch (PostalCodeLookupException ex) {
+            LOGGER.info("Offer map location lookup failed: postalCode={}", postalCode, ex);
+            return Optional.empty();
+        }
+    }
+
+    private Optional<OfferMapLocation> toOfferMapLocation(
+            OfferCardDto offer,
+            Map<String, PostalCodeLocation> locations) {
+        if (offer == null || offer.postalCode() == null || offer.postalCode().isBlank()) {
+            return Optional.empty();
+        }
+        String normalizedPostalCode = postalCodeService.normalizePostalCode(offer.postalCode());
+        PostalCodeLocation location = locations.get(normalizedPostalCode);
+        if (location == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new OfferMapLocation(
+                offer.id(),
+                offer.title(),
+                location.getPostalCode(),
+                mapPlaceName(offer, location),
+                location.getLatitude(),
+                location.getLongitude()));
+    }
+
+    private String mapPlaceName(OfferCardDto offer, PostalCodeLocation location) {
+        if (location.getPrimaryPlaceName() != null && !location.getPrimaryPlaceName().isBlank()) {
+            return location.getPrimaryPlaceName();
+        }
+        return offer.city();
     }
 
     @Transactional(readOnly = true)

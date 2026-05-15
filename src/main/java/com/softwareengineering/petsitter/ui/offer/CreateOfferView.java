@@ -133,6 +133,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         add(createPageWrapper(mode, pageBg));
         if (isEditMode()) {
             populateEditForm();
+        } else if (isOwnerOffer() && formData.pets().isEmpty()) {
+            UI.getCurrent().beforeClientResponse(this, context -> openMissingPetDialog());
         }
     }
 
@@ -700,7 +702,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 offerService.deleteCurrentUserOffer(editingOfferId);
                 confirm.close();
                 showSuccess("Offer wurde gelöscht.");
-                navigateAfterSuccessfulSave();
+                navigateToReturnTarget();
             } catch (RuntimeException exception) {
                 showError("Offer konnte nicht gelöscht werden: " + exception.getMessage());
             }
@@ -770,6 +772,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private void onPublishClicked() {
         try {
             List<OfferPetOptionDto> selectedPets = isOwnerOffer() ? selectedPets() : List.of();
+            if (isOwnerOffer() && formData.pets().isEmpty()) {
+                openMissingPetDialog();
+                return;
+            }
             if (!validatePublishForm(selectedPets)) {
                 return;
             }
@@ -780,16 +786,81 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             if (isEditMode()) {
                 result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPets, selectedAnimalType));
                 showSuccess("Änderungen wurden gespeichert: " + result.offerId());
-                navigateAfterSuccessfulSave();
+                navigateToReturnTarget();
                 return;
             }
 
             result = offerService.createOffer(buildRequest(selectedPets, selectedAnimalType));
             showSuccess("Eintrag wurde gespeichert: " + result.offerId());
-            navigateAfterSuccessfulSave();
+            navigateToReturnTarget();
         } catch (RuntimeException exception) {
             showError("Eintrag konnte nicht gespeichert werden: " + exception.getMessage());
         }
+    }
+
+    private void openMissingPetDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("420px");
+        dialog.setCloseOnEsc(true);
+        dialog.setCloseOnOutsideClick(false);
+
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.getStyle().set("gap", "18px");
+
+        H3 title = new H3("Haustier erforderlich");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "20px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Paragraph message = new Paragraph(
+                "Für einen Auftrag musst du zuerst mindestens ein Haustier in deinem Profil hinterlegen.");
+        message.getStyle()
+                .set("margin", "0")
+                .set("font-size", "14px")
+                .set("color", "#7b7069")
+                .set("line-height", "1.5");
+
+        Button cancel = new Button("Abbrechen");
+        cancel.getStyle()
+                .set("background", BEIGE)
+                .set("color", BROWN)
+                .set("border", "1px solid " + BORDER)
+                .set("border-radius", "22px")
+                .set("height", "40px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        cancel.addClickListener(event -> {
+            dialog.close();
+            navigateToReturnTarget();
+        });
+
+        Button addPet = new Button("Haustier hinzufügen");
+        addPet.getStyle()
+                .set("background", BROWN)
+                .set("color", "white")
+                .set("border-radius", "22px")
+                .set("height", "40px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        addPet.addClickListener(event -> {
+            dialog.close();
+            UI.getCurrent().navigate("profile", QueryParameters.of("tab", "pets"));
+        });
+
+        HorizontalLayout buttons = new HorizontalLayout(cancel, addPet);
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.getStyle().set("gap", "10px");
+
+        layout.add(title, message, buttons);
+        dialog.add(layout);
+        dialog.open();
     }
 
     private List<OfferPetOptionDto> selectedPets() {
@@ -1011,7 +1082,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
     }
 
-    private void navigateAfterSuccessfulSave() {
+    private void navigateToReturnTarget() {
         UI ui = UI.getCurrent();
         if (ui != null) {
             ui.navigate(returnTarget.path(), returnTarget.queryParameters());

@@ -369,7 +369,9 @@ public class MyOffers extends Div {
             dialog.close();
             UI ui = UI.getCurrent();
             if (ui != null) {
-                ui.navigate("auftrag-erstellen", QueryParameters.of("mode", mode));
+                ui.navigate("auftrag-erstellen", new QueryParameters(java.util.Map.of(
+                        "mode", List.of(mode),
+                        "returnTo", List.of("/profile?tab=offers"))));
             }
         });
         return option;

@@ -244,7 +244,10 @@ public class StartView extends VerticalLayout {
     }
 
     private void onCreateOfferClicked() {
-        UI.getCurrent().navigate("auftrag-erstellen", com.vaadin.flow.router.QueryParameters.of("mode", "offer"));
+        Map<String, List<String>> parameters = new LinkedHashMap<>();
+        parameters.put("mode", List.of("offer"));
+        parameters.put("returnTo", List.of("/"));
+        UI.getCurrent().navigate("auftrag-erstellen", new QueryParameters(parameters));
     }
 
     private QueryParameters queryParametersFor(OfferSearchMode mode, FilterSearchBar.SearchCriteria criteria) {

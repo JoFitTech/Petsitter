@@ -43,6 +43,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
@@ -57,6 +58,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
     private static final String BEIGE = "#f6e8d0";
     private static final String BORDER = "#eadfce";
+    private static final String RETURN_TO_PARAMETER = "returnTo";
+    private static final NavigationTarget DEFAULT_RETURN_TARGET =
+            new NavigationTarget("profile", QueryParameters.of("tab", "offers"));
 
     private final OfferService offerService;
 
@@ -69,6 +73,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private OfferType currentOfferType;
     private UUID editingOfferId;
     private CreateOfferRequest editOfferData;
+    private NavigationTarget returnTarget = DEFAULT_RETURN_TARGET;
     private TextField titleField;
     private Select<OfferAnimalType> animalTypeSelect;
     private MultiSelectComboBox<OfferPetOptionDto> petSelect;
@@ -104,6 +109,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         removeAll();
         java.util.Map<String, java.util.List<String>> parameters =
                 event.getLocation().getQueryParameters().getParameters();
+        returnTarget = returnTargetFrom(parameters);
         if (!loadEditState(parameters, event)) {
             return;
         }
@@ -688,13 +694,13 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             if (isEditMode()) {
                 result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPets, selectedAnimalType));
                 showSuccess("Änderungen wurden gespeichert: " + result.offerId());
-                navigateToProfileOffers();
+                navigateAfterSuccessfulSave();
                 return;
             }
 
             result = offerService.createOffer(buildRequest(selectedPets, selectedAnimalType));
             showSuccess("Eintrag wurde gespeichert: " + result.offerId());
-            clearForm();
+            navigateAfterSuccessfulSave();
         } catch (RuntimeException exception) {
             showError("Eintrag konnte nicht gespeichert werden: " + exception.getMessage());
         }
@@ -909,10 +915,33 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
     }
 
-    private void navigateToProfileOffers() {
+    private void navigateAfterSuccessfulSave() {
         UI ui = UI.getCurrent();
         if (ui != null) {
-            ui.navigate("profile", QueryParameters.of("tab", "offers"));
+            ui.navigate(returnTarget.path(), returnTarget.queryParameters());
         }
+    }
+
+    private NavigationTarget returnTargetFrom(Map<String, List<String>> parameters) {
+        List<String> values = parameters.get(RETURN_TO_PARAMETER);
+        String value = values == null || values.isEmpty() ? null : values.get(0);
+        return returnTargetFrom(value);
+    }
+
+    private NavigationTarget returnTargetFrom(String value) {
+        if (value == null) {
+            return DEFAULT_RETURN_TARGET;
+        }
+
+        return switch (value.trim()) {
+            case "/" -> new NavigationTarget("", new QueryParameters(Map.of()));
+            case "/tierhalter-finden", "tierhalter-finden" ->
+                    new NavigationTarget("tierhalter-finden", new QueryParameters(Map.of()));
+            case "/profile?tab=offers", "profile?tab=offers" -> DEFAULT_RETURN_TARGET;
+            default -> DEFAULT_RETURN_TARGET;
+        };
+    }
+
+    private record NavigationTarget(String path, QueryParameters queryParameters) {
     }
 }

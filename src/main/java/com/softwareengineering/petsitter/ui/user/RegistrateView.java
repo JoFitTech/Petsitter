@@ -9,6 +9,7 @@ import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -42,6 +43,7 @@ public class RegistrateView extends VerticalLayout {
 
     private TextField postalCodeField;
     private TextField cityField;
+    private ComboBox<String> landField;
     private String currentRegistrationEmail = "";
 
     public RegistrateView(UserService userService, PostalCodeService postalCodeService) {
@@ -229,7 +231,17 @@ public class RegistrateView extends VerticalLayout {
         geburtstagsField.addValueChangeListener(e -> geburtstagsField.setInvalid(false));
         HorizontalLayout rowTelGeb = twoColRow(telefonField, geburtstagsField);
 
-        TextField nationalitaetField = pillTextField("Nationalität");
+        ComboBox<String> nationalitaetField = pillComboBox("Nationalität",
+                "Deutsch", "Österreichisch", "Schweizerisch", "Amerikanisch", "Australisch",
+                "Belgisch", "Brasilianisch", "Bulgarisch", "Chinesisch", "Dänisch",
+                "Englisch", "Finnisch", "Französisch", "Griechisch", "Indisch",
+                "Indonesisch", "Iranisch", "Irakisch", "Irisch", "Israelisch",
+                "Italienisch", "Japanisch", "Kanadisch", "Kolumbianisch", "Kroatisch",
+                "Luxemburgisch", "Marokkanisch", "Mexikanisch", "Niederländisch", "Nigerianisch",
+                "Norwegisch", "Pakistanisch", "Polnisch", "Portugiesisch", "Rumänisch",
+                "Russisch", "Schwedisch", "Serbisch", "Slowakisch", "Slowenisch",
+                "Spanisch", "Südafrikanisch", "Südkoreanisch", "Tschechisch", "Türkisch",
+                "Ukrainisch", "Ungarisch", "Vietnamesisch");
         nationalitaetField.getStyle().set("width", "50%").set("min-width", "200px");
         HorizontalLayout rowNat = new HorizontalLayout(nationalitaetField);
         rowNat.setWidthFull();
@@ -246,22 +258,25 @@ public class RegistrateView extends VerticalLayout {
         postalCodeField = pillTextField("Postleitzahl");
         cityField = pillTextField("Ort");
         boolean[] cityAutoFilled = {false};
+        boolean[] landAutoFilled = {false};
         postalCodeField.addValueChangeListener(e -> {
             postalCodeField.setInvalid(false);
             String plz = e.getValue();
             if (plz != null && plz.matches("\\d{5}")) {
-                postalCodeService.findGermanLocation(plz)
-                        .map(loc -> loc.getPlaceNamesList())
-                        .filter(names -> !names.isEmpty())
-                        .ifPresent(names -> {
-                            if (cityField.getValue().isBlank() || cityAutoFilled[0]) {
-                                cityField.setValue(names.get(0));
-                                cityAutoFilled[0] = true;
-                            }
-                        });
-            } else if (cityAutoFilled[0]) {
-                cityField.setValue("");
-                cityAutoFilled[0] = false;
+                postalCodeService.findGermanLocation(plz).ifPresent(loc -> {
+                    java.util.List<String> names = loc.getPlaceNamesList();
+                    if (!names.isEmpty() && (cityField.getValue().isBlank() || cityAutoFilled[0])) {
+                        cityField.setValue(names.get(0));
+                        cityAutoFilled[0] = true;
+                    }
+                    if (landField.getValue() == null || landField.getValue().isBlank() || landAutoFilled[0]) {
+                        landField.setValue("Deutschland");
+                        landAutoFilled[0] = true;
+                    }
+                });
+            } else {
+                if (cityAutoFilled[0]) { cityField.setValue(""); cityAutoFilled[0] = false; }
+                if (landAutoFilled[0]) { landField.setValue(null); landAutoFilled[0] = false; }
             }
         });
         cityField.addValueChangeListener(e -> {
@@ -270,7 +285,18 @@ public class RegistrateView extends VerticalLayout {
         });
         HorizontalLayout rowPlzOrt = twoColRow(postalCodeField, cityField);
 
-        TextField landField = pillTextField("Land");
+        landField = pillComboBox("Land",
+                "Deutschland", "Österreich", "Schweiz", "Frankreich", "Italien",
+                "Spanien", "Portugal", "Niederlande", "Belgien", "Luxemburg",
+                "Polen", "Tschechien", "Slowakei", "Ungarn", "Rumänien",
+                "Bulgarien", "Kroatien", "Serbien", "Slowenien", "Griechenland",
+                "Schweden", "Norwegen", "Dänemark", "Finnland", "Irland",
+                "Großbritannien", "Türkei", "Russland", "Ukraine",
+                "USA", "Kanada", "Australien", "Japan", "China",
+                "Indien", "Brasilien", "Argentinien", "Mexiko", "Südafrika",
+                "Nigeria", "Ägypten", "Marokko", "Iran", "Saudi-Arabien",
+                "Südkorea", "Indonesien", "Vietnam", "Pakistan");
+        landField.addValueChangeListener(e -> { if (e.isFromClient()) landAutoFilled[0] = false; });
         landField.getStyle().set("width", "50%").set("min-width", "200px");
         HorizontalLayout rowLand = new HorizontalLayout(landField);
         rowLand.setWidthFull();
@@ -465,6 +491,23 @@ public class RegistrateView extends VerticalLayout {
         if (left instanceof com.vaadin.flow.component.HasSize hs1) hs1.setWidth("50%");
         if (right instanceof com.vaadin.flow.component.HasSize hs2) hs2.setWidth("50%");
         return row;
+    }
+
+    private ComboBox<String> pillComboBox(String placeholder, String... items) {
+        ComboBox<String> cb = new ComboBox<>();
+        cb.setPlaceholder(placeholder);
+        cb.setItems(items);
+        cb.setAllowCustomValue(true);
+        cb.addCustomValueSetListener(e -> cb.setValue(e.getDetail()));
+        cb.setWidthFull();
+        cb.getStyle()
+                .set("border-radius", "28px")
+                .set("--vaadin-input-field-background", INPUT_BG)
+                .set("--vaadin-input-field-border-radius", "28px");
+        cb.getElement().getStyle()
+                .set("--lumo-contrast-10pct", INPUT_BG)
+                .set("--lumo-border-radius-m", "28px");
+        return cb;
     }
 
     private TextField pillTextField(String placeholder) {

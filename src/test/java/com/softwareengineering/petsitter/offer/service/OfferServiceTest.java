@@ -148,6 +148,7 @@ class OfferServiceTest {
         assertThat(savedOffer.getCreateUser()).isSameAs(owner);
         assertThat(savedOffer.getUpdateUser()).isSameAs(owner);
         assertThat(savedOffer.getPet()).isSameAs(selectedPet);
+        assertThat(savedOffer.getPets()).containsExactly(selectedPet);
         assertThat(savedOffer.getTitle()).isEqualTo("Katzenbetreuung gesucht");
         assertThat(savedOffer.getFrequency()).isEqualTo(OfferFrequency.ONE_TIME);
         assertThat(savedOffer.getCareType()).isEqualTo(OfferCareType.PET_SITTING);
@@ -156,6 +157,43 @@ class OfferServiceTest {
         assertThat(savedOffer.getPrice()).isEqualByComparingTo("25.50");
         assertThat(savedOffer.getDescription()).isEqualTo("Fuettern und Gassi gehen");
         assertThat(savedOffer.getStatus()).isEqualTo(OfferStatus.OPEN);
+    }
+
+    @Test
+    void createOfferSavesAllSelectedOwnerPets() {
+        UUID savedOfferId = UUID.randomUUID();
+        User owner = user(UUID.randomUUID());
+        Pet dog = pet(UUID.randomUUID(), owner, "Balu", PetSpecies.DOG);
+        Pet cat = pet(UUID.randomUUID(), owner, "Mila", PetSpecies.CAT);
+        AtomicReference<Offer> savedOfferReference = new AtomicReference<>();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(savedOfferReference, saveCount, savedOfferId),
+                petRepository(List.of(dog, cat), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(owner)
+        );
+        LocalDate startDate = LocalDate.now();
+        CreateOfferRequest request = new CreateOfferRequest(
+                OfferType.OWNER_OFFER,
+                startDate,
+                startDate.plusDays(2),
+                null,
+                List.of(dog.getId(), cat.getId()),
+                BigDecimal.valueOf(25.50),
+                "Betreuung gesucht",
+                OfferFrequency.ONE_TIME,
+                OfferCareType.PET_SITTING,
+                null,
+                "Fuettern und spielen"
+        );
+
+        CreateOfferResult result = offerService.createOffer(request);
+
+        Offer savedOffer = savedOfferReference.get();
+        assertThat(result.offerId()).isEqualTo(savedOfferId);
+        assertThat(saveCount).hasValue(1);
+        assertThat(savedOffer.getPet()).isSameAs(dog);
+        assertThat(savedOffer.getPets()).containsExactly(dog, cat);
     }
 
     @Test
@@ -217,6 +255,7 @@ class OfferServiceTest {
         assertThat(saveCount).hasValue(1);
         assertThat(savedOffer.getOfferType()).isEqualTo(OfferType.SITTER_OFFER);
         assertThat(savedOffer.getPet()).isNull();
+        assertThat(savedOffer.getPets()).isEmpty();
         assertThat(savedOffer.getTitle()).isEqualTo("Ich betreue Hunde");
         assertThat(savedOffer.getFrequency()).isEqualTo(OfferFrequency.REGULAR);
         assertThat(savedOffer.getCareType()).isEqualTo(OfferCareType.PET_AND_HOUSE_SITTING);
@@ -404,7 +443,9 @@ class OfferServiceTest {
         ownerOpen.setDescription("Füttern und spielen");
         ownerOpen.setFrequency(OfferFrequency.ONE_TIME);
         ownerOpen.setCareType(OfferCareType.PET_SITTING);
-        ownerOpen.setPet(pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT));
+        ownerOpen.setPets(List.of(
+                pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT),
+                pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG)));
         Offer sitterBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), BigDecimal.valueOf(250));
         sitterBooked.setAnimalType(OfferAnimalType.DOG);
@@ -430,8 +471,8 @@ class OfferServiceTest {
         assertThat(result.get(0).description()).isEqualTo("Füttern und spielen");
         assertThat(result.get(0).frequency()).isEqualTo(OfferFrequency.ONE_TIME);
         assertThat(result.get(0).careType()).isEqualTo(OfferCareType.PET_SITTING);
-        assertThat(result.get(0).petName()).isEqualTo("Mila");
-        assertThat(result.get(0).petSpecies()).isEqualTo("Katze");
+        assertThat(result.get(0).petName()).isEqualTo("Mila, Balu");
+        assertThat(result.get(0).petSpecies()).isEqualTo("Katze, Hund");
         assertThat(result.get(1).animalType()).isEqualTo(OfferAnimalType.DOG);
         assertThat(result.get(2).title()).isEqualTo("Auftrag");
     }
@@ -486,10 +527,11 @@ class OfferServiceTest {
     void getCurrentUserOfferForEditMapsEditableOfferIntoCreateRequest() {
         User currentUser = user(UUID.randomUUID());
         Pet selectedPet = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
+        Pet secondPet = pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG);
         Offer offer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
                 LocalDate.now(), LocalDate.now().plusDays(2), BigDecimal.valueOf(42));
         offer.setCreateUser(currentUser);
-        offer.setPet(selectedPet);
+        offer.setPets(List.of(selectedPet, secondPet));
         offer.setTitle("Katzenbetreuung");
         offer.setFrequency(OfferFrequency.REGULAR);
         offer.setCareType(OfferCareType.PET_AND_HOUSE_SITTING);
@@ -502,6 +544,7 @@ class OfferServiceTest {
         assertThat(result.startDate()).isEqualTo(offer.getStartDate());
         assertThat(result.endDate()).isEqualTo(offer.getEndDate());
         assertThat(result.petId()).isEqualTo(selectedPet.getId());
+        assertThat(result.petIds()).containsExactly(selectedPet.getId(), secondPet.getId());
         assertThat(result.price()).isEqualByComparingTo("42");
         assertThat(result.title()).isEqualTo("Katzenbetreuung");
         assertThat(result.frequency()).isEqualTo(OfferFrequency.REGULAR);
@@ -514,6 +557,7 @@ class OfferServiceTest {
     void updateCurrentUserOfferUpdatesOwnOpenOffer() {
         User currentUser = user(UUID.randomUUID());
         Pet selectedPet = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
+        Pet secondPet = pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG);
         Offer offer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
                 LocalDate.now(), LocalDate.now().plusDays(2), BigDecimal.valueOf(20));
         offer.setCreateUser(currentUser);
@@ -522,7 +566,7 @@ class OfferServiceTest {
         AtomicInteger saveCount = new AtomicInteger();
         OfferService offerService = serviceWithAuthenticatedUser(
                 offerRepositoryForEdit(offer, savedOffer, saveCount),
-                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>(selectedPet)),
+                petRepository(List.of(selectedPet, secondPet), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.of(currentUser)
         );
         LocalDate newStart = LocalDate.now().plusDays(1);
@@ -532,7 +576,8 @@ class OfferServiceTest {
                 OfferType.OWNER_OFFER,
                 newStart,
                 newEnd,
-                selectedPet.getId(),
+                null,
+                List.of(selectedPet.getId(), secondPet.getId()),
                 BigDecimal.valueOf(55),
                 "Neuer Titel",
                 OfferFrequency.ONE_TIME,
@@ -546,6 +591,7 @@ class OfferServiceTest {
         assertThat(offer.getStartDate()).isEqualTo(newStart);
         assertThat(offer.getEndDate()).isEqualTo(newEnd);
         assertThat(offer.getPet()).isSameAs(selectedPet);
+        assertThat(offer.getPets()).containsExactly(selectedPet, secondPet);
         assertThat(offer.getTitle()).isEqualTo("Neuer Titel");
         assertThat(offer.getFrequency()).isEqualTo(OfferFrequency.ONE_TIME);
         assertThat(offer.getCareType()).isEqualTo(OfferCareType.PET_SITTING);
@@ -940,16 +986,20 @@ class OfferServiceTest {
     }
 
     @Test
-    void searchOpenOffersAnimalTypeFiltersOwnerOffersByPetSpecies() {
+    void searchOpenOffersAnimalTypeFiltersOwnerOffersToAllowedPetTypeSet() {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 18);
         UUID dogOfferId = UUID.randomUUID();
-        UUID rabbitOfferId = UUID.randomUUID();
+        UUID catOfferId = UUID.randomUUID();
+        UUID dogCatOfferId = UUID.randomUUID();
         OfferService offerService = serviceWithAuthenticatedUser(
                 offerRepositoryReturningOffers(List.of(
                         ownerOffer(dogOfferId, from, to, BigDecimal.valueOf(120), PetSpecies.DOG),
-                        ownerOffer(rabbitOfferId, from, to, BigDecimal.valueOf(120), PetSpecies.RABBIT),
-                        ownerOffer(UUID.randomUUID(), from, to, BigDecimal.valueOf(120), PetSpecies.CAT),
+                        ownerOffer(catOfferId, from, to, BigDecimal.valueOf(120), PetSpecies.CAT),
+                        ownerOffer(dogCatOfferId, from, to, BigDecimal.valueOf(120), PetSpecies.DOG, PetSpecies.CAT),
+                        ownerOffer(UUID.randomUUID(), from, to, BigDecimal.valueOf(120),
+                                PetSpecies.DOG, PetSpecies.CAT, PetSpecies.BIRD),
+                        ownerOffer(UUID.randomUUID(), from, to, BigDecimal.valueOf(120), PetSpecies.RABBIT),
                         offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
                                 from, to, BigDecimal.valueOf(120), null, null, OfferAnimalType.SMALL_ANIMAL)
                 ), new AtomicReference<>(), new AtomicReference<>()),
@@ -957,12 +1007,19 @@ class OfferServiceTest {
                 Optional.empty()
         );
 
-        List<OfferCardDto> result = offerService.searchOpenOffers(
+        List<OfferCardDto> dogOnlyResult = offerService.searchOpenOffers(
                 searchCriteria(OfferSearchMode.TIERHALTER, from, to,
                         OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100),
-                        null, null, Set.of(OfferAnimalType.DOG, OfferAnimalType.SMALL_ANIMAL)));
+                        null, null, Set.of(OfferAnimalType.DOG)));
 
-        assertThat(result).extracting(OfferCardDto::id).containsExactly(dogOfferId, rabbitOfferId);
+        List<OfferCardDto> dogAndCatResult = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERHALTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100),
+                        null, null, Set.of(OfferAnimalType.DOG, OfferAnimalType.CAT)));
+
+        assertThat(dogOnlyResult).extracting(OfferCardDto::id).containsExactly(dogOfferId);
+        assertThat(dogAndCatResult).extracting(OfferCardDto::id)
+                .containsExactly(dogOfferId, catOfferId, dogCatOfferId);
     }
 
     @Test
@@ -1303,9 +1360,12 @@ class OfferServiceTest {
     }
 
     private Offer ownerOffer(UUID offerId, LocalDate startDate, LocalDate endDate,
-            BigDecimal price, PetSpecies petSpecies) {
+            BigDecimal price, PetSpecies... petSpecies) {
         Offer offer = offer(offerId, OfferType.OWNER_OFFER, OfferStatus.OPEN, startDate, endDate, price);
-        offer.setPet(pet(UUID.randomUUID(), user(UUID.randomUUID()), "Testtier", petSpecies));
+        User owner = user(UUID.randomUUID());
+        offer.setPets(java.util.Arrays.stream(petSpecies)
+                .map(species -> pet(UUID.randomUUID(), owner, "Testtier", species))
+                .toList());
         return offer;
     }
 
@@ -1474,7 +1534,9 @@ class OfferServiceTest {
                         if (pet != null && pet.getId().equals(args[0])) {
                             return Optional.of(pet);
                         }
-                        return Optional.empty();
+                        return pets.stream()
+                                .filter(candidate -> candidate.getId().equals(args[0]))
+                                .findFirst();
                     }
                     if ("toString".equals(method.getName())) {
                         return "PetRepositoryTestDouble";

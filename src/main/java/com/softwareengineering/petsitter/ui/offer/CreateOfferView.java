@@ -17,7 +17,7 @@ import com.softwareengineering.petsitter.ui.user.UserView;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.combobox.ComboBox;
+import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
@@ -41,6 +41,7 @@ import jakarta.annotation.security.RolesAllowed;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -70,7 +71,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private CreateOfferRequest editOfferData;
     private TextField titleField;
     private Select<OfferAnimalType> animalTypeSelect;
-    private ComboBox<OfferPetOptionDto> petSelect;
+    private MultiSelectComboBox<OfferPetOptionDto> petSelect;
     private RadioButtonGroup<OfferFrequency> frequencyGroup;
     private DatePicker fromDatePicker;
     private DatePicker toDatePicker;
@@ -410,7 +411,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         section.setPadding(false);
         section.setSpacing(false);
 
-        NativeLabel label = new NativeLabel("Haustier auswählen");
+        NativeLabel label = new NativeLabel("Haustiere auswählen");
         label.getStyle()
                 .set("font-size", "15px")
                 .set("font-weight", "700")
@@ -418,10 +419,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("margin-bottom", "8px")
                 .set("display", "block");
 
-        petSelect = new ComboBox<>();
+        petSelect = new MultiSelectComboBox<>();
         petSelect.setItems(formData.pets());
         petSelect.setItemLabelGenerator(OfferPetOptionDto::label);
-        petSelect.setPlaceholder("Wähle ein Haustier");
+        petSelect.setPlaceholder("Wähle Haustiere");
         petSelect.setClearButtonVisible(true);
         petSelect.setWidthFull();
         petSelect.addValueChangeListener(event -> petSelect.setInvalid(false));
@@ -662,7 +663,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             System.out.println("  Tierart:     " + animalTypeSelect.getValue());
         }
         if (isOwnerOffer() && petSelect != null) {
-            System.out.println("  Haustier:    " + petSelect.getValue());
+            System.out.println("  Haustiere:   " + petSelect.getValue());
         }
         System.out.println("  Häufigkeit:  " + frequencyGroup.getValue());
         System.out.println("  Von:         " + fromDatePicker.getValue());
@@ -676,8 +677,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private void onPublishClicked() {
         try {
-            OfferPetOptionDto selectedPet = isOwnerOffer() ? petSelect.getValue() : null;
-            if (!validatePublishForm(selectedPet)) {
+            List<OfferPetOptionDto> selectedPets = isOwnerOffer() ? selectedPets() : List.of();
+            if (!validatePublishForm(selectedPets)) {
                 return;
             }
 
@@ -685,13 +686,13 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
             CreateOfferResult result;
             if (isEditMode()) {
-                result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPet, selectedAnimalType));
+                result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPets, selectedAnimalType));
                 showSuccess("Änderungen wurden gespeichert: " + result.offerId());
                 navigateToProfileOffers();
                 return;
             }
 
-            result = offerService.createOffer(buildRequest(selectedPet, selectedAnimalType));
+            result = offerService.createOffer(buildRequest(selectedPets, selectedAnimalType));
             showSuccess("Eintrag wurde gespeichert: " + result.offerId());
             clearForm();
         } catch (RuntimeException exception) {
@@ -699,7 +700,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         }
     }
 
-    private boolean validatePublishForm(OfferPetOptionDto selectedPet) {
+    private List<OfferPetOptionDto> selectedPets() {
+        return petSelect == null ? List.of() : new ArrayList<>(petSelect.getValue());
+    }
+
+    private boolean validatePublishForm(List<OfferPetOptionDto> selectedPets) {
         boolean valid = true;
 
         if (titleField.getValue().isBlank()) {
@@ -708,7 +713,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             valid = false;
         }
 
-        if (isOwnerOffer() && selectedPet == null && petSelect != null) {
+        if (isOwnerOffer() && selectedPets.isEmpty() && petSelect != null) {
             petSelect.setInvalid(true);
             petSelect.setErrorMessage("Pflichtfeld");
             valid = false;
@@ -742,12 +747,13 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         return valid;
     }
 
-    private CreateOfferRequest buildRequest(OfferPetOptionDto selectedPet, OfferAnimalType selectedAnimalType) {
+    private CreateOfferRequest buildRequest(List<OfferPetOptionDto> selectedPets, OfferAnimalType selectedAnimalType) {
         return new CreateOfferRequest(
                 currentOfferType,
                 fromDatePicker.getValue(),
                 toDatePicker.getValue(),
-                selectedPet == null ? null : selectedPet.id(),
+                null,
+                selectedPets.stream().map(OfferPetOptionDto::id).toList(),
                 priceField.getValue(),
                 titleField.getValue(),
                 frequencyGroup.getValue(),
@@ -855,7 +861,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             animalTypeSelect.setValue(editOfferData.animalType());
         }
         if (petSelect != null) {
-            petSelect.setValue(findPetOption(editOfferData.petId()));
+            petSelect.setValue(findPetOptions(editOfferData.petIds()));
         }
         frequencyGroup.setValue(editOfferData.frequency() != null ? editOfferData.frequency() : OfferFrequency.ONE_TIME);
         fromDatePicker.setValue(editableDateOrNull(editOfferData.startDate()));
@@ -867,14 +873,18 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         updatePriceSummary();
     }
 
-    private OfferPetOptionDto findPetOption(UUID petId) {
-        if (petId == null) {
-            return null;
+    private LinkedHashSet<OfferPetOptionDto> findPetOptions(List<UUID> petIds) {
+        LinkedHashSet<OfferPetOptionDto> selectedOptions = new LinkedHashSet<>();
+        if (petIds == null || petIds.isEmpty()) {
+            return selectedOptions;
         }
-        return formData.pets().stream()
-                .filter(option -> petId.equals(option.id()))
-                .findFirst()
-                .orElse(null);
+        for (UUID petId : petIds) {
+            formData.pets().stream()
+                    .filter(option -> petId.equals(option.id()))
+                    .findFirst()
+                    .ifPresent(selectedOptions::add);
+        }
+        return selectedOptions;
     }
 
     private LocalDate editableDateOrNull(LocalDate value) {

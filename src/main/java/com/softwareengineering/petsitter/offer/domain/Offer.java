@@ -11,13 +11,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -55,6 +60,13 @@ public class Offer {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pet_id")
     private Pet pet;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "offer_pet",
+            joinColumns = @JoinColumn(name = "offer_id"),
+            inverseJoinColumns = @JoinColumn(name = "pet_id"))
+    private Set<Pet> pets = new LinkedHashSet<>();
 
     @Column(name = "title", length = 120)
     private String title;
@@ -177,11 +189,35 @@ public class Offer {
     }
 
     public Pet getPet() {
-        return pet;
+        return getPets().stream().findFirst().orElse(null);
     }
 
     public void setPet(Pet pet) {
         this.pet = pet;
+        getPets().clear();
+        if (pet != null) {
+            getPets().add(pet);
+        }
+    }
+
+    public Set<Pet> getPets() {
+        if (pets == null) {
+            pets = new LinkedHashSet<>();
+        }
+        if (pets.isEmpty() && pet != null) {
+            pets.add(pet);
+        }
+        return pets;
+    }
+
+    public void setPets(Collection<Pet> pets) {
+        getPets().clear();
+        if (pets != null) {
+            pets.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(this.pets::add);
+        }
+        this.pet = getPets().stream().findFirst().orElse(null);
     }
 
     public String getTitle() {

@@ -297,23 +297,33 @@ public class OfferService {
             return offer.getAnimalType() != null && animalTypes.contains(offer.getAnimalType());
         }
         if (offer.getOfferType() == OfferType.OWNER_OFFER) {
-            return animalTypes.stream()
-                    .anyMatch(animalType -> matchesOwnerPetSpecies(offer.getPet(), animalType));
+            return matchesOwnerOfferPetTypes(offer, animalTypes);
         }
         return false;
     }
 
-    private boolean matchesOwnerPetSpecies(Pet pet, OfferAnimalType animalType) {
-        if (pet == null || pet.getSpecies() == null) {
-            return false;
+    private boolean matchesOwnerOfferPetTypes(Offer offer, Set<OfferAnimalType> allowedAnimalTypes) {
+        Set<OfferAnimalType> offerAnimalTypes = new LinkedHashSet<>();
+        for (Pet pet : offerPets(offer)) {
+            OfferAnimalType animalType = ownerPetAnimalType(pet);
+            if (animalType == null) {
+                return false;
+            }
+            offerAnimalTypes.add(animalType);
         }
-        return switch (animalType) {
-            case DOG -> pet.getSpecies() == PetSpecies.DOG;
-            case CAT -> pet.getSpecies() == PetSpecies.CAT;
-            case BIRD -> pet.getSpecies() == PetSpecies.BIRD;
-            case SMALL_ANIMAL -> pet.getSpecies() == PetSpecies.RABBIT;
-            case OTHER -> pet.getSpecies() == PetSpecies.OTHER;
-            case REPTILE, FISH -> false;
+        return !offerAnimalTypes.isEmpty() && allowedAnimalTypes.containsAll(offerAnimalTypes);
+    }
+
+    private OfferAnimalType ownerPetAnimalType(Pet pet) {
+        if (pet == null || pet.getSpecies() == null) {
+            return null;
+        }
+        return switch (pet.getSpecies()) {
+            case DOG -> OfferAnimalType.DOG;
+            case CAT -> OfferAnimalType.CAT;
+            case BIRD -> OfferAnimalType.BIRD;
+            case RABBIT -> OfferAnimalType.SMALL_ANIMAL;
+            case OTHER -> OfferAnimalType.OTHER;
         };
     }
 
@@ -438,7 +448,7 @@ public class OfferService {
     private OfferCardDto toCardDto(Offer offer, Integer distanceKm) {
         boolean verified = offer.getCreateUser() != null
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
-        Pet pet = offer.getPet();
+        List<Pet> pets = offerPets(offer);
         User createUser = offer.getCreateUser();
         return new OfferCardDto(
                 offer.getOfferId(),
@@ -451,9 +461,9 @@ public class OfferService {
                 offer.getDescription(),
                 offer.getFrequency(),
                 offer.getCareType(),
-                pet != null ? pet.getName() : null,
-                pet != null ? petSpeciesLabel(pet) : null,
-                pet != null ? pet.getBreed() : null,
+                petNames(pets),
+                petSpeciesLabels(pets),
+                petBreeds(pets),
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
                 distanceKm
@@ -461,7 +471,7 @@ public class OfferService {
     }
 
     private MyOfferCardDto toMyOfferCardDto(Offer offer) {
-        Pet pet = offer.getPet();
+        List<Pet> pets = offerPets(offer);
         return new MyOfferCardDto(
                 offer.getOfferId(),
                 titleOrFallback(offer),
@@ -473,9 +483,9 @@ public class OfferService {
                 offer.getDescription(),
                 offer.getFrequency(),
                 offer.getCareType(),
-                pet != null ? pet.getName() : null,
-                pet != null ? petSpeciesLabel(pet) : null,
-                pet != null ? pet.getBreed() : null,
+                petNames(pets),
+                petSpeciesLabels(pets),
+                petBreeds(pets),
                 offer.getAnimalType()
         );
     }
@@ -498,6 +508,34 @@ public class OfferService {
             case RABBIT -> "Kaninchen";
             default     -> pet.getSpecies().name();
         };
+    }
+
+    private List<Pet> offerPets(Offer offer) {
+        if (offer == null) {
+            return List.of();
+        }
+        return offer.getPets().stream().toList();
+    }
+
+    private String petNames(List<Pet> pets) {
+        return petSummary(pets, Pet::getName);
+    }
+
+    private String petSpeciesLabels(List<Pet> pets) {
+        return petSummary(pets, this::petSpeciesLabel);
+    }
+
+    private String petBreeds(List<Pet> pets) {
+        return petSummary(pets, Pet::getBreed);
+    }
+
+    private String petSummary(List<Pet> pets, java.util.function.Function<Pet, String> mapper) {
+        String value = pets.stream()
+                .map(mapper)
+                .filter(text -> text != null && !text.isBlank())
+                .distinct()
+                .collect(Collectors.joining(", "));
+        return value.isBlank() ? null : value;
     }
 
     @Transactional(readOnly = true)
@@ -572,7 +610,7 @@ public class OfferService {
         offer.setEndDate(request.endDate());
         offer.setCreateUser(currentUser);
         offer.setUpdateUser(currentUser);
-        offer.setPet(resolvePet(request.petId(), currentUser));
+        offer.setPets(resolvePets(request.petIds(), currentUser));
         offer.setTitle(cleanText(request.title()));
         offer.setFrequency(request.frequency());
         offer.setCareType(request.careType());
@@ -604,7 +642,7 @@ public class OfferService {
         offer.setStartDate(request.startDate());
         offer.setEndDate(request.endDate());
         offer.setUpdateUser(currentUser);
-        offer.setPet(resolvePet(request.petId(), currentUser));
+        offer.setPets(resolvePets(request.petIds(), currentUser));
         offer.setTitle(cleanText(request.title()));
         offer.setFrequency(request.frequency());
         offer.setCareType(request.careType());
@@ -814,6 +852,7 @@ public class OfferService {
                 offer.getStartDate(),
                 offer.getEndDate(),
                 offer.getPet() != null ? offer.getPet().getId() : null,
+                offerPets(offer).stream().map(Pet::getId).toList(),
                 offer.getPrice(),
                 offer.getTitle(),
                 offer.getFrequency(),
@@ -839,7 +878,7 @@ public class OfferService {
             throw new BusinessRuleViolationException("Das Enddatum muss am oder nach dem Startdatum liegen.");
         }
 
-        if (request.offerType() == OfferType.OWNER_OFFER && request.petId() == null) {
+        if (request.offerType() == OfferType.OWNER_OFFER && request.petIds().isEmpty()) {
             throw new BusinessRuleViolationException("Bitte ein Haustier fuer den Auftrag auswaehlen.");
         }
 
@@ -847,7 +886,7 @@ public class OfferService {
             throw new BusinessRuleViolationException("Tierarten werden nur bei Sitter-Angeboten gespeichert.");
         }
 
-        if (request.offerType() == OfferType.SITTER_OFFER && request.petId() != null) {
+        if (request.offerType() == OfferType.SITTER_OFFER && !request.petIds().isEmpty()) {
             throw new BusinessRuleViolationException("Sitter-Angebote duerfen kein eigenes Haustier enthalten.");
         }
 
@@ -872,6 +911,15 @@ public class OfferService {
             throw new ForbiddenOperationException("Pet gehoert nicht dem aktuellen User.");
         }
         return pet;
+    }
+
+    private List<Pet> resolvePets(List<UUID> petIds, User currentUser) {
+        if (petIds == null || petIds.isEmpty()) {
+            return List.of();
+        }
+        return petIds.stream()
+                .map(petId -> resolvePet(petId, currentUser))
+                .toList();
     }
 
     private String cleanText(String value) {

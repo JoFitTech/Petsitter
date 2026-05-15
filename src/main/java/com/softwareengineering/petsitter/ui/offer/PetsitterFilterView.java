@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.offer;
 
+import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
@@ -24,6 +25,7 @@ import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -43,6 +45,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 @Route(value = "petsitter-suche", layout = MainLayout.class)
 @PageTitle("Suche | Pawsitter")
@@ -66,6 +69,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     };
 
     private final OfferService offerService;
+    private final FavoriteService favoriteService;
 
     private H1 pageTitle;
     private Div leftBlob;
@@ -76,8 +80,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private OfferSearchCriteria currentCriteria;
 
     @Autowired
-    public PetsitterFilterView(OfferService offerService) {
+    public PetsitterFilterView(OfferService offerService, FavoriteService favoriteService) {
         this.offerService = offerService;
+        this.favoriteService = favoriteService;
         this.currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
 
         setSizeFull();
@@ -463,7 +468,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void renderOffers() {
-        List<OfferCardDto> offers = offerService.searchOpenOffers(currentCriteria);
+        List<OfferCardDto> offers = withFavoriteState(offerService.searchOpenOffers(currentCriteria));
 
         resultsLabel.setText(resultText(offers.size()));
         renderMapMarkers(offers);
@@ -532,8 +537,26 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
     }
 
-    private void onFavoriteClicked(OfferCardDto dto) {
-        // TODO: favoriteService.toggleFavorite(dto.id());
+    private boolean onFavoriteClicked(OfferCardDto dto) {
+        try {
+            boolean favorited = favoriteService.toggleCurrentUserFavorite(dto.id());
+            Notification.show(
+                    favorited ? "Offer zu Favoriten hinzugefügt." : "Offer aus Favoriten entfernt.",
+                    2500,
+                    Notification.Position.TOP_CENTER);
+            return favorited;
+        } catch (RuntimeException exception) {
+            Notification.show(exception.getMessage(), 3500, Notification.Position.TOP_CENTER);
+            return dto.favorited();
+        }
+    }
+
+    private List<OfferCardDto> withFavoriteState(List<OfferCardDto> offers) {
+        Set<UUID> favoriteOfferIds = favoriteService.favoriteOfferIdsForCurrentUser(
+                offers.stream().map(OfferCardDto::id).toList());
+        return offers.stream()
+                .map(offer -> offer.withFavorited(favoriteOfferIds.contains(offer.id())))
+                .toList();
     }
 
     private Div buildMapPanel() {

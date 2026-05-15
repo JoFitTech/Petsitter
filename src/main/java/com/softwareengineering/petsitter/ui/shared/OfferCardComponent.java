@@ -16,6 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class OfferCardComponent extends Div {
 
@@ -35,7 +36,7 @@ public class OfferCardComponent extends Div {
 
     public OfferCardComponent(OfferCardDto dto,
                               Consumer<OfferCardDto> onCardClick,
-                              Consumer<OfferCardDto> onFavoriteClick) {
+                              Function<OfferCardDto, Boolean> onFavoriteClick) {
         getStyle()
                 .set("background", "white")
                 .set("border-radius", "24px")
@@ -114,20 +115,27 @@ public class OfferCardComponent extends Div {
                 .set("margin", "0")
                 .set("color", DARK);
 
-        Button heartBtn = new Button(new Icon(VaadinIcon.HEART_O));
-        heartBtn.setAriaLabel("Als Favorit markieren");
+        Button heartBtn = new Button();
+        boolean[] favorited = {dto.favorited()};
+        updateFavoriteButton(heartBtn, favorited[0]);
         heartBtn.getStyle()
                 .set("width", "34px")
                 .set("height", "34px")
                 .set("min-width", "34px")
                 .set("border-radius", "50%")
                 .set("background", "transparent")
-                .set("color", "#b0a090")
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
                 .set("flex-shrink", "0");
-        heartBtn.addClickListener(e -> onFavoriteClick.accept(dto));
-        heartBtn.getElement().addEventListener("click", ev -> {}).addEventData("event.stopPropagation()");
+        heartBtn.addClickListener(e -> {
+            Boolean newFavoriteState = onFavoriteClick.apply(dto.withFavorited(favorited[0]));
+            if (newFavoriteState != null) {
+                favorited[0] = newFavoriteState;
+                updateFavoriteButton(heartBtn, favorited[0]);
+            }
+            playFavoriteAnimation(heartBtn);
+        });
+        heartBtn.getElement().executeJs("this.addEventListener('click', event => event.stopPropagation());");
 
         titleRow.add(cardTitle, heartBtn);
 
@@ -179,6 +187,24 @@ public class OfferCardComponent extends Div {
 
         box.add(labelSpan, valueSpan);
         return box;
+    }
+
+    private static void updateFavoriteButton(Button heartBtn, boolean favorited) {
+        Icon icon = new Icon(favorited ? VaadinIcon.HEART : VaadinIcon.HEART_O);
+        icon.setSize("19px");
+        heartBtn.setIcon(icon);
+        heartBtn.setAriaLabel(favorited ? "Aus Favoriten entfernen" : "Als Favorit markieren");
+        heartBtn.getStyle().set("color", favorited ? "#d94b4b" : "#b0a090");
+    }
+
+    private static void playFavoriteAnimation(Button heartBtn) {
+        heartBtn.getElement().executeJs("""
+                this.animate([
+                    { transform: 'scale(1)' },
+                    { transform: 'scale(1.22)' },
+                    { transform: 'scale(1)' }
+                ], { duration: 180, easing: 'ease-out' });
+                """);
     }
 
     static String colorFor(OfferAnimalType animalType) {

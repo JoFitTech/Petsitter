@@ -24,8 +24,31 @@ public record OfferCardDto(
         String petBreed,
         String postalCode,
         String city,
-        Integer distanceKm
+        Integer distanceKm,
+        boolean favorited
 ) {
+    public OfferCardDto(
+            UUID id,
+            String title,
+            LocalDate startDate,
+            LocalDate endDate,
+            BigDecimal price,
+            OfferAnimalType animalType,
+            boolean creatorVerified,
+            String description,
+            OfferFrequency frequency,
+            OfferCareType careType,
+            String petName,
+            String petSpecies,
+            String petBreed,
+            String postalCode,
+            String city,
+            Integer distanceKm
+    ) {
+        this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
+                frequency, careType, petName, petSpecies, petBreed, postalCode, city, distanceKm, false);
+    }
+
     public OfferCardDto(
             UUID id,
             String title,
@@ -42,6 +65,11 @@ public record OfferCardDto(
             String petBreed
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, null, null, null);
+                frequency, careType, petName, petSpecies, petBreed, null, null, null, false);
+    }
+
+    public OfferCardDto withFavorited(boolean favorited) {
+        return new OfferCardDto(id, title, startDate, endDate, price, animalType, creatorVerified, description,
+                frequency, careType, petName, petSpecies, petBreed, postalCode, city, distanceKm, favorited);
     }
 }

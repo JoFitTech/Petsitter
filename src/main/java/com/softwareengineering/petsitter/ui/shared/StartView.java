@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
@@ -8,6 +9,7 @@ import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.*;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
@@ -17,6 +19,8 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Route(value = "", layout = MainLayout.class)
 public class StartView extends VerticalLayout {
@@ -26,10 +30,12 @@ public class StartView extends VerticalLayout {
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
 
     private final OfferService offerService;
+    private final FavoriteService favoriteService;
 
     @Autowired
-    public StartView(OfferService offerService) {
+    public StartView(OfferService offerService, FavoriteService favoriteService) {
         this.offerService = offerService;
+        this.favoriteService = favoriteService;
         setWidthFull();
         setPadding(false);
         setSpacing(false);
@@ -230,7 +236,7 @@ public class StartView extends VerticalLayout {
                 .set("grid-template-columns", "repeat(auto-fit, minmax(300px, 1fr))")
                 .set("gap", "32px");
 
-        List<OfferCardDto> offers = offerService.getOpenOffersByType(OfferType.OWNER_OFFER);
+        List<OfferCardDto> offers = withFavoriteState(offerService.getOpenOffersByType(OfferType.OWNER_OFFER));
         offers.forEach(dto -> grid.add(new OfferCardComponent(dto, this::openOfferDialog, this::onFavoriteClicked)));
 
         section.add(heading, grid);
@@ -279,7 +285,25 @@ public class StartView extends VerticalLayout {
         new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
     }
 
-    private void onFavoriteClicked(OfferCardDto dto) {
-        // TODO: favoriteService.toggleFavorite(dto.id());
+    private boolean onFavoriteClicked(OfferCardDto dto) {
+        try {
+            boolean favorited = favoriteService.toggleCurrentUserFavorite(dto.id());
+            Notification.show(
+                    favorited ? "Offer zu Favoriten hinzugefügt." : "Offer aus Favoriten entfernt.",
+                    2500,
+                    Notification.Position.TOP_CENTER);
+            return favorited;
+        } catch (RuntimeException exception) {
+            Notification.show(exception.getMessage(), 3500, Notification.Position.TOP_CENTER);
+            return dto.favorited();
+        }
+    }
+
+    private List<OfferCardDto> withFavoriteState(List<OfferCardDto> offers) {
+        Set<UUID> favoriteOfferIds = favoriteService.favoriteOfferIdsForCurrentUser(
+                offers.stream().map(OfferCardDto::id).toList());
+        return offers.stream()
+                .map(offer -> offer.withFavorited(favoriteOfferIds.contains(offer.id())))
+                .toList();
     }
 }

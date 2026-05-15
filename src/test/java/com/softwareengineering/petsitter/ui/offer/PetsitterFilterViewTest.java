@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.offer;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
+import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import java.util.Collection;
 import java.util.Optional;
@@ -30,6 +31,11 @@ class PetsitterFilterViewTest {
 
         @Override
         public Optional<String> validateOriginPostalCode(String postalCode) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PostalCodeMapLocation> resolveSearchOriginLocation(String postalCode) {
             return Optional.empty();
         }
     }

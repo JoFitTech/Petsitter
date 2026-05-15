@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
+import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
@@ -1233,6 +1234,41 @@ class OfferServiceTest {
                 .contains("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
     }
 
+    @Test
+    void resolveSearchOriginLocationReturnsMapLocationForKnownPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of("49080", location("49080", "Osnabrueck", 52.2588709, 8.0327320)))
+        );
+
+        Optional<PostalCodeMapLocation> result = offerService.resolveSearchOriginLocation(" 49080 ");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().postalCode()).isEqualTo("49080");
+        assertThat(result.get().placeName()).isEqualTo("Osnabrueck");
+        assertThat(result.get().latitude()).isEqualByComparingTo("52.2588709");
+        assertThat(result.get().longitude()).isEqualByComparingTo("8.032732");
+    }
+
+    @Test
+    void resolveSearchOriginLocationReturnsEmptyForMissingOrInvalidPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of())
+        );
+
+        assertThat(offerService.resolveSearchOriginLocation(null)).isEmpty();
+        assertThat(offerService.resolveSearchOriginLocation("   ")).isEmpty();
+        assertThat(offerService.resolveSearchOriginLocation("1234")).isEmpty();
+        assertThat(offerService.resolveSearchOriginLocation("49205")).isEmpty();
+    }
+
     private OfferSearchCriteria searchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
             OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings) {
         return searchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, null, null, Set.of());
@@ -1370,11 +1406,15 @@ class OfferServiceTest {
     }
 
     private PostalCodeLocation location(String postalCode, double latitude, double longitude) {
+        return location(postalCode, postalCode, latitude, longitude);
+    }
+
+    private PostalCodeLocation location(String postalCode, String primaryPlaceName, double latitude, double longitude) {
         return new PostalCodeLocation(
                 "DE",
                 postalCode,
-                postalCode,
-                postalCode,
+                primaryPlaceName,
+                primaryPlaceName,
                 BigDecimal.valueOf(latitude),
                 BigDecimal.valueOf(longitude),
                 java.time.LocalDateTime.now());

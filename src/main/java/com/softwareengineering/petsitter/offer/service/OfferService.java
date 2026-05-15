@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.offer.service;
 
 import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
+import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
@@ -196,6 +197,30 @@ public class OfferService {
             return Optional.of("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
         }
         return Optional.empty();
+    }
+
+    @Transactional
+    public Optional<PostalCodeMapLocation> resolveSearchOriginLocation(String postalCode) {
+        if (postalCode == null || postalCode.isBlank() || postalCodeService == null) {
+            return Optional.empty();
+        }
+
+        String normalizedPostalCode = postalCodeService.normalizePostalCode(postalCode);
+        if (!postalCodeService.isValidGermanPostalCodeFormat(normalizedPostalCode)) {
+            return Optional.empty();
+        }
+
+        try {
+            return postalCodeService.findGermanLocation(normalizedPostalCode)
+                    .map(location -> new PostalCodeMapLocation(
+                            location.getPostalCode(),
+                            location.getPrimaryPlaceName(),
+                            location.getLatitude(),
+                            location.getLongitude()));
+        } catch (PostalCodeLookupException ex) {
+            LOGGER.info("Search map location lookup failed: originPostalCode={}", normalizedPostalCode, ex);
+            return Optional.empty();
+        }
     }
 
     @Transactional(readOnly = true)

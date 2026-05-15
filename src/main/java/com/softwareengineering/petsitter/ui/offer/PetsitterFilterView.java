@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.ui.offer;
 
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
+import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
@@ -17,6 +18,7 @@ import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dependency.JsModule;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
@@ -50,23 +52,13 @@ import java.util.UUID;
 @Route(value = "petsitter-suche", layout = MainLayout.class)
 @PageTitle("Suche | Pawsitter")
 @PermitAll
+@JsModule("./maps/pawsitter-map.ts")
 public class PetsitterFilterView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK       = "#4a3428";
     private static final String CREAM      = "#fbf8f1";
     private static final String ACCENT     = "#7b5236";
     private static final String CARD_BG    = "#ffffff";
-    private static final String BORDER_CLR = "#ead5ae";
-
-    private static final String[][] MAP_MARKER_POSITIONS = {
-        {"62%", "28%"},
-        {"56%", "38%"},
-        {"60%", "44%"},
-        {"52%", "50%"},
-        {"48%", "56%"},
-        {"60%", "58%"},
-        {"56%", "66%"},
-    };
 
     private final OfferService offerService;
     private final FavoriteService favoriteService;
@@ -76,7 +68,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private H2 resultsLabel;
     private Div filterBarContainer;
     private Div offerGrid;
-    private Div mapMarkerLayer;
+    private Div mapContainer;
+    private Span mapLocationLabel;
+    private Span mapStatusLabel;
     private OfferSearchCriteria currentCriteria;
 
     @Autowired
@@ -108,6 +102,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
 
         applyModeChrome();
         renderFilterBar();
+        renderMapLocation();
         renderOffers();
     }
 
@@ -471,7 +466,6 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         List<OfferCardDto> offers = withFavoriteState(offerService.searchOpenOffers(currentCriteria));
 
         resultsLabel.setText(resultText(offers.size()));
-        renderMapMarkers(offers);
         offerGrid.removeAll();
         if (offers.isEmpty()) {
             offerGrid.add(buildEmptyState());
@@ -484,19 +478,61 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 this::onFavoriteClicked)));
     }
 
-    private void renderMapMarkers(List<OfferCardDto> offers) {
-        mapMarkerLayer.removeAll();
-        for (int i = 0; i < offers.size() && i < MAP_MARKER_POSITIONS.length; i++) {
-            String[] position = MAP_MARKER_POSITIONS[i];
-            mapMarkerLayer.add(buildMapMarker(formatPrice(offers.get(i).price()), position[0], position[1], i == 0));
+    private void renderMapLocation() {
+        if (mapContainer == null) {
+            return;
         }
+
+        String originPostalCode = currentCriteria.originPostalCode();
+        if (originPostalCode == null || originPostalCode.isBlank()) {
+            showDefaultMap("Deutschland", "Keine Ausgangs-PLZ gefiltert.");
+            return;
+        }
+
+        offerService.resolveSearchOriginLocation(originPostalCode)
+                .ifPresentOrElse(
+                        this::showMapLocation,
+                        () -> showDefaultMap("Standort nicht verfügbar", "Die gefilterte PLZ konnte nicht aufgelöst werden."));
     }
 
-    private String formatPrice(BigDecimal price) {
-        if (price == null) {
-            return "–";
+    private void showMapLocation(PostalCodeMapLocation location) {
+        String label = formatMapLocation(location);
+        mapLocationLabel.setText(label);
+        mapStatusLabel.setText("Gefilterte Ausgangs-PLZ");
+        mapContainer.getElement().executeJs(
+                """
+                const element = this;
+                const showLocation = () => window.PawsitterMap.showLocation(element, $0, $1, $2);
+                const run = (attempts) => window.PawsitterMap
+                    ? showLocation()
+                    : attempts > 0 && window.requestAnimationFrame(() => run(attempts - 1));
+                run(20);
+                """,
+                location.latitude().doubleValue(),
+                location.longitude().doubleValue(),
+                label);
+    }
+
+    private void showDefaultMap(String title, String status) {
+        mapLocationLabel.setText(title);
+        mapStatusLabel.setText(status);
+        mapContainer.getElement().executeJs(
+                """
+                const element = this;
+                const showDefault = () => window.PawsitterMap.showDefault(element);
+                const run = (attempts) => window.PawsitterMap
+                    ? showDefault()
+                    : attempts > 0 && window.requestAnimationFrame(() => run(attempts - 1));
+                run(20);
+                """);
+    }
+
+    private String formatMapLocation(PostalCodeMapLocation location) {
+        String placeName = location.placeName() == null ? "" : location.placeName().trim();
+        if (placeName.isBlank()) {
+            return location.postalCode();
         }
-        return price.stripTrailingZeros().toPlainString() + " €";
+        return location.postalCode() + " " + placeName;
     }
 
     private String resultText(int count) {
@@ -569,189 +605,43 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 .set("box-shadow", "0 8px 32px rgba(74,52,40,0.14)")
                 .set("position", "sticky")
                 .set("top", "24px")
-                .set("align-self", "flex-start");
+                .set("align-self", "flex-start")
+                .set("background", CARD_BG);
 
-        Div mapArea = new Div();
-        mapArea.getStyle()
+        Div mapHeader = new Div();
+        mapHeader.getStyle()
+                .set("padding", "14px 16px 12px 16px")
+                .set("border-bottom", "1px solid #ead5ae")
+                .set("box-sizing", "border-box");
+
+        mapLocationLabel = new Span("Deutschland");
+        mapLocationLabel.getStyle()
+                .set("display", "block")
+                .set("font-size", "15px")
+                .set("font-weight", "800")
+                .set("line-height", "1.25")
+                .set("color", DARK);
+
+        mapStatusLabel = new Span("Keine Ausgangs-PLZ gefiltert.");
+        mapStatusLabel.getStyle()
+                .set("display", "block")
+                .set("font-size", "12px")
+                .set("font-weight", "700")
+                .set("line-height", "1.35")
+                .set("margin-top", "3px")
+                .set("color", "#7b7069");
+        mapHeader.add(mapLocationLabel, mapStatusLabel);
+
+        mapContainer = new Div();
+        mapContainer.getStyle()
                 .set("width", "100%")
-                .set("height", "640px")
-                .set("background", "linear-gradient(135deg, #e8f0e8 0%, #d5e8d5 40%, #c8dfd8 70%, #b8cfd8 100%)")
+                .set("height", "586px")
+                .set("background", "#e8efe8")
                 .set("position", "relative")
                 .set("overflow", "hidden");
 
-        addMapGridLines(mapArea);
-        addMapRoads(mapArea);
-
-        mapMarkerLayer = new Div();
-        mapMarkerLayer.getStyle()
-                .set("position", "absolute")
-                .set("inset", "0")
-                .set("pointer-events", "none");
-
-        mapArea.add(mapMarkerLayer, buildMapControls(), buildMapExpandButton(), buildMapAttribution());
-        mapWrapper.add(mapArea);
+        mapWrapper.add(mapHeader, mapContainer);
         return mapWrapper;
-    }
-
-    private Div buildMapMarker(String price, String left, String top, boolean highlighted) {
-        Div marker = new Div();
-        marker.getStyle()
-                .set("position", "absolute")
-                .set("left", left)
-                .set("top", top)
-                .set("transform", "translate(-50%, -50%)")
-                .set("background", highlighted ? DARK : CARD_BG)
-                .set("color", highlighted ? "white" : DARK)
-                .set("border", "2px solid " + (highlighted ? DARK : BORDER_CLR))
-                .set("border-radius", "20px")
-                .set("padding", "5px 12px")
-                .set("font-size", "13px")
-                .set("font-weight", "800")
-                .set("box-shadow", highlighted
-                        ? "0 4px 16px rgba(74,52,40,0.45)"
-                        : "0 3px 10px rgba(74,52,40,0.18)")
-                .set("cursor", "pointer")
-                .set("pointer-events", "auto")
-                .set("white-space", "nowrap")
-                .set("transition", "transform 0.15s ease");
-
-        marker.add(new Span(price));
-        marker.getElement().executeJs(
-                "this.addEventListener('mouseenter', () => this.style.transform='translate(-50%,-50%) scale(1.1)');"
-                        + "this.addEventListener('mouseleave', () => this.style.transform='translate(-50%,-50%) scale(1)');");
-        return marker;
-    }
-
-    private Div buildMapControls() {
-        Div controls = new Div();
-        controls.getStyle()
-                .set("position", "absolute")
-                .set("right", "12px")
-                .set("top", "56px")
-                .set("display", "flex")
-                .set("flex-direction", "column")
-                .set("gap", "2px");
-
-        controls.add(mapControlBtn("+"), mapControlBtn("−"));
-        return controls;
-    }
-
-    private Div buildMapExpandButton() {
-        Div expandBtn = new Div();
-        expandBtn.getStyle()
-                .set("position", "absolute")
-                .set("top", "12px")
-                .set("right", "12px")
-                .set("width", "34px")
-                .set("height", "34px")
-                .set("background", CARD_BG)
-                .set("border-radius", "8px")
-                .set("box-shadow", "0 2px 8px rgba(0,0,0,0.2)")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("cursor", "pointer");
-
-        Icon expandIcon = new Icon(VaadinIcon.EXPAND_FULL);
-        expandIcon.setSize("16px");
-        expandBtn.add(expandIcon);
-        return expandBtn;
-    }
-
-    private Span buildMapAttribution() {
-        Span attribution = new Span("Google Karte — Karzbehler © 2026 Google");
-        attribution.getStyle()
-                .set("position", "absolute")
-                .set("bottom", "6px")
-                .set("left", "8px")
-                .set("font-size", "10px")
-                .set("color", "#555")
-                .set("background", "rgba(255,255,255,0.8)")
-                .set("padding", "2px 6px")
-                .set("border-radius", "4px");
-        return attribution;
-    }
-
-    private Div mapControlBtn(String symbol) {
-        Div button = new Div();
-        button.getStyle()
-                .set("width", "34px")
-                .set("height", "34px")
-                .set("background", CARD_BG)
-                .set("box-shadow", "0 2px 8px rgba(0,0,0,0.2)")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("font-size", "20px")
-                .set("font-weight", "700")
-                .set("color", DARK)
-                .set("cursor", "pointer")
-                .set("user-select", "none");
-        button.add(new Span(symbol));
-        return button;
-    }
-
-    private void addMapGridLines(Div mapArea) {
-        String[] verticals = {"20%", "40%", "60%", "80%"};
-        String[] horizontals = {"15%", "30%", "45%", "60%", "75%", "90%"};
-
-        for (String pos : verticals) {
-            Div line = new Div();
-            line.getStyle()
-                    .set("position", "absolute")
-                    .set("left", pos)
-                    .set("top", "0")
-                    .set("width", "1px")
-                    .set("height", "100%")
-                    .set("background", "rgba(160,180,160,0.35)");
-            mapArea.add(line);
-        }
-        for (String pos : horizontals) {
-            Div line = new Div();
-            line.getStyle()
-                    .set("position", "absolute")
-                    .set("top", pos)
-                    .set("left", "0")
-                    .set("height", "1px")
-                    .set("width", "100%")
-                    .set("background", "rgba(160,180,160,0.35)");
-            mapArea.add(line);
-        }
-    }
-
-    private void addMapRoads(Div mapArea) {
-        Div road1 = new Div();
-        road1.getStyle()
-                .set("position", "absolute")
-                .set("top", "52%")
-                .set("left", "0")
-                .set("height", "5px")
-                .set("width", "100%")
-                .set("background", "rgba(255,255,240,0.7)")
-                .set("border-top", "1px solid rgba(200,200,180,0.5)")
-                .set("border-bottom", "1px solid rgba(200,200,180,0.5)");
-
-        Div road2 = new Div();
-        road2.getStyle()
-                .set("position", "absolute")
-                .set("top", "20%")
-                .set("left", "-10%")
-                .set("height", "4px")
-                .set("width", "130%")
-                .set("background", "rgba(255,255,240,0.6)")
-                .set("transform", "rotate(22deg)")
-                .set("transform-origin", "left center");
-
-        Div road3 = new Div();
-        road3.getStyle()
-                .set("position", "absolute")
-                .set("left", "55%")
-                .set("top", "0")
-                .set("width", "5px")
-                .set("height", "100%")
-                .set("background", "rgba(255,255,240,0.6)");
-
-        mapArea.add(road1, road2, road3);
     }
 
     private OfferSearchCriteria defaultCriteria(OfferSearchMode mode) {

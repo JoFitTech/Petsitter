@@ -234,17 +234,9 @@ public class OfferService {
     private boolean matchesDateRange(Offer offer, OfferSearchCriteria criteria) {
         return switch (criteria.dateFilterMode()) {
             case ANY -> true;
-            case EXACT -> matchesExactDateRange(offer, criteria.from(), criteria.to());
             case CONTAINED -> matchesContainedDateRange(offer, criteria.from(), criteria.to());
             case OVERLAP -> matchesFlexibleDateRange(offer, criteria.from(), criteria.to(), criteria.dateFlexDays());
         };
-    }
-
-    private boolean matchesExactDateRange(Offer offer, LocalDate from, LocalDate to) {
-        return from != null
-                && to != null
-                && offer.getStartDate().equals(from)
-                && offer.getEndDate().equals(to);
     }
 
     private boolean matchesContainedDateRange(Offer offer, LocalDate from, LocalDate to) {

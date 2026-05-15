@@ -356,7 +356,7 @@ public class FilterSearchBar extends Div {
 
     private RadioButtonGroup<OfferDateFilterMode> dateModeGroup() {
         RadioButtonGroup<OfferDateFilterMode> group = new RadioButtonGroup<>();
-        group.setItems(OfferDateFilterMode.ANY, OfferDateFilterMode.EXACT,
+        group.setItems(OfferDateFilterMode.ANY,
                 OfferDateFilterMode.CONTAINED, OfferDateFilterMode.OVERLAP);
         group.setValue(selectedDateFilterMode);
         group.setItemLabelGenerator(this::dateModeLabel);
@@ -383,7 +383,6 @@ public class FilterSearchBar extends Div {
     private String dateModeLabel(OfferDateFilterMode mode) {
         return switch (mode) {
             case ANY       -> "Zeitlich flexibel";
-            case EXACT     -> "Exakter Zeitraum";
             case CONTAINED -> "Innerhalb des Zeitraums";
             case OVERLAP   -> "Zeitraum mit Toleranz";
         };
@@ -604,7 +603,6 @@ public class FilterSearchBar extends Div {
         String formattedRange = formatPlainDateRange();
         return switch (selectedDateFilterMode) {
             case ANY -> "Zeitlich flexibel";
-            case EXACT -> "Exakt " + formattedRange;
             case CONTAINED -> "Innerhalb " + formattedRange;
             case OVERLAP -> selectedDateFlexDays > 0
                     ? formattedRange + " +/- " + selectedDateFlexDays + " Tage"

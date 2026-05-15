@@ -4,7 +4,6 @@ import java.util.Locale;
 
 public enum OfferDateFilterMode {
     ANY("any"),
-    EXACT("exact"),
     CONTAINED("contained"),
     OVERLAP("overlap");
 

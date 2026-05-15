@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
+import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
@@ -19,6 +20,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
@@ -1233,6 +1235,70 @@ class OfferServiceTest {
                 .contains("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");
     }
 
+    @Test
+    void resolveSearchOriginLocationReturnsMapLocationForKnownPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of("49080", location("49080", "Osnabrueck", 52.2588709, 8.0327320)))
+        );
+
+        Optional<PostalCodeMapLocation> result = offerService.resolveSearchOriginLocation(" 49080 ");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().postalCode()).isEqualTo("49080");
+        assertThat(result.get().placeName()).isEqualTo("Osnabrueck");
+        assertThat(result.get().latitude()).isEqualByComparingTo("52.2588709");
+        assertThat(result.get().longitude()).isEqualByComparingTo("8.032732");
+    }
+
+    @Test
+    void resolveSearchOriginLocationReturnsEmptyForMissingOrInvalidPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of())
+        );
+
+        assertThat(offerService.resolveSearchOriginLocation(null)).isEmpty();
+        assertThat(offerService.resolveSearchOriginLocation("   ")).isEmpty();
+        assertThat(offerService.resolveSearchOriginLocation("1234")).isEmpty();
+        assertThat(offerService.resolveSearchOriginLocation("49205")).isEmpty();
+    }
+
+    @Test
+    void resolveOfferMapLocationsReturnsCoordinatesForFilteredOffers() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of(
+                        "10115", location("10115", "Berlin", 52.5321, 13.3849),
+                        "49080", location("49080", "Osnabrueck", 52.2588709, 8.0327320)))
+        );
+        UUID firstOfferId = UUID.randomUUID();
+        UUID secondOfferId = UUID.randomUUID();
+
+        List<OfferMapLocation> result = offerService.resolveOfferMapLocations(List.of(
+                offerCard(firstOfferId, "Sitter in Berlin", "10115", "Berlin"),
+                offerCard(secondOfferId, "Betreuung in Osnabrueck", "49080", "Osnabrueck"),
+                offerCard(UUID.randomUUID(), "Ohne Koordinaten", "99999", "Unbekannt"),
+                offerCard(UUID.randomUUID(), "Ungueltige PLZ", "1234", "Unbekannt")));
+
+        assertThat(result).extracting(OfferMapLocation::offerId).containsExactly(firstOfferId, secondOfferId);
+        assertThat(result).extracting(OfferMapLocation::title)
+                .containsExactly("Sitter in Berlin", "Betreuung in Osnabrueck");
+        assertThat(result).extracting(OfferMapLocation::postalCode).containsExactly("10115", "49080");
+        assertThat(result).extracting(OfferMapLocation::placeName).containsExactly("Berlin", "Osnabrueck");
+        assertThat(result.getFirst().latitude()).isEqualByComparingTo("52.5321");
+        assertThat(result.getFirst().longitude()).isEqualByComparingTo("13.3849");
+    }
+
     private OfferSearchCriteria searchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
             OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings) {
         return searchCriteria(mode, from, to, dateFilterMode, dateFlexDays, earnings, null, null, Set.of());
@@ -1336,6 +1402,28 @@ class OfferServiceTest {
         return pet;
     }
 
+    private OfferCardDto offerCard(UUID offerId, String title, String postalCode, String city) {
+        return new OfferCardDto(
+                offerId,
+                title,
+                LocalDate.of(2026, 6, 15),
+                LocalDate.of(2026, 6, 18),
+                BigDecimal.valueOf(80),
+                OfferAnimalType.DOG,
+                true,
+                "Beschreibung",
+                OfferFrequency.ONE_TIME,
+                OfferCareType.PET_SITTING,
+                null,
+                null,
+                null,
+                postalCode,
+                city,
+                null,
+                false,
+                OfferType.SITTER_OFFER);
+    }
+
     private Offer offer(UUID offerId, OfferType offerType, OfferStatus status,
             LocalDate startDate, LocalDate endDate, BigDecimal price) {
         Offer offer = new Offer();
@@ -1370,11 +1458,15 @@ class OfferServiceTest {
     }
 
     private PostalCodeLocation location(String postalCode, double latitude, double longitude) {
+        return location(postalCode, postalCode, latitude, longitude);
+    }
+
+    private PostalCodeLocation location(String postalCode, String primaryPlaceName, double latitude, double longitude) {
         return new PostalCodeLocation(
                 "DE",
                 postalCode,
-                postalCode,
-                postalCode,
+                primaryPlaceName,
+                primaryPlaceName,
                 BigDecimal.valueOf(latitude),
                 BigDecimal.valueOf(longitude),
                 java.time.LocalDateTime.now());

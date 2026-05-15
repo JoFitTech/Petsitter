@@ -60,6 +60,7 @@ public class FilterSearchBar extends Div {
     private final Function<String, Optional<String>> originPostalCodeValidator;
 
     private TextField originPostalCodeField;
+    private Span distancePostalCodeValue;
     private LocalDate selectedFrom;
     private LocalDate selectedTo;
     private OfferDateFilterMode selectedDateFilterMode;
@@ -67,15 +68,6 @@ public class FilterSearchBar extends Div {
     private BigDecimal selectedEarnings;
     private int selectedDistance;
     private String selectedOriginPostalCode;
-
-    public FilterSearchBar(EarningsMode earningsMode, Consumer<SearchCriteria> onSearch) {
-        this(earningsMode, defaultCriteria(), onSearch);
-    }
-
-    public FilterSearchBar(EarningsMode earningsMode, SearchCriteria initialCriteria,
-            Consumer<SearchCriteria> onSearch) {
-        this(earningsMode, initialCriteria, postalCode -> Optional.empty(), onSearch);
-    }
 
     public FilterSearchBar(EarningsMode earningsMode, SearchCriteria initialCriteria,
             Function<String, Optional<String>> originPostalCodeValidator,
@@ -108,7 +100,7 @@ public class FilterSearchBar extends Div {
 
         FilterPill whenField = filterPill("📅", "Wann?", formatDateRange(), true);
         FilterPill earningsField = filterPill("€", "Verdienst", formatEarningsValue(), false);
-        FilterPill distanceField = filterPill("↕", "Entfernung", "bis " + selectedDistance + " km", false);
+        FilterPill distanceField = distancePill();
 
         whenValue = whenField.value();
         earningsValue = earningsField.value();
@@ -179,6 +171,57 @@ public class FilterSearchBar extends Div {
                 new BigDecimal("80"),
                 5,
                 originPostalCode);
+    }
+
+    private FilterPill distancePill() {
+        Div pill = new Div();
+        pill.getStyle()
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("gap", "10px")
+                .set("flex", "1")
+                .set("padding", "0 20px")
+                .set("cursor", "pointer");
+        pill.getElement().setAttribute("role", "button");
+        pill.getElement().setAttribute("tabindex", "0");
+
+        Span iconSpan = new Span("↕");
+        iconSpan.getStyle()
+                .set("font-size", "20px")
+                .set("color", BROWN)
+                .set("flex-shrink", "0");
+
+        VerticalLayout text = new VerticalLayout();
+        text.setPadding(false);
+        text.setSpacing(false);
+
+        Span labelSpan = new Span("Entfernung");
+        labelSpan.getStyle()
+                .set("font-size", "11px")
+                .set("color", LABEL)
+                .set("font-weight", "700")
+                .set("letter-spacing", "0.3px");
+
+        Span valueSpan = new Span("bis " + selectedDistance + " km");
+        valueSpan.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("color", DARK);
+
+        distancePostalCodeValue = new Span(formatDistancePostalCode());
+        distancePostalCodeValue.getStyle()
+                .set("font-size", "11px")
+                .set("color", LABEL)
+                .set("font-weight", "700")
+                .set("letter-spacing", "0.3px");
+
+        text.add(labelSpan, valueSpan, distancePostalCodeValue);
+        pill.add(iconSpan, text);
+        return new FilterPill(pill, valueSpan);
+    }
+
+    private String formatDistancePostalCode() {
+        return selectedOriginPostalCode != null ? "ab " + selectedOriginPostalCode : "PLZ eingeben";
     }
 
     private FilterPill filterPill(String icon, String label, String value, boolean first) {
@@ -452,6 +495,7 @@ public class FilterSearchBar extends Div {
             if (selectedOriginPostalCode == null || selectedOriginPostalCode.length() <= 5) {
                 originPostalCodeField.setInvalid(false);
             }
+            distancePostalCodeValue.setText(formatDistancePostalCode());
         });
 
         Span currentValue = new Span(selectedDistance + " km");
@@ -648,11 +692,6 @@ public class FilterSearchBar extends Div {
             int distanceKm,
             String originPostalCode
     ) {
-        public SearchCriteria(LocalDate from, LocalDate to, OfferDateFilterMode dateFilterMode,
-                int dateFlexDays, BigDecimal earnings, int distanceKm) {
-            this(from, to, dateFilterMode, dateFlexDays, earnings, distanceKm, null);
-        }
-
         public SearchCriteria {
             if (dateFilterMode == null) {
                 dateFilterMode = OfferDateFilterMode.OVERLAP;

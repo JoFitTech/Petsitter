@@ -103,11 +103,6 @@ public class OfferService {
     }
 
     OfferService(OfferRepository offerRepository, PetRepository petRepository,
-            AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules) {
-        this(offerRepository, petRepository, authenticatedUser, createOfferFormRules, null);
-    }
-
-    OfferService(OfferRepository offerRepository, PetRepository petRepository,
             AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules,
             PostalCodeService postalCodeService) {
         this.offerRepository = offerRepository;
@@ -183,7 +178,7 @@ public class OfferService {
     @Transactional
     public Optional<String> validateOriginPostalCode(String postalCode) {
         if (postalCode == null || postalCode.isBlank()) {
-            return Optional.empty();
+            return Optional.of("Bitte eine Ausgangs-PLZ eingeben.");
         }
         if (postalCodeService == null) {
             return Optional.of("Die Postleitzahl konnte gerade nicht überprüft werden. Bitte später erneut versuchen.");

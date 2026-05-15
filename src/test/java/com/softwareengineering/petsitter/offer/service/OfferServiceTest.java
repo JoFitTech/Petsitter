@@ -1098,6 +1098,21 @@ class OfferServiceTest {
     }
 
     @Test
+    void validateOriginPostalCodeRejectsBlankPostalCode() {
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(new AtomicReference<>(), new AtomicInteger()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeServiceWithLookup(Map.of())
+        );
+
+        assertThat(offerService.validateOriginPostalCode(null)).contains("Bitte eine Ausgangs-PLZ eingeben.");
+        assertThat(offerService.validateOriginPostalCode("")).contains("Bitte eine Ausgangs-PLZ eingeben.");
+        assertThat(offerService.validateOriginPostalCode("   ")).contains("Bitte eine Ausgangs-PLZ eingeben.");
+    }
+
+    @Test
     void validateOriginPostalCodeAcceptsKnownPostalCode() {
         OfferService offerService = serviceWithAuthenticatedUser(
                 offerRepository(new AtomicReference<>(), new AtomicInteger()),

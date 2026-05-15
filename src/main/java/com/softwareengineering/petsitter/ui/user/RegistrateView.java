@@ -246,6 +246,59 @@ public class RegistrateView extends VerticalLayout {
                 rowStrasseHaus, rowPlzOrt, rowLand
         );
 
+        // ── Step 3: Code confirmation layout ──────────────────────────────
+        VerticalLayout codeLayout = new VerticalLayout();
+        codeLayout.setPadding(false);
+        codeLayout.setSpacing(false);
+        codeLayout.getStyle().set("gap", "12px");
+        codeLayout.setVisible(false);
+
+        H2 codeHeading = sectionHeading("Bestätigungscode eingeben");
+
+        Paragraph codeHint = new Paragraph("Der Code wurde per E-Mail gesendet.");
+        codeHint.getStyle()
+                .set("margin", "0")
+                .set("font-size", "13px")
+                .set("color", "#8a7060");
+
+        TextField codeField = pillTextField("Bestätigungscode");
+
+        Button confirmBtn = new Button("Code bestätigen");
+        confirmBtn.setWidthFull();
+        confirmBtn.getStyle()
+                .set("background", BROWN_BTN)
+                .set("color", "white")
+                .set("border-radius", "28px")
+                .set("height", "48px")
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        confirmBtn.addClickListener(e -> {
+            clearMessages();
+            String email = currentRegistrationEmail == null || currentRegistrationEmail.isBlank()
+                    ? emailField.getValue()
+                    : currentRegistrationEmail;
+            UserAuthResult result = userService.completeRegistration(new UserRegistrationConfirmationRequest(
+                    email,
+                    codeField.getValue()));
+            handleAuthResult(result);
+        });
+
+        codeLayout.add(codeHeading, codeHint, codeField, confirmBtn);
+
+        // ── "Bereits registriert?" link ────────────────────────────────────
+        Span loginBtn = new Span("Bereits registriert? Hier einloggen");
+        loginBtn.getStyle()
+                .set("color", LINK_CLR)
+                .set("font-size", "14px")
+                .set("font-weight", "600")
+                .set("cursor", "pointer")
+                .set("text-decoration", "underline")
+                .set("margin-top", "4px")
+                .set("align-self", "center");
+        loginBtn.addClickListener(e -> UI.getCurrent().navigate("login"));
+
         // ── Register button ────────────────────────────────────────────────
         Button registerBtn = new Button("Weiter");
         registerBtn.setWidthFull();
@@ -278,61 +331,24 @@ public class RegistrateView extends VerticalLayout {
                         postalCodeField.getValue(),
                         cityField.getValue(),
                         null), currentRequestIp());
-                showResult(result);
+                if (result.success()) {
+                    tabs.setVisible(false);
+                    datenLayout.setVisible(false);
+                    registerBtn.setVisible(false);
+                    loginBtn.setVisible(false);
+                    codeLayout.setVisible(true);
+                    showStatus(result.message());
+                } else {
+                    showError(result.message());
+                }
             }
         });
 
-        TextField codeField = pillTextField("Bestätigungscode");
-        Button confirmBtn = new Button("Code bestätigen");
-        confirmBtn.setWidthFull();
-        confirmBtn.getStyle()
-                .set("background", BROWN_BTN)
-                .set("color", "white")
-                .set("border-radius", "28px")
-                .set("height", "48px")
-                .set("font-size", "15px")
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        confirmBtn.addClickListener(e -> {
-            clearMessages();
-            String email = currentRegistrationEmail == null || currentRegistrationEmail.isBlank()
-                    ? emailField.getValue()
-                    : currentRegistrationEmail;
-            UserAuthResult result = userService.completeRegistration(new UserRegistrationConfirmationRequest(
-                    email,
-                    codeField.getValue()));
-            handleAuthResult(result);
-        });
-
-        Paragraph codeHint = new Paragraph("Nach der Registrierung kommt der Code per E-Mail.");
-        codeHint.getStyle()
-                .set("margin", "16px 0 0 0")
-                .set("font-size", "13px")
-                .set("color", "#8a7060")
-                .set("align-self", "center");
-
-        // ── "Bereits registriert?" link ────────────────────────────────────
-        Span loginBtn = new Span("Bereits registriert? Hier einloggen");
-        loginBtn.getStyle()
-                .set("color", LINK_CLR)
-                .set("font-size", "14px")
-                .set("font-weight", "600")
-                .set("cursor", "pointer")
-                .set("text-decoration", "underline")
-                .set("margin-top", "4px")
-                .set("align-self", "center");
-        loginBtn.addClickListener(e -> {
-            UI.getCurrent().navigate("login");
-        });
         kontoTab.addClickListener(e -> {
             styleTabButton(kontoTab, true);
             styleTabButton(datenTab, false);
             kontoLayout.setVisible(true);
             datenLayout.setVisible(false);
-            codeHint.setVisible(true);
-            codeField.setVisible(true);
-            confirmBtn.setVisible(true);
             registerBtn.setText("Weiter");
         });
 
@@ -341,9 +357,6 @@ public class RegistrateView extends VerticalLayout {
             styleTabButton(datenTab, true);
             kontoLayout.setVisible(false);
             datenLayout.setVisible(true);
-            codeHint.setVisible(false);
-            codeField.setVisible(false);
-            confirmBtn.setVisible(false);
             registerBtn.setText("Registrieren & Starten");
         });
 
@@ -351,7 +364,8 @@ public class RegistrateView extends VerticalLayout {
                 tabs,
                 kontoLayout,
                 datenLayout,
-                registerBtn, codeHint, codeField, confirmBtn, loginBtn
+                codeLayout,
+                registerBtn, loginBtn
         );
         return form;
     }

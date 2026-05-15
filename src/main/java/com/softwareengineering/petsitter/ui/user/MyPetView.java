@@ -1,8 +1,13 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.pet.dto.PetDeletionAction;
+import com.softwareengineering.petsitter.pet.dto.PetDeletionDecision;
+import com.softwareengineering.petsitter.pet.dto.PetDeletionImpact;
+import com.softwareengineering.petsitter.pet.dto.PetDeletionOfferImpact;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.service.PetService;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
@@ -12,9 +17,13 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.radiobutton.RadioButtonGroup;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public class MyPetView extends Div {
 
@@ -228,8 +237,24 @@ public class MyPetView extends Div {
     }
 
     private void confirmDelete(PetDto pet) {
+        PetDeletionImpact impact;
+        try {
+            impact = petService.analyzeCurrentUserPetDeletion(pet.id());
+        } catch (Exception ex) {
+            Notification.show("Fehler: " + ex.getMessage(), 3500, Notification.Position.TOP_CENTER);
+            return;
+        }
+
+        if (impact.hasBlockingOffers()) {
+            openBlockedDeleteDialog(pet, impact);
+            return;
+        }
+        openDeleteDecisionDialog(pet, impact);
+    }
+
+    private void openDeleteDecisionDialog(PetDto pet, PetDeletionImpact impact) {
         Dialog confirm = new Dialog();
-        confirm.setWidth("360px");
+        confirm.setWidth(impact.hasAffectedOffers() ? "560px" : "360px");
         confirm.setCloseOnEsc(true);
         confirm.setCloseOnOutsideClick(false);
 
@@ -238,15 +263,26 @@ public class MyPetView extends Div {
         layout.setSpacing(false);
         layout.getStyle().set("gap", "20px");
 
-        Span msg = new Span("Möchtest du " + pet.name() + " wirklich löschen?");
-        msg.getStyle().set("font-size", "15px").set("color", DARK).set("font-weight", "600");
+        H3 title = new H3("Tier löschen?");
+        title.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
+
+        Paragraph msg = new Paragraph(deleteDialogMessage(pet, impact));
+        msg.getStyle().set("margin", "0").set("font-size", "15px").set("color", DARK).set("font-weight", "600")
+                .set("line-height", "1.5");
+
+        Map<UUID, RadioButtonGroup<PetDeletionAction>> decisionGroups = new LinkedHashMap<>();
+        if (impact.hasAffectedOffers()) {
+            layout.add(title, msg, buildAffectedOffersSection(impact, decisionGroups));
+        } else {
+            layout.add(title, msg);
+        }
 
         Button yes = styledSaveBtn("Löschen");
         Button no = styledCancelBtn("Abbrechen");
         no.addClickListener(e -> confirm.close());
         yes.addClickListener(e -> {
             try {
-                petService.deletePet(pet.id());
+                petService.deleteCurrentUserPet(pet.id(), selectedDecisions(impact, decisionGroups));
                 confirm.close();
                 Notification.show(pet.name() + " wurde gelöscht.", 2500, Notification.Position.TOP_CENTER);
                 loadPets();
@@ -260,9 +296,133 @@ public class MyPetView extends Div {
         btns.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
         btns.getStyle().set("gap", "10px");
 
-        layout.add(msg, btns);
+        layout.add(btns);
         confirm.add(layout);
         confirm.open();
+    }
+
+    private void openBlockedDeleteDialog(PetDto pet, PetDeletionImpact impact) {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("560px");
+        dialog.setCloseOnEsc(true);
+        dialog.setCloseOnOutsideClick(false);
+
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.getStyle().set("gap", "18px");
+
+        H3 title = new H3("Tier kann noch nicht gelöscht werden");
+        title.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
+
+        Paragraph msg = new Paragraph(pet.name()
+                + " ist noch in gebuchten oder stornierten Angeboten hinterlegt. Diese Fälle werden später über die Buchungslogik bereinigt, damit beteiligte Sitter informiert werden können.");
+        msg.getStyle().set("margin", "0").set("font-size", "15px").set("color", DARK).set("line-height", "1.5");
+
+        Button ok = styledSaveBtn("Verstanden");
+        ok.addClickListener(event -> dialog.close());
+        HorizontalLayout btns = new HorizontalLayout(ok);
+        btns.setWidthFull();
+        btns.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+
+        layout.add(title, msg, buildBlockingOffersSection(impact), btns);
+        dialog.add(layout);
+        dialog.open();
+    }
+
+    private Component buildAffectedOffersSection(PetDeletionImpact impact,
+            Map<UUID, RadioButtonGroup<PetDeletionAction>> decisionGroups) {
+        VerticalLayout list = new VerticalLayout();
+        list.setPadding(false);
+        list.setSpacing(false);
+        list.getStyle().set("gap", "12px");
+
+        for (PetDeletionOfferImpact offer : impact.offers()) {
+            Div item = offerImpactItem(offer);
+            if (offer.requiresDecision()) {
+                RadioButtonGroup<PetDeletionAction> group = new RadioButtonGroup<>();
+                group.setItems(offer.availableActions());
+                group.setItemLabelGenerator(this::actionLabel);
+                group.setValue(PetDeletionAction.REMOVE_PET_FROM_OFFER);
+                group.getStyle().set("margin-top", "8px");
+                decisionGroups.put(offer.offerId(), group);
+                item.add(group);
+            } else {
+                Span action = new Span("Dieses Angebot enthält nur dieses Tier und wird mit gelöscht.");
+                action.getStyle().set("display", "block").set("margin-top", "8px")
+                        .set("font-size", "13px").set("font-weight", "700").set("color", "#9a4f36");
+                item.add(action);
+            }
+            list.add(item);
+        }
+        return list;
+    }
+
+    private Component buildBlockingOffersSection(PetDeletionImpact impact) {
+        VerticalLayout list = new VerticalLayout();
+        list.setPadding(false);
+        list.setSpacing(false);
+        list.getStyle().set("gap", "12px");
+
+        impact.offers().stream()
+                .filter(PetDeletionOfferImpact::blocksDeletion)
+                .map(this::offerImpactItem)
+                .forEach(list::add);
+        return list;
+    }
+
+    private Div offerImpactItem(PetDeletionOfferImpact offer) {
+        Div item = new Div();
+        item.getStyle()
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "12px")
+                .set("background", "#fbf8f1")
+                .set("padding", "14px 16px");
+
+        Span title = new Span(offer.title());
+        title.getStyle().set("display", "block").set("font-weight", "800").set("font-size", "15px").set("color", DARK);
+
+        Span details = new Span(statusLabel(offer) + " · " + offer.petCount()
+                + (offer.petCount() == 1 ? " Tier" : " Tiere"));
+        details.getStyle().set("display", "block").set("margin-top", "4px")
+                .set("font-size", "13px").set("font-weight", "700").set("color", "#7a6050");
+
+        item.add(title, details);
+        return item;
+    }
+
+    private List<PetDeletionDecision> selectedDecisions(PetDeletionImpact impact,
+            Map<UUID, RadioButtonGroup<PetDeletionAction>> decisionGroups) {
+        return impact.offers().stream()
+                .map(offer -> new PetDeletionDecision(
+                        offer.offerId(),
+                        offer.requiresDecision()
+                                ? decisionGroups.get(offer.offerId()).getValue()
+                                : PetDeletionAction.DELETE_OFFER))
+                .toList();
+    }
+
+    private String deleteDialogMessage(PetDto pet, PetDeletionImpact impact) {
+        if (!impact.hasAffectedOffers()) {
+            return "Möchtest du " + pet.name() + " wirklich löschen?";
+        }
+        return pet.name()
+                + " ist noch in offenen Angeboten hinterlegt. Prüfe die Auswirkungen und bestätige die Löschung.";
+    }
+
+    private String actionLabel(PetDeletionAction action) {
+        return switch (action) {
+            case REMOVE_PET_FROM_OFFER -> "Nur Tier aus Angebot entfernen";
+            case DELETE_OFFER -> "Gesamtes Angebot löschen";
+        };
+    }
+
+    private String statusLabel(PetDeletionOfferImpact offer) {
+        return switch (offer.status()) {
+            case OPEN -> "Offen";
+            case BOOKED -> "Gebucht";
+            case CANCELLED -> "Storniert";
+        };
     }
 
     private String displaySpeciesLabel(PetDto pet) {

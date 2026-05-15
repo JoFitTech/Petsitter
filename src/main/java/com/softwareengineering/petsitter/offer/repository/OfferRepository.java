@@ -7,6 +7,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface OfferRepository extends JpaRepository<Offer, UUID> {
     List<Offer> findAllByOfferTypeAndStatusAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
@@ -19,4 +21,13 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
     List<Offer> findAllByOfferTypeAndStatus(OfferType offerType, OfferStatus status);
 
     List<Offer> findAllByCreateUserIdOrderByCreateDateDesc(UUID userId);
+
+    @Query("""
+            select distinct o
+            from Offer o
+            left join o.pets p
+            where o.createUser.id = :userId
+              and (p.id = :petId or o.pet.id = :petId)
+            """)
+    List<Offer> findAllByCreateUserIdAndPetId(@Param("userId") UUID userId, @Param("petId") UUID petId);
 }

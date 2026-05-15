@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -344,6 +345,9 @@ public class UserService {
         if (postalCodeError.isPresent()) {
             return postalCodeError;
         }
+        if (request.birthDate() == null || request.birthDate().isAfter(LocalDate.now().minusYears(18))) {
+            return Optional.of("Du musst mindestens 18 Jahre alt sein.");
+        }
         return Optional.empty();
     }
 
@@ -368,7 +372,10 @@ public class UserService {
         user.setPostalCode(clean(request.postalCode()));
         user.setCity(clean(request.city()));
         user.setAddressAddition(cleanNullable(request.addressAddition()));
-        user.setCountry("Deutschland");
+        user.setCountry(request.country() != null && !request.country().isBlank()
+                ? request.country() : "Deutschland");
+        user.setBirthDate(request.birthDate());
+        user.setNationality(cleanNullable(request.nationality()));
         user.setAccountRole(AccountRole.SIGNED_IN_USER);
         user.setAccountStatus(AccountStatus.PENDING);
         user.setDeleteAfter(LocalDateTime.now().plusHours(24));

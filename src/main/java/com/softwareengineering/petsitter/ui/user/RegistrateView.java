@@ -1,11 +1,15 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import java.time.LocalDate;
+
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
@@ -33,15 +37,18 @@ public class RegistrateView extends VerticalLayout {
     private static final String DANGER    = "#c73e1d";
 
     private final UserService userService;
+    private final PostalCodeService postalCodeService;
     private final Paragraph errorMessage = new Paragraph();
     private final Paragraph statusMessage = new Paragraph();
 
     private TextField postalCodeField;
     private TextField cityField;
+    private ComboBox<String> landField;
     private String currentRegistrationEmail = "";
 
-    public RegistrateView(UserService userService) {
+    public RegistrateView(UserService userService, PostalCodeService postalCodeService) {
         this.userService = userService;
+        this.postalCodeService = postalCodeService;
 
         setSizeFull();
         setPadding(false);
@@ -199,8 +206,12 @@ public class RegistrateView extends VerticalLayout {
         passwortConfirmField.setWidthFull();
         stylePasswordField(passwortConfirmField);
 
+        emailField.addValueChangeListener(e -> emailField.setInvalid(false));
+        passwortField.addValueChangeListener(e -> passwortField.setInvalid(false));
+        passwortConfirmField.addValueChangeListener(e -> passwortConfirmField.setInvalid(false));
+
         HorizontalLayout rowPass = twoColRow(passwortField, passwortConfirmField);
-        
+
         kontoLayout.add(emailField, rowPass);
 
         // ── Daten Fields ──────────────────────────────────────────────────
@@ -208,6 +219,8 @@ public class RegistrateView extends VerticalLayout {
 
         TextField vornameField = pillTextField("Vorname");
         TextField nachnameField = pillTextField("Nachname");
+        vornameField.addValueChangeListener(e -> vornameField.setInvalid(false));
+        nachnameField.addValueChangeListener(e -> nachnameField.setInvalid(false));
         HorizontalLayout rowVorNach = twoColRow(vornameField, nachnameField);
 
         TextField telefonField = pillTextField("Telefonnummer");
@@ -215,9 +228,20 @@ public class RegistrateView extends VerticalLayout {
         geburtstagsField.setPlaceholder("Geburtstag");
         geburtstagsField.setWidthFull();
         styleDateField(geburtstagsField.getElement());
+        geburtstagsField.addValueChangeListener(e -> geburtstagsField.setInvalid(false));
         HorizontalLayout rowTelGeb = twoColRow(telefonField, geburtstagsField);
 
-        TextField nationalitaetField = pillTextField("Nationalität");
+        ComboBox<String> nationalitaetField = pillComboBox("Nationalität",
+                "Deutsch", "Österreichisch", "Schweizerisch", "Amerikanisch", "Australisch",
+                "Belgisch", "Brasilianisch", "Bulgarisch", "Chinesisch", "Dänisch",
+                "Englisch", "Finnisch", "Französisch", "Griechisch", "Indisch",
+                "Indonesisch", "Iranisch", "Irakisch", "Irisch", "Israelisch",
+                "Italienisch", "Japanisch", "Kanadisch", "Kolumbianisch", "Kroatisch",
+                "Luxemburgisch", "Marokkanisch", "Mexikanisch", "Niederländisch", "Nigerianisch",
+                "Norwegisch", "Pakistanisch", "Polnisch", "Portugiesisch", "Rumänisch",
+                "Russisch", "Schwedisch", "Serbisch", "Slowakisch", "Slowenisch",
+                "Spanisch", "Südafrikanisch", "Südkoreanisch", "Tschechisch", "Türkisch",
+                "Ukrainisch", "Ungarisch", "Vietnamesisch");
         nationalitaetField.getStyle().set("width", "50%").set("min-width", "200px");
         HorizontalLayout rowNat = new HorizontalLayout(nationalitaetField);
         rowNat.setWidthFull();
@@ -227,13 +251,52 @@ public class RegistrateView extends VerticalLayout {
 
         TextField strasseField = pillTextField("Straße");
         TextField hausnummerField = pillTextField("Hausnummer");
+        strasseField.addValueChangeListener(e -> strasseField.setInvalid(false));
+        hausnummerField.addValueChangeListener(e -> hausnummerField.setInvalid(false));
         HorizontalLayout rowStrasseHaus = twoColRow(strasseField, hausnummerField);
 
         postalCodeField = pillTextField("Postleitzahl");
         cityField = pillTextField("Ort");
+        boolean[] cityAutoFilled = {false};
+        boolean[] landAutoFilled = {false};
+        postalCodeField.addValueChangeListener(e -> {
+            postalCodeField.setInvalid(false);
+            String plz = e.getValue();
+            if (plz != null && plz.matches("\\d{5}")) {
+                postalCodeService.findGermanLocation(plz).ifPresent(loc -> {
+                    java.util.List<String> names = loc.getPlaceNamesList();
+                    if (!names.isEmpty() && (cityField.getValue().isBlank() || cityAutoFilled[0])) {
+                        cityField.setValue(names.get(0));
+                        cityAutoFilled[0] = true;
+                    }
+                    if (landField.getValue() == null || landField.getValue().isBlank() || landAutoFilled[0]) {
+                        landField.setValue("Deutschland");
+                        landAutoFilled[0] = true;
+                    }
+                });
+            } else {
+                if (cityAutoFilled[0]) { cityField.setValue(""); cityAutoFilled[0] = false; }
+                if (landAutoFilled[0]) { landField.setValue(null); landAutoFilled[0] = false; }
+            }
+        });
+        cityField.addValueChangeListener(e -> {
+            cityField.setInvalid(false);
+            if (e.isFromClient()) cityAutoFilled[0] = false;
+        });
         HorizontalLayout rowPlzOrt = twoColRow(postalCodeField, cityField);
 
-        TextField landField = pillTextField("Land");
+        landField = pillComboBox("Land",
+                "Deutschland", "Österreich", "Schweiz", "Frankreich", "Italien",
+                "Spanien", "Portugal", "Niederlande", "Belgien", "Luxemburg",
+                "Polen", "Tschechien", "Slowakei", "Ungarn", "Rumänien",
+                "Bulgarien", "Kroatien", "Serbien", "Slowenien", "Griechenland",
+                "Schweden", "Norwegen", "Dänemark", "Finnland", "Irland",
+                "Großbritannien", "Türkei", "Russland", "Ukraine",
+                "USA", "Kanada", "Australien", "Japan", "China",
+                "Indien", "Brasilien", "Argentinien", "Mexiko", "Südafrika",
+                "Nigeria", "Ägypten", "Marokko", "Iran", "Saudi-Arabien",
+                "Südkorea", "Indonesien", "Vietnam", "Pakistan");
+        landField.addValueChangeListener(e -> { if (e.isFromClient()) landAutoFilled[0] = false; });
         landField.getStyle().set("width", "50%").set("min-width", "200px");
         HorizontalLayout rowLand = new HorizontalLayout(landField);
         rowLand.setWidthFull();
@@ -246,43 +309,23 @@ public class RegistrateView extends VerticalLayout {
                 rowStrasseHaus, rowPlzOrt, rowLand
         );
 
-        // ── Register button ────────────────────────────────────────────────
-        Button registerBtn = new Button("Weiter");
-        registerBtn.setWidthFull();
-        registerBtn.getStyle()
-                .set("background", BROWN_BTN)
-                .set("color", "white")
-                .set("border-radius", "28px")
-                .set("height", "52px")
-                .set("font-size", "16px")
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer")
-                .set("margin-top", "10px")
-                .set("letter-spacing", "0.3px");
-        registerBtn.addClickListener(e -> {
-            if ("Weiter".equals(registerBtn.getText())) {
-                datenTab.click();
-            } else {
-                clearMessages();
-                currentRegistrationEmail = emailField.getValue();
-                UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
-                        emailField.getValue(),
-                        passwortField.getValue(),
-                        passwortConfirmField.getValue(),
-                        vornameField.getValue(),
-                        nachnameField.getValue(),
-                        telefonField.getValue(),
-                        strasseField.getValue(),
-                        hausnummerField.getValue(),
-                        postalCodeField.getValue(),
-                        cityField.getValue(),
-                        null), currentRequestIp());
-                showResult(result);
-            }
-        });
+        // ── Step 3: Code confirmation layout ──────────────────────────────
+        VerticalLayout codeLayout = new VerticalLayout();
+        codeLayout.setPadding(false);
+        codeLayout.setSpacing(false);
+        codeLayout.getStyle().set("gap", "12px");
+        codeLayout.setVisible(false);
+
+        H2 codeHeading = sectionHeading("Bestätigungscode eingeben");
+
+        Paragraph codeHint = new Paragraph("Der Code wurde per E-Mail gesendet.");
+        codeHint.getStyle()
+                .set("margin", "0")
+                .set("font-size", "13px")
+                .set("color", "#8a7060");
 
         TextField codeField = pillTextField("Bestätigungscode");
+
         Button confirmBtn = new Button("Code bestätigen");
         confirmBtn.setWidthFull();
         confirmBtn.getStyle()
@@ -305,12 +348,7 @@ public class RegistrateView extends VerticalLayout {
             handleAuthResult(result);
         });
 
-        Paragraph codeHint = new Paragraph("Nach der Registrierung kommt der Code per E-Mail.");
-        codeHint.getStyle()
-                .set("margin", "16px 0 0 0")
-                .set("font-size", "13px")
-                .set("color", "#8a7060")
-                .set("align-self", "center");
+        codeLayout.add(codeHeading, codeHint, codeField, confirmBtn);
 
         // ── "Bereits registriert?" link ────────────────────────────────────
         Span loginBtn = new Span("Bereits registriert? Hier einloggen");
@@ -322,17 +360,94 @@ public class RegistrateView extends VerticalLayout {
                 .set("text-decoration", "underline")
                 .set("margin-top", "4px")
                 .set("align-self", "center");
-        loginBtn.addClickListener(e -> {
-            UI.getCurrent().navigate("login");
+        loginBtn.addClickListener(e -> UI.getCurrent().navigate("login"));
+
+        // ── Register button ────────────────────────────────────────────────
+        Button registerBtn = new Button("Weiter");
+        registerBtn.setWidthFull();
+        registerBtn.getStyle()
+                .set("background", BROWN_BTN)
+                .set("color", "white")
+                .set("border-radius", "28px")
+                .set("height", "52px")
+                .set("font-size", "16px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("margin-top", "10px")
+                .set("letter-spacing", "0.3px");
+        registerBtn.addClickListener(e -> {
+            if ("Weiter".equals(registerBtn.getText())) {
+                boolean valid = true;
+                if (emailField.getValue().isBlank() || !emailField.getValue().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                    emailField.setInvalid(true);
+                    emailField.setErrorMessage("Gültige E-Mail eingeben");
+                    valid = false;
+                }
+                if (passwortField.getValue().length() < 8) {
+                    passwortField.setInvalid(true);
+                    passwortField.setErrorMessage("Mindestens 8 Zeichen");
+                    valid = false;
+                }
+                if (!passwortConfirmField.getValue().equals(passwortField.getValue())) {
+                    passwortConfirmField.setInvalid(true);
+                    passwortConfirmField.setErrorMessage("Passwörter stimmen nicht überein");
+                    valid = false;
+                }
+                if (valid) datenTab.click();
+            } else {
+                boolean valid = true;
+                if (vornameField.getValue().isBlank()) { vornameField.setInvalid(true); vornameField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (nachnameField.getValue().isBlank()) { nachnameField.setInvalid(true); nachnameField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (strasseField.getValue().isBlank()) { strasseField.setInvalid(true); strasseField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (hausnummerField.getValue().isBlank()) { hausnummerField.setInvalid(true); hausnummerField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (postalCodeField.getValue().isBlank()) { postalCodeField.setInvalid(true); postalCodeField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (cityField.getValue().isBlank()) { cityField.setInvalid(true); cityField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (geburtstagsField.getValue() == null) {
+                    geburtstagsField.setInvalid(true);
+                    geburtstagsField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                } else if (geburtstagsField.getValue().isAfter(LocalDate.now().minusYears(18))) {
+                    geburtstagsField.setInvalid(true);
+                    geburtstagsField.setErrorMessage("Mindestalter 18 Jahre");
+                    valid = false;
+                }
+                if (!valid) return;
+                clearMessages();
+                currentRegistrationEmail = emailField.getValue();
+                UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
+                        emailField.getValue(),
+                        passwortField.getValue(),
+                        passwortConfirmField.getValue(),
+                        vornameField.getValue(),
+                        nachnameField.getValue(),
+                        telefonField.getValue(),
+                        strasseField.getValue(),
+                        hausnummerField.getValue(),
+                        postalCodeField.getValue(),
+                        cityField.getValue(),
+                        null,
+                        geburtstagsField.getValue(),
+                        nationalitaetField.getValue(),
+                        landField.getValue()), currentRequestIp());
+                if (result.success()) {
+                    tabs.setVisible(false);
+                    datenLayout.setVisible(false);
+                    registerBtn.setVisible(false);
+                    loginBtn.setVisible(false);
+                    codeLayout.setVisible(true);
+                    showStatus(result.message());
+                } else {
+                    showError(result.message());
+                }
+            }
         });
+
         kontoTab.addClickListener(e -> {
             styleTabButton(kontoTab, true);
             styleTabButton(datenTab, false);
             kontoLayout.setVisible(true);
             datenLayout.setVisible(false);
-            codeHint.setVisible(true);
-            codeField.setVisible(true);
-            confirmBtn.setVisible(true);
             registerBtn.setText("Weiter");
         });
 
@@ -341,9 +456,6 @@ public class RegistrateView extends VerticalLayout {
             styleTabButton(datenTab, true);
             kontoLayout.setVisible(false);
             datenLayout.setVisible(true);
-            codeHint.setVisible(false);
-            codeField.setVisible(false);
-            confirmBtn.setVisible(false);
             registerBtn.setText("Registrieren & Starten");
         });
 
@@ -351,7 +463,8 @@ public class RegistrateView extends VerticalLayout {
                 tabs,
                 kontoLayout,
                 datenLayout,
-                registerBtn, codeHint, codeField, confirmBtn, loginBtn
+                codeLayout,
+                registerBtn, loginBtn
         );
         return form;
     }
@@ -381,6 +494,23 @@ public class RegistrateView extends VerticalLayout {
         if (left instanceof com.vaadin.flow.component.HasSize hs1) hs1.setWidth("50%");
         if (right instanceof com.vaadin.flow.component.HasSize hs2) hs2.setWidth("50%");
         return row;
+    }
+
+    private ComboBox<String> pillComboBox(String placeholder, String... items) {
+        ComboBox<String> cb = new ComboBox<>();
+        cb.setPlaceholder(placeholder);
+        cb.setItems(items);
+        cb.setAllowCustomValue(true);
+        cb.addCustomValueSetListener(e -> cb.setValue(e.getDetail()));
+        cb.setWidthFull();
+        cb.getStyle()
+                .set("border-radius", "28px")
+                .set("--vaadin-input-field-background", INPUT_BG)
+                .set("--vaadin-input-field-border-radius", "28px");
+        cb.getElement().getStyle()
+                .set("--lumo-contrast-10pct", INPUT_BG)
+                .set("--lumo-border-radius-m", "28px");
+        return cb;
     }
 
     private TextField pillTextField(String placeholder) {

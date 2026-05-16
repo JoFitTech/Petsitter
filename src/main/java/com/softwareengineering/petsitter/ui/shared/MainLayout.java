@@ -1,12 +1,19 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.chat.service.ChatEventBus;
+import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.notification.domain.Notification;
+import com.softwareengineering.petsitter.notification.domain.NotificationType;
+import com.softwareengineering.petsitter.notification.service.NotificationService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.icon.Icon;
@@ -16,26 +23,49 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.router.AfterNavigationEvent;
 import com.vaadin.flow.router.AfterNavigationObserver;
+import com.vaadin.flow.router.QueryParameters;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
     private static final String DARK      = "#4a3428";
     private static final String BROWN     = "#7b5236";
     private static final String LIGHT_BG  = "#fbf8f1";
-    private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
     private static final String NAV_ACTIVE_BG = "#f6e3bd";
     private static final String NAV_INACTIVE_BG = "#fff6e6";
     private static final String NAV_BORDER = "#ead5ae";
 
     private final AuthenticatedUser authenticatedUser;
+    private final NotificationService notificationService;
+    private final ChatEventBus chatEventBus;
     private Button findOwnerBtn;
     private Button findSitterBtn;
+    private Span mailBadge;
+    private Span mailTypingIndicator;
+    private Registration badgeRegistration;
+    private Registration typingHeaderRegistration;
+    private final ScheduledExecutorService typingHeaderScheduler = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> hideTypingHeaderFuture;
 
-    public MainLayout(AuthenticatedUser authenticatedUser) {
+    private static final DateTimeFormatter NOTIFICATION_TIME_FORMAT = DateTimeFormatter.ofPattern("dd.MM HH:mm");
+
+    public MainLayout(
+            AuthenticatedUser authenticatedUser,
+            NotificationService notificationService,
+            ChatEventBus chatEventBus
+    ) {
         this.authenticatedUser = authenticatedUser;
+        this.notificationService = notificationService;
+        this.chatEventBus = chatEventBus;
 
         // ── Global page background & font ─────────────────────────────────
         getElement().getStyle()
@@ -45,6 +75,8 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
         // ── Navbar (Header) ───────────────────────────────────────────────
         addToNavbar(true, buildHeader());
+
+        registerBadgeListener();
     }
 
     // ── Override showRouterLayoutContent to append the footer ─────────────
@@ -124,6 +156,9 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 event.getLocation().getPath(),
                 event.getLocation().getQueryParameters().getParameters()
         );
+        if (mailBadge != null) {
+            updateMailBadge(mailBadge);
+        }
     }
 
     private void updateNavigationState(String path, Map<String, List<String>> queryParameters) {
@@ -152,8 +187,9 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         rightIcons.setAlignItems(FlexComponent.Alignment.CENTER);
         rightIcons.getStyle().set("gap", "8px");
 
-        Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
-        mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
+        // Mail button with unread badge (for Chat)
+        Component mailBtnWithBadge = buildMailButtonWithBadge();
+        rightIcons.add(mailBtnWithBadge);
 
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
@@ -161,8 +197,252 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
-        rightIcons.add(mailBtn, heartBtn, profileBtn);
+        rightIcons.add(heartBtn, profileBtn);
         return rightIcons;
+    }
+
+    private Component buildMailButtonWithBadge() {
+        HorizontalLayout container = new HorizontalLayout();
+        container.setAlignItems(FlexComponent.Alignment.CENTER);
+        container.setSpacing(false);
+        container.getStyle()
+            .set("position", "relative")
+            .set("width", "42px")
+            .set("height", "42px");
+
+        Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
+        mailBtn.addClickListener(e -> openNotificationDialog());
+        container.add(mailBtn);
+
+        // Badge with unread count
+        mailBadge = new Span();
+        mailBadge.getStyle()
+            .set("position", "absolute")
+            .set("top", "0")
+            .set("right", "0")
+            .set("width", "20px")
+            .set("height", "20px")
+            .set("background", "#e74c3c")
+            .set("color", "white")
+            .set("border-radius", "50%")
+            .set("display", "flex")
+            .set("align-items", "center")
+            .set("justify-content", "center")
+            .set("font-size", "10px")
+            .set("font-weight", "700")
+            .set("z-index", "10")
+            .set("display", "none"); // hidden by default
+
+        updateMailBadge(mailBadge);
+        container.add(mailBadge);
+
+        mailTypingIndicator = new Span("...");
+        mailTypingIndicator.getStyle()
+                .set("position", "absolute")
+                .set("bottom", "-4px")
+                .set("right", "-8px")
+                .set("padding", "0 6px")
+                .set("height", "16px")
+                .set("line-height", "16px")
+                .set("border-radius", "10px")
+                .set("background", "#8db3c3")
+                .set("color", "white")
+                .set("font-size", "10px")
+                .set("font-weight", "700")
+                .set("display", "none");
+        container.add(mailTypingIndicator);
+
+        return container;
+    }
+
+    private void updateMailBadge(Span badge) {
+        long unread = authenticatedUser.get()
+                .map(user -> notificationService.countUnread(user.getId()))
+                .orElse(0L);
+
+        if (unread <= 0) {
+            badge.setText("");
+            badge.getStyle().set("display", "none");
+            return;
+        }
+
+        badge.setText(unread > 99 ? "99+" : Long.toString(unread));
+        badge.getStyle().set("display", "flex");
+    }
+
+    private void openNotificationDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Benachrichtigungen");
+        dialog.setWidth("480px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        List<Notification> inbox = authenticatedUser.get()
+                .map(user -> notificationService.getInbox(user.getId()))
+                .orElse(List.of());
+
+        if (inbox.isEmpty()) {
+            content.add(new Paragraph("Keine Benachrichtigungen vorhanden."));
+        } else {
+            Map<LocalDate, List<Notification>> grouped = groupNotificationsByDate(inbox);
+            for (Map.Entry<LocalDate, List<Notification>> entry : grouped.entrySet()) {
+                Span groupHeader = new Span(toDateGroupLabel(entry.getKey()));
+                groupHeader.getStyle()
+                        .set("font-weight", "700")
+                        .set("font-size", "13px")
+                        .set("color", "#7a6050")
+                        .set("margin", "8px 0 2px 0");
+                content.add(groupHeader);
+
+                for (Notification notification : entry.getValue()) {
+                    content.add(buildNotificationRow(dialog, notification));
+                }
+            }
+        }
+
+        Button chatButton = new Button("Chat öffnen", e -> {
+            dialog.close();
+            UI.getCurrent().navigate("chat");
+        });
+
+        dialog.add(content);
+        dialog.getFooter().add(chatButton);
+        dialog.open();
+    }
+
+    private Component buildNotificationRow(Dialog dialog, Notification notification) {
+        Button row = new Button();
+        row.setWidthFull();
+        row.getStyle()
+                .set("text-align", "left")
+                .set("justify-content", "flex-start")
+                .set("background", notification.isRead() ? "#ffffff" : "#fff4de")
+                .set("border", notification.isRead() ? "1px solid #ead5ae" : "1px solid #e2b56b")
+                .set("border-left", notification.isRead() ? "1px solid #ead5ae" : "5px solid #e2b56b")
+                .set("border-radius", "10px")
+                .set("padding", "10px");
+
+        VerticalLayout layout = new VerticalLayout();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+
+        Span message = new Span(notification.getMessage());
+        message.getStyle().set("font-weight", notification.isRead() ? "500" : "700");
+
+        Span meta = new Span(notification.getType().name() + " • "
+                + notification.getCreatedAt().format(NOTIFICATION_TIME_FORMAT));
+        meta.getStyle().set("font-size", "12px").set("color", "#7a6050");
+
+        if (!notification.isRead()) {
+            Span unreadDot = new Span();
+            unreadDot.getStyle()
+                    .set("width", "8px")
+                    .set("height", "8px")
+                    .set("border-radius", "50%")
+                    .set("display", "inline-block")
+                    .set("background", "#d98b2b")
+                    .set("margin-bottom", "6px");
+            layout.add(unreadDot);
+        }
+
+        layout.add(message, meta);
+        row.setIcon(layout);
+
+        row.addClickListener(e -> {
+            authenticatedUser.get().ifPresent(user -> notificationService.markAsRead(notification.getId(), user.getId()));
+            dialog.close();
+
+            if (notification.getType() == NotificationType.CHAT_MESSAGE
+                    && notification.getReferenceId() != null
+                    && !notification.getReferenceId().isBlank()) {
+                UI.getCurrent().navigate("chat", QueryParameters.of("conversation", notification.getReferenceId()));
+            } else {
+                UI.getCurrent().navigate("chat");
+            }
+        });
+
+        return row;
+    }
+
+    private void registerBadgeListener() {
+        authenticatedUser.get().ifPresent(user ->
+                badgeRegistration = chatEventBus.register(user.getId(), message -> {
+                    UI ui = getUI().orElse(null);
+                    if (ui != null && mailBadge != null) {
+                        ui.access(() -> updateMailBadge(mailBadge));
+                    }
+                })
+        );
+
+        authenticatedUser.get().ifPresent(user ->
+                typingHeaderRegistration = chatEventBus.registerTyping(user.getId(), event -> {
+                    UI ui = getUI().orElse(null);
+                    if (ui == null || mailTypingIndicator == null) {
+                        return;
+                    }
+                    ui.access(() -> {
+                        if (!event.typing()) {
+                            hideTypingHeaderIndicator();
+                            return;
+                        }
+
+                        mailTypingIndicator.getStyle().set("display", "inline-block");
+
+                        if (hideTypingHeaderFuture != null) {
+                            hideTypingHeaderFuture.cancel(false);
+                        }
+                        hideTypingHeaderFuture = typingHeaderScheduler.schedule(() -> {
+                            UI currentUi = getUI().orElse(null);
+                            if (currentUi != null) {
+                                currentUi.access(this::hideTypingHeaderIndicator);
+                            }
+                        }, 2, TimeUnit.SECONDS);
+                    });
+                })
+        );
+    }
+
+    private void hideTypingHeaderIndicator() {
+        if (mailTypingIndicator != null) {
+            mailTypingIndicator.getStyle().set("display", "none");
+        }
+    }
+
+    private Map<LocalDate, List<Notification>> groupNotificationsByDate(List<Notification> notifications) {
+        Map<LocalDate, List<Notification>> grouped = new LinkedHashMap<>();
+        for (Notification notification : notifications) {
+            LocalDate date = notification.getCreatedAt().toLocalDate();
+            grouped.computeIfAbsent(date, ignored -> new java.util.ArrayList<>()).add(notification);
+        }
+        return grouped;
+    }
+
+    private String toDateGroupLabel(LocalDate date) {
+        LocalDate today = LocalDate.now();
+        if (date.equals(today)) {
+            return "Heute";
+        }
+        if (date.equals(today.minusDays(1))) {
+            return "Gestern";
+        }
+        return date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+    }
+
+    @Override
+    protected void onDetach(DetachEvent detachEvent) {
+        super.onDetach(detachEvent);
+        if (badgeRegistration != null) {
+            badgeRegistration.remove();
+        }
+        if (typingHeaderRegistration != null) {
+            typingHeaderRegistration.remove();
+        }
+        if (hideTypingHeaderFuture != null) {
+            hideTypingHeaderFuture.cancel(true);
+        }
+        typingHeaderScheduler.shutdownNow();
     }
 
 

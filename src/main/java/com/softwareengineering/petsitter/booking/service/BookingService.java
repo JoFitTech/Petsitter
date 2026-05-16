@@ -17,6 +17,7 @@ import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,15 +42,18 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final OfferRequestRepository offerRequestRepository;
     private final OfferRepository offerRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public BookingService(
             BookingRepository bookingRepository,
             OfferRequestRepository offerRequestRepository,
-            OfferRepository offerRepository
+            OfferRepository offerRepository,
+            ApplicationEventPublisher eventPublisher
     ) {
         this.bookingRepository = bookingRepository;
         this.offerRequestRepository = offerRequestRepository;
         this.offerRepository = offerRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     /**
@@ -113,6 +117,9 @@ public class BookingService {
             other.setStatus(RequestStatus.DENIED);
         }
         offerRequestRepository.saveAll(otherPending);
+
+        // Schritt 5: Event publizieren für Chat-Konversation (entkopplt via Listener)
+        eventPublisher.publishEvent(new BookingCreatedEvent(this, booking.getId()));
 
         return booking;
     }

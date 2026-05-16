@@ -1,0 +1,176 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] -----------------< com.softwareengineering:petsitter >------------------
+[INFO] Building petsitter 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:4.0.5:run (default-cli) > test-compile @ petsitter >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ petsitter ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] Copying 15 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- vaadin:25.1.3:prepare-frontend (default) @ petsitter ---
+[INFO] ClassFinder initialized: 168 urls, 9814 classes scanned, 71 annotation types cached, 2136 subtype relationships cached, took 1849ms
+[INFO] Visited 121 classes. Took 292 ms.
+[INFO] Copying frontend resources from jar files ...
+[INFO] Visited 178 resources. Took 359 ms.
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ petsitter ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ petsitter ---
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ petsitter ---
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] 
+[INFO] <<< spring-boot:4.0.5:run (default-cli) < test-compile @ petsitter <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:4.0.5:run (default-cli) @ petsitter ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.0.5)
+
+2026-05-16T13:16:01.082+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.s.petsitter.PetsitterApplication       : Starting PetsitterApplication using Java 23.0.2 with PID 33256 (C:\Users\josef.lautner\Source\IdeaProjects\Uni\Petsitter\target\classes started by josef.lautner in C:\Users\josef.lautner\Source\IdeaProjects\Uni\Petsitter)
+2026-05-16T13:16:01.088+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.s.petsitter.PetsitterApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-05-16T13:16:01.197+02:00  INFO 33256 --- [petsitter] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-05-16T13:16:01.198+02:00  INFO 33256 --- [petsitter] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-05-16T13:16:01.234+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.b.d.c.l.DockerComposeLifecycleManager : Using Docker Compose file C:\Users\josef.lautner\Source\IdeaProjects\Uni\Petsitter\compose.yaml
+2026-05-16T13:16:06.806+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.b.d.c.l.DockerComposeLifecycleManager : There are already Docker Compose services running, skipping startup
+2026-05-16T13:16:08.000+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-05-16T13:16:08.007+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-05-16T13:16:08.277+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data JPA - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.chat.repository.ChatConversationRepository; If you want this repository to be a JPA repository, consider annotating your entities with one of these annotations: jakarta.persistence.Entity, jakarta.persistence.MappedSuperclass (preferred), or consider extending one of the following types with your repository: org.springframework.data.jpa.repository.JpaRepository
+2026-05-16T13:16:08.282+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data JPA - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.chat.repository.ChatMessageRepository; If you want this repository to be a JPA repository, consider annotating your entities with one of these annotations: jakarta.persistence.Entity, jakarta.persistence.MappedSuperclass (preferred), or consider extending one of the following types with your repository: org.springframework.data.jpa.repository.JpaRepository
+2026-05-16T13:16:08.364+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 344 ms. Found 7 JPA repository interfaces.
+2026-05-16T13:16:08.427+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Multiple Spring Data modules found, entering strict repository configuration mode
+2026-05-16T13:16:08.429+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data MongoDB repositories in DEFAULT mode.
+2026-05-16T13:16:08.482+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.booking.repository.BookingRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.484+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.notification.repository.NotificationRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.486+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.487+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.offer.repository.OfferRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.488+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.pet.repository.PetRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.489+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.user.repository.LoginCodeRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.492+02:00  INFO 33256 --- [petsitter] [  restartedMain] .RepositoryConfigurationExtensionSupport : Spring Data MongoDB - Could not safely identify store assignment for repository candidate interface com.softwareengineering.petsitter.user.repository.UserRepository; If you want this repository to be a MongoDB repository, consider annotating your entities with one of these annotations: org.springframework.data.mongodb.core.mapping.Document (preferred), or consider extending one of the following types with your repository: org.springframework.data.mongodb.repository.MongoRepository
+2026-05-16T13:16:08.558+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 125 ms. Found 2 MongoDB repository interfaces.
+2026-05-16T13:16:09.590+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.s.boot.tomcat.TomcatWebServer          : Tomcat initialized with port 8080 (http)
+2026-05-16T13:16:09.610+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-05-16T13:16:09.612+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/11.0.20]
+2026-05-16T13:16:09.688+02:00  INFO 33256 --- [petsitter] [  restartedMain] b.w.c.s.WebApplicationContextInitializer : Root WebApplicationContext: initialization completed in 2860 ms
+2026-05-16T13:16:15.574+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.v.f.s.VaadinServletContextInitializer  : Search for subclasses and classes with annotations took 5283 ms
+2026-05-16T13:16:15.830+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.v.b.d.startup.DevModeStartupListener   : Starting dev-mode updaters in C:\Users\josef.lautner\Source\IdeaProjects\Uni\Petsitter folder.
+2026-05-16T13:16:15.902+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.v.f.s.f.s.FullDependenciesScanner      : Visited 121 classes. Took 33 ms.
+2026-05-16T13:16:15.906+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.v.f.s.frontend.BundleValidationUtil    : Checking if a development mode bundle build is needed
+2026-05-16T13:16:16.111+02:00  INFO 33256 --- [petsitter] [  restartedMain] c.v.f.s.frontend.BundleValidationUtil    : A development mode bundle build is not needed
+2026-05-16T13:16:16.158+02:00  INFO 33256 --- [petsitter] [in-dev-server-1] c.v.f.s.frontend.TaskCopyFrontendFiles   : Copying frontend resources from jar files ...
+2026-05-16T13:16:16.282+02:00  INFO 33256 --- [petsitter] [in-dev-server-1] c.v.f.s.frontend.TaskCopyFrontendFiles   : Visited 20 resources. Took 124 ms.
+2026-05-16T13:16:17.192+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.flywaydb.core.FlywayExecutor         : Database: jdbc:mysql://127.0.0.1:3306/petsitter (MySQL 8.4)
+2026-05-16T13:16:17.755+02:00  WARN 33256 --- [petsitter] [  restartedMain] o.f.c.internal.database.base.Database    : Using MySQL 8.4 which is newer than the version Flyway has been verified with. The latest verified version of MySQL is 8.1.
+2026-05-16T13:16:17.849+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.f.core.internal.command.DbValidate     : Successfully validated 16 migrations (execution time 00:00.067s)
+2026-05-16T13:16:17.891+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.f.core.internal.command.DbMigrate      : Current version of schema `petsitter`: 16
+2026-05-16T13:16:17.893+02:00  WARN 33256 --- [petsitter] [  restartedMain] o.f.core.internal.command.DbMigrate      : Schema `petsitter` has a version (16) that is newer than the latest available migration (13) !
+2026-05-16T13:16:17.899+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.f.core.internal.command.DbMigrate      : Schema `petsitter` is up to date. No migration necessary.
+2026-05-16T13:16:18.063+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.hibernate.orm.jpa                    : HHH008540: Processing PersistenceUnitInfo [name: default]
+2026-05-16T13:16:18.118+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.hibernate.orm.core                   : HHH000001: Hibernate ORM core version 7.2.7.Final
+2026-05-16T13:16:18.670+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-05-16T13:16:18.706+02:00  WARN 33256 --- [petsitter] [  restartedMain] org.hibernate.orm.deprecation            : HHH90000025: MySQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-05-16T13:16:18.723+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [undefined/unknown]
+	Database driver: undefined/unknown
+	Database dialect: MySQLDialect
+	Database version: 8.0
+	Default catalog/schema: unknown/unknown
+	Autocommit mode: undefined/unknown
+	Isolation level: <unknown>
+	JDBC fetch size: undefined/unknown
+	Pool: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-05-16T13:16:19.989+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.hibernate.orm.core                   : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-05-16T13:16:20.011+02:00  INFO 33256 --- [petsitter] [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-05-16T13:16:20.145+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.s.d.j.r.query.QueryEnhancerFactories   : Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-05-16T13:16:20.740+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.mongodb.driver.client                : MongoClient with metadata {"driver": {"name": "mongo-java-driver|spring-boot|sync", "version": "5.6.4"}, "os": {"type": "Windows", "name": "Windows 11", "architecture": "amd64", "version": "10.0"}, "platform": "Java/Oracle Corporation/23.0.2+7-58"} created with settings MongoClientSettings{readPreference=primary, writeConcern=WriteConcern{w=null, wTimeout=null ms, journal=null}, retryWrites=true, retryReads=true, readConcern=ReadConcern{level=null}, credential=MongoCredential{mechanism=null, userName='petsitter', source='admin', password=<hidden>, mechanismProperties=<hidden>}, transportSettings=null, commandListeners=[], codecRegistry=ProvidersCodecRegistry{codecProviders=[ValueCodecProvider{}, BsonValueCodecProvider{}, DBRefCodecProvider{}, DBObjectCodecProvider{}, DocumentCodecProvider{}, CollectionCodecProvider{}, IterableCodecProvider{}, MapCodecProvider{}, GeoJsonCodecProvider{}, GridFSFileCodecProvider{}, Jsr310CodecProvider{}, JsonObjectCodecProvider{}, BsonCodecProvider{}, com.mongodb.client.model.mql.ExpressionCodecProvider@7fcbeea3, com.mongodb.Jep395RecordCodecProvider@6f1d4ff7, com.mongodb.KotlinCodecProvider@1d1414f7, EnumCodecProvider{}]}, loggerSettings=LoggerSettings{maxDocumentLength=1000}, clusterSettings={hosts=[127.0.0.1:27017], srvServiceName=mongodb, mode=SINGLE, requiredClusterType=UNKNOWN, requiredReplicaSetName='null', serverSelector='null', clusterListeners='[]', serverSelectionTimeout='30000 ms', localThreshold='15 ms'}, socketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=0, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, heartbeatSocketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=10000, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, connectionPoolSettings=ConnectionPoolSettings{maxSize=100, minSize=0, maxWaitTimeMS=120000, maxConnectionLifeTimeMS=0, maxConnectionIdleTimeMS=0, maintenanceInitialDelayMS=0, maintenanceFrequencyMS=60000, connectionPoolListeners=[], maxConnecting=2}, serverSettings=ServerSettings{heartbeatFrequencyMS=10000, minHeartbeatFrequencyMS=500, serverMonitoringMode=AUTO, serverListeners='[]', serverMonitorListeners='[]'}, sslSettings=SslSettings{enabled=false, invalidHostNameAllowed=false, context=null}, applicationName='null', compressorList=[], uuidRepresentation=UNSPECIFIED, serverApi=null, autoEncryptionSettings=null, dnsClient=null, inetAddressResolver=null, contextProvider=null, timeoutMS=null}
+2026-05-16T13:16:20.748+02:00  INFO 33256 --- [petsitter] [127.0.0.1:27017] org.mongodb.driver.cluster               : Monitor thread successfully connected to server with description ServerDescription{address=127.0.0.1:27017, type=STANDALONE, cryptd=false, state=CONNECTED, ok=true, minWireVersion=0, maxWireVersion=27, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=30, roundTripTimeNanos=27465800, minRoundTripTimeNanos=0}
+2026-05-16T13:16:22.480+02:00  INFO 33256 --- [petsitter] [  restartedMain] r$InitializeUserDetailsManagerConfigurer : Global AuthenticationManager configured with UserDetailsService bean with name databaseUserDetailsService
+2026-05-16T13:16:23.875+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereHandler com.vaadin.flow.server.communication.PushAtmosphereHandler mapped to context-path: /*
+2026-05-16T13:16:23.876+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed the following AtmosphereInterceptor mapped to AtmosphereHandler com.vaadin.flow.server.communication.PushAtmosphereHandler
+2026-05-16T13:16:24.090+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Atmosphere is using org.atmosphere.util.VoidAnnotationProcessor for processing annotation
+2026-05-16T13:16:24.117+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.util.ForkJoinPool         : Using ForkJoinPool  java.util.concurrent.ForkJoinPool. Set the org.atmosphere.cpr.broadcaster.maxAsyncWriteThreads to -1 to fully use its power.
+2026-05-16T13:16:24.140+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed WebSocketProtocol org.atmosphere.websocket.protocol.SimpleHttpProtocol 
+2026-05-16T13:16:24.158+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.a.container.JSR356AsyncSupport         : JSR 356 Mapping path /VAADIN/push
+2026-05-16T13:16:24.241+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installing Default AtmosphereInterceptors
+2026-05-16T13:16:24.246+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.CorsInterceptor : CORS Interceptor Support
+2026-05-16T13:16:24.248+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.CacheHeadersInterceptor : Default Response's Headers Interceptor
+2026-05-16T13:16:24.251+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.PaddingAtmosphereInterceptor : Browser Padding Interceptor Support
+2026-05-16T13:16:24.254+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.AndroidAtmosphereInterceptor : Android Interceptor Support
+2026-05-16T13:16:24.258+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.HeartbeatInterceptor : Heartbeat Interceptor Support
+2026-05-16T13:16:24.261+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.SSEAtmosphereInterceptor : SSE Interceptor Support
+2026-05-16T13:16:24.264+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.JSONPAtmosphereInterceptor : JSONP Interceptor Support
+2026-05-16T13:16:24.280+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.JavaScriptProtocol : Atmosphere JavaScript Protocol
+2026-05-16T13:16:24.298+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.WebSocketMessageSuspendInterceptor : org.atmosphere.interceptor.WebSocketMessageSuspendInterceptor
+2026-05-16T13:16:24.329+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.OnDisconnectInterceptor : Browser disconnection detection
+2026-05-16T13:16:24.338+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : 	org.atmosphere.interceptor.IdleResourceInterceptor : org.atmosphere.interceptor.IdleResourceInterceptor
+2026-05-16T13:16:24.340+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Set org.atmosphere.cpr.AtmosphereInterceptor.disableDefaults to disable them.
+2026-05-16T13:16:24.343+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor CORS Interceptor Support with priority FIRST_BEFORE_DEFAULT 
+2026-05-16T13:16:24.348+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor Default Response's Headers Interceptor with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.354+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor Browser Padding Interceptor Support with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.437+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor Android Interceptor Support with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.445+02:00  INFO 33256 --- [petsitter] [  restartedMain] o.a.interceptor.HeartbeatInterceptor     : HeartbeatInterceptor configured with padding value 'X', client frequency 0 seconds and server frequency 60 seconds
+2026-05-16T13:16:24.449+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor Heartbeat Interceptor Support with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.453+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor SSE Interceptor Support with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.474+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor JSONP Interceptor Support with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.488+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor Atmosphere JavaScript Protocol with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.513+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor org.atmosphere.interceptor.WebSocketMessageSuspendInterceptor with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.517+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor Browser disconnection detection with priority AFTER_DEFAULT 
+2026-05-16T13:16:24.547+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor org.atmosphere.interceptor.IdleResourceInterceptor with priority BEFORE_DEFAULT 
+2026-05-16T13:16:24.549+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Using EndpointMapper class org.atmosphere.util.DefaultEndpointMapper
+2026-05-16T13:16:24.557+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Using BroadcasterCache: org.atmosphere.cache.UUIDBroadcasterCache
+2026-05-16T13:16:24.559+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Default Broadcaster Class: org.atmosphere.cpr.DefaultBroadcaster
+2026-05-16T13:16:24.559+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Broadcaster Shared List Resources: false
+2026-05-16T13:16:24.561+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Broadcaster Polling Wait Time 100
+2026-05-16T13:16:24.561+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Shared ExecutorService supported: true
+2026-05-16T13:16:24.561+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Messaging ExecutorService Pool Size unavailable - Not instance of ThreadPoolExecutor
+2026-05-16T13:16:24.564+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Async I/O Thread Pool Size: 200
+2026-05-16T13:16:24.566+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Using BroadcasterFactory: org.atmosphere.cpr.DefaultBroadcasterFactory
+2026-05-16T13:16:24.566+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Using AtmosphereResurceFactory: org.atmosphere.cpr.DefaultAtmosphereResourceFactory
+2026-05-16T13:16:24.568+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Using WebSocketProcessor: org.atmosphere.websocket.DefaultWebSocketProcessor
+2026-05-16T13:16:24.641+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Invoke AtmosphereInterceptor on WebSocket message true
+2026-05-16T13:16:24.649+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : HttpSession supported: true
+2026-05-16T13:16:24.667+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Atmosphere is using org.atmosphere.inject.InjectableObjectFactory for dependency injection and object creation
+2026-05-16T13:16:24.688+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Atmosphere is using async support: org.atmosphere.container.JSR356AsyncSupport running under container: Apache Tomcat/11.0.20 using jakarta.servlet/3.0 and jsr356/WebSocket API
+2026-05-16T13:16:24.690+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Atmosphere Framework 3.0.5.slf4jvaadin1 started.
+2026-05-16T13:16:24.709+02:00  INFO 33256 --- [petsitter] [  restartedMain] org.atmosphere.cpr.AtmosphereFramework   : Installed AtmosphereInterceptor  Track Message Size Interceptor using | with priority BEFORE_DEFAULT 
+2026-05-16T13:16:24.768+02:00  WARN 33256 --- [petsitter] [  restartedMain] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Failed to start bean 'webServerStartStop'
+2026-05-16T13:16:25.145+02:00  INFO 33256 --- [petsitter] [  restartedMain] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-05-16T13:16:25.247+02:00  INFO 33256 --- [petsitter] [  restartedMain] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-05-16T13:16:25.340+02:00 ERROR 33256 --- [petsitter] [  restartedMain] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Web server failed to start. Port 8080 was already in use.
+
+Action:
+
+Identify and stop the process that's listening on port 8080 or configure this application to listen on another port.
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  37.830 s
+[INFO] Finished at: 2026-05-16T13:16:25+02:00
+[INFO] ------------------------------------------------------------------------

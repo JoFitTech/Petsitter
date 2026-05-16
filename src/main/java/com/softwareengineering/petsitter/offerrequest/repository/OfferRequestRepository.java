@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface OfferRequestRepository extends JpaRepository<OfferRequest, UUID> {
     Optional<OfferRequest> findByOfferOfferIdAndRequesterId(UUID offerId, UUID requesterId);
 
+    List<OfferRequest> findAllByOfferOfferId(UUID offerId);
+
     List<OfferRequest> findAllByOfferOfferIdAndStatus(UUID offerId, RequestStatus status);
 
     List<OfferRequest> findAllByRequesterId(UUID requesterId);

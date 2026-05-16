@@ -47,3 +47,11 @@ src/main/frontend/generated/
 
 ### No local environment variables ###
 application-local.yml
+
+### Application Logs (never version control) ###
+*.log
+app_error.log
+app_output.log
+current-run.log
+startup.log
+

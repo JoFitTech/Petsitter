@@ -11,7 +11,6 @@ import com.softwareengineering.petsitter.chat.repository.ChatConversationReposit
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -32,7 +31,7 @@ class ChatAccessServiceTest {
         conversation.setOwnerId(ownerId);
         conversation.setSitterId(sitterId);
 
-        when(conversationRepository.findAll()).thenReturn(List.of(conversation));
+        when(conversationRepository.findById("conv-1")).thenReturn(Optional.of(conversation));
 
         ChatConversationDocument forOwner = service.verifyAccess("conv-1", ownerId);
         ChatConversationDocument forSitter = service.verifyAccess("conv-1", sitterId);
@@ -52,7 +51,7 @@ class ChatAccessServiceTest {
         conversation.setOwnerId(UUID.randomUUID());
         conversation.setSitterId(UUID.randomUUID());
 
-        when(conversationRepository.findAll()).thenReturn(List.of(conversation));
+        when(conversationRepository.findById("conv-2")).thenReturn(Optional.of(conversation));
 
         assertThatThrownBy(() -> service.verifyAccess("conv-2", UUID.randomUUID()))
                 .isInstanceOf(ForbiddenOperationException.class);

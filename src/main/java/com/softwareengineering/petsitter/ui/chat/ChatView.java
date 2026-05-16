@@ -446,11 +446,16 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
 
         try {
-            chatService.sendMessage(activeConversationId, text);
+            ChatMessageDto sent = chatService.sendMessage(activeConversationId, text);
             messageInput.setValue("");
             publishTyping(false);
 
-            // Messages will update via ChatEventBus listener
+            // Add sender's message immediately to UI (don't wait for EventBus)
+            messageList.add(buildMessageBubble(sent));
+            messageList.getElement().executeJs("this.scrollTop = this.scrollHeight");
+
+            // Refresh conversation list for updated timestamp
+            refreshConversationList();
         } catch (Exception e) {
             log.error("Failed to send message: {}", e.getMessage());
             messageInput.setValue("Fehler: Nachricht konnte nicht gesendet werden.");

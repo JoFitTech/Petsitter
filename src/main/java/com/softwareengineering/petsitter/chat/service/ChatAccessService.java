@@ -44,9 +44,7 @@ public class ChatAccessService {
      * @throws ForbiddenOperationException     wenn User nicht authorized ist
      */
     public ChatConversationDocument verifyAccess(String conversationId, UUID userId) {
-        ChatConversationDocument conversation = conversationRepository.findAll().stream()
-            .filter(item -> conversationId.equals(item.getId()))
-            .findFirst()
+        ChatConversationDocument conversation = conversationRepository.findById(conversationId)
             .orElseThrow(() -> new NotFoundException("Chat-Konversation nicht gefunden: " + conversationId));
 
         boolean isOwner = conversation.getOwnerId().equals(userId);

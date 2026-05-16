@@ -3,8 +3,9 @@ package com.softwareengineering.petsitter.chat.service;
 import com.softwareengineering.petsitter.booking.service.BookingCreatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 
 /**
  * Application Event Listener für Booking-Erstellung.
@@ -27,11 +28,14 @@ public class ChatBookingListener {
 
     /**
      * Listener für neue Bookings.
-     * Erstellt automatisch eine Chat-Konversation.
+     * Erstellt automatisch eine Chat-Konversation nach erfolgreichem Booking-Commit.
+     *
+     * Verwendet @TransactionalEventListener mit AFTER_COMMIT Phase, um sicherzustellen,
+     * dass die Chat nur erstellt wird, wenn die Booking-Transaktion erfolgreich committed wurde.
      *
      * @param event Das BookingCreatedEvent mit der Booking-ID
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onBookingCreated(BookingCreatedEvent event) {
         log.info("BookingCreatedEvent received for booking {}", event.getBookingId());
         try {

@@ -452,9 +452,23 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
         // Styling and content based on status
         if (status == RequestStatus.ACCEPTED) {
-            card.getStyle().set("background", "#edf7ed").set("border", "1px solid #b8ddb8");
-            card.add(makeCardTitle("✅ Anfrage angenommen", "#2e7d32"));
-            card.add(makeCardOfferSpan(offerTitle));
+            boolean cancelled = false;
+            if (requestId != null) {
+                try {
+                    cancelled = bookingService.isBookingCancelledForRequest(UUID.fromString(requestId));
+                } catch (Exception e) {
+                    log.warn("Could not check booking cancellation: {}", e.getMessage());
+                }
+            }
+            if (cancelled) {
+                card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
+                card.add(makeCardTitle("🚫 Buchung storniert", "#7a6050"));
+                card.add(makeCardOfferSpan(offerTitle));
+            } else {
+                card.getStyle().set("background", "#edf7ed").set("border", "1px solid #b8ddb8");
+                card.add(makeCardTitle("✅ Anfrage angenommen", "#2e7d32"));
+                card.add(makeCardOfferSpan(offerTitle));
+            }
         } else if (status == RequestStatus.DENIED) {
             card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
             card.add(makeCardTitle("❌ Anfrage abgelehnt", "#7a6050"));

@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.user;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.dto.BookingDto;
 import com.softwareengineering.petsitter.booking.service.BookingService;
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
@@ -19,12 +20,14 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.QueryParameters;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 public class MyBookings extends Div {
@@ -35,11 +38,13 @@ public class MyBookings extends Div {
     private static final String BORDER  = "#ead5ae";
 
     private final BookingService bookingService;
+    private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
     private final Div bookingsContainer = new Div();
 
-    public MyBookings(BookingService bookingService, AuthenticatedUser authenticatedUser) {
+    public MyBookings(BookingService bookingService, ChatService chatService, AuthenticatedUser authenticatedUser) {
         this.bookingService = bookingService;
+        this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
 
         setWidthFull();
@@ -190,7 +195,14 @@ public class MyBookings extends Div {
                 .set("height", "40px")
                 .set("cursor", "pointer")
                 .set("margin-top", "16px");
-        chatBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
+        chatBtn.addClickListener(e -> {
+            Optional<String> convId = chatService.getConversationIdForBooking(dto.id());
+            if (convId.isPresent()) {
+                UI.getCurrent().navigate("chat", QueryParameters.of("conversation", convId.get()));
+            } else {
+                UI.getCurrent().navigate("chat");
+            }
+        });
 
         card.add(colorBar, titleRow, subtitle);
         if (petSpan != null) card.add(petSpan);

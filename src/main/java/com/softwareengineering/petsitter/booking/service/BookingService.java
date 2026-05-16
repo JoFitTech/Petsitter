@@ -145,6 +145,17 @@ public class BookingService {
 
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
+
+        Offer offer = booking.getOffer();
+        offer.setStatus(OfferStatus.OPEN);
+        offerRepository.save(offer);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isBookingCancelledForRequest(UUID requestId) {
+        return bookingRepository.findByAcceptedRequest_Id(requestId)
+                .map(b -> b.getStatus() == BookingStatus.CANCELLED)
+                .orElse(false);
     }
 
     /**

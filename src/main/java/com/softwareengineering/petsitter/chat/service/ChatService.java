@@ -408,6 +408,15 @@ public class ChatService {
             ));
     }
 
+    public java.util.Optional<String> getConversationIdForBooking(UUID bookingId) {
+        return conversationRepository.findByBookingId(bookingId)
+            .map(ChatConversationDocument::getId)
+            .or(() -> {
+                // Fallback: find by user pair using booking data
+                return java.util.Optional.empty();
+            });
+    }
+
     // ── Private Hilfsmethoden ────────────────────────────────────────────
 
     private ChatConversationDto toConversationDto(ChatConversationDocument doc) {

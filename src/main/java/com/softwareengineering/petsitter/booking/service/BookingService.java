@@ -159,9 +159,9 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public boolean isBookingCancelledForRequest(UUID requestId) {
-        return bookingRepository.findByAcceptedRequest_Id(requestId)
-                .map(b -> b.getStatus() == BookingStatus.CANCELLED)
-                .orElse(false);
+        List<Booking> bookings = bookingRepository.findAllByAcceptedRequest_Id(requestId);
+        if (bookings.isEmpty()) return false;
+        return bookings.stream().allMatch(b -> b.getStatus() == BookingStatus.CANCELLED);
     }
 
     /**

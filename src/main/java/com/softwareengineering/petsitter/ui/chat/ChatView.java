@@ -444,6 +444,20 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
                 return buildAcceptedCard(acceptedAsRequester.get());
             }
 
+            // Denied — current user was the creator
+            Optional<OfferRequest> deniedAsCreator =
+                requestService.findDeniedRequestFromRequesterToCreator(currentUserId, otherUserId);
+            if (deniedAsCreator.isPresent()) {
+                return buildDeniedCard(deniedAsCreator.get());
+            }
+
+            // Denied — current user was the requester
+            Optional<OfferRequest> deniedAsRequester =
+                requestService.findDeniedRequestFromRequesterToCreator(otherUserId, currentUserId);
+            if (deniedAsRequester.isPresent()) {
+                return buildDeniedCard(deniedAsRequester.get());
+            }
+
         } catch (Exception e) {
             log.warn("Could not build request card: {}", e.getMessage());
         }
@@ -526,6 +540,29 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         status.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic");
 
         card.add(title, offerSpan, status);
+        return card;
+    }
+
+    private Component buildDeniedCard(OfferRequest request) {
+        Div card = new Div();
+        card.getStyle()
+            .set("background", "#f5f5f5")
+            .set("border", "1px solid #d0c8c0")
+            .set("border-radius", "12px")
+            .set("padding", "16px")
+            .set("margin", "0 auto 4px auto")
+            .set("max-width", "80%")
+            .set("width", "fit-content");
+
+        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
+
+        Span title = new Span("❌ Anfrage abgelehnt");
+        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "4px");
+
+        Span offerSpan = new Span("Angebot: " + offerTitle);
+        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050");
+
+        card.add(title, offerSpan);
         return card;
     }
 

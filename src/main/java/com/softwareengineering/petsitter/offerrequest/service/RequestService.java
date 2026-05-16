@@ -276,6 +276,21 @@ public class RequestService {
         }
         OfferRequest req = accepted.get(0);
         req.getOffer().getOfferId();
+        req.getOffer().getTitle();
+        req.getRequester().getId();
+        return Optional.of(req);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OfferRequest> findDeniedRequestFromRequesterToCreator(UUID creatorId, UUID requesterId) {
+        List<OfferRequest> denied = offerRequestRepository
+            .findAllByOffer_CreateUser_IdAndRequester_IdAndStatus(creatorId, requesterId, RequestStatus.DENIED);
+        if (denied.isEmpty()) {
+            return Optional.empty();
+        }
+        OfferRequest req = denied.get(0);
+        req.getOffer().getOfferId();
+        req.getOffer().getTitle();
         req.getRequester().getId();
         return Optional.of(req);
     }

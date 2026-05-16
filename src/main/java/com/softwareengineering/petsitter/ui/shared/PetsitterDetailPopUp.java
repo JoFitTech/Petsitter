@@ -251,6 +251,13 @@ public class PetsitterDetailPopUp extends Dialog {
                 btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
                 return btn;
             }
+            if (existingStatus == RequestStatus.DENIED) {
+                Button btn = styledButton("Anfrage abgelehnt");
+                btn.setEnabled(false);
+                btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
+                btn.getElement().setAttribute("title", "Deine Anfrage wurde abgelehnt");
+                return btn;
+            }
         }
 
         Button btn = styledButton("Auftrag anfragen");

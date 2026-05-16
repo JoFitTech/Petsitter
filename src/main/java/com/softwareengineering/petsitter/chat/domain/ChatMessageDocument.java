@@ -65,6 +65,12 @@ public class ChatMessageDocument {
      */
     private boolean read;
 
+    private String type;
+
+    private String requestId;
+
+    private String offerTitle;
+
     public ChatMessageDocument() {
     }
 
@@ -130,6 +136,30 @@ public class ChatMessageDocument {
 
     public void setRead(boolean read) {
         this.read = read;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public String getOfferTitle() {
+        return offerTitle;
+    }
+
+    public void setOfferTitle(String offerTitle) {
+        this.offerTitle = offerTitle;
     }
 
 }

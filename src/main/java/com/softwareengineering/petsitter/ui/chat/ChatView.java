@@ -8,6 +8,7 @@ import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
@@ -380,15 +381,7 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             List<ChatMessageDto> messages = chatService.getMessages(conversationId);
             messageList.removeAll();
 
-            // Request card as first item (if a request exists between these users)
-            if (selected != null) {
-                Component card = buildRequestCard(selected);
-                if (card != null) {
-                    messageList.add(card);
-                }
-            }
-
-            if (messages.isEmpty() && messageList.getComponentCount() == 0) {
+            if (messages.isEmpty()) {
                 messageList.add(new Paragraph("Keine Nachrichten in diesem Chat."));
             } else {
                 for (ChatMessageDto msg : messages) {
@@ -412,200 +405,130 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
     }
 
-    private Component buildRequestCard(ChatConversationDto conv) {
-        UUID otherUserId = currentUserId.equals(conv.ownerId()) ? conv.sitterId() : conv.ownerId();
-
-        try {
-            // Current user is the offer creator → they received the request
-            Optional<OfferRequest> pendingAsCreator =
-                requestService.findPendingRequestFromRequesterToCreator(currentUserId, otherUserId);
-            if (pendingAsCreator.isPresent()) {
-                return buildActionableRequestCard(pendingAsCreator.get(), conv);
-            }
-
-            // Current user is the requester → they sent the request
-            Optional<OfferRequest> pendingAsRequester =
-                requestService.findPendingRequestFromRequesterToCreator(otherUserId, currentUserId);
-            if (pendingAsRequester.isPresent()) {
-                return buildPendingRequesterCard(pendingAsRequester.get());
-            }
-
-            // Accepted — current user was the creator
-            Optional<OfferRequest> acceptedAsCreator =
-                requestService.findAcceptedRequestFromRequesterToCreator(currentUserId, otherUserId);
-            if (acceptedAsCreator.isPresent()) {
-                return buildAcceptedCard(acceptedAsCreator.get());
-            }
-
-            // Accepted — current user was the requester
-            Optional<OfferRequest> acceptedAsRequester =
-                requestService.findAcceptedRequestFromRequesterToCreator(otherUserId, currentUserId);
-            if (acceptedAsRequester.isPresent()) {
-                return buildAcceptedCard(acceptedAsRequester.get());
-            }
-
-            // Denied — current user was the creator
-            Optional<OfferRequest> deniedAsCreator =
-                requestService.findDeniedRequestFromRequesterToCreator(currentUserId, otherUserId);
-            if (deniedAsCreator.isPresent()) {
-                return buildDeniedCard(deniedAsCreator.get());
-            }
-
-            // Denied — current user was the requester
-            Optional<OfferRequest> deniedAsRequester =
-                requestService.findDeniedRequestFromRequesterToCreator(otherUserId, currentUserId);
-            if (deniedAsRequester.isPresent()) {
-                return buildDeniedCard(deniedAsRequester.get());
-            }
-
-        } catch (Exception e) {
-            log.warn("Could not build request card: {}", e.getMessage());
-        }
-        return null;
-    }
-
-    private Component buildActionableRequestCard(OfferRequest request, ChatConversationDto conv) {
-        Div card = new Div();
-        card.getStyle()
-            .set("background", "#fff8ec")
-            .set("border", "1px solid #f0d8a8")
-            .set("border-radius", "12px")
-            .set("padding", "16px")
-            .set("margin", "0 auto 4px auto")
-            .set("max-width", "80%")
-            .set("width", "fit-content");
-
-        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
-        String requesterName = request.getRequester().getFirstName() + " " + request.getRequester().getLastName();
-
-        Span title = new Span("📋 Angebotsanfrage");
-        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#4a3428").set("display", "block").set("margin-bottom", "4px");
-
-        Span offerSpan = new Span("Angebot: " + offerTitle);
-        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "4px");
-
-        Span fromSpan = new Span("Von: " + requesterName);
-        fromSpan.getStyle().set("font-size", "12px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "12px");
-
-        HorizontalLayout buttons = new HorizontalLayout();
-        buttons.setSpacing(true);
-
-        Button acceptBtn = new Button("Annehmen", e -> {
-            try {
-                bookingService.acceptRequest(request.getId(), currentUserId);
-                Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
-                n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                selectConversation(activeConversationId);
-            } catch (Exception ex) {
-                Notification.show("Fehler: " + ex.getMessage());
-            }
-        });
-        acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
-
-        Button denyBtn = new Button("Ablehnen", e -> {
-            try {
-                requestService.denyRequest(request.getId(), currentUserId);
-                selectConversation(activeConversationId);
-            } catch (Exception ex) {
-                Notification.show("Fehler: " + ex.getMessage());
-            }
-        });
-        denyBtn.getStyle().set("border-radius", "8px");
-
-        buttons.add(acceptBtn, denyBtn);
-        card.add(title, offerSpan, fromSpan, buttons);
-        return card;
-    }
-
-    private Component buildPendingRequesterCard(OfferRequest request) {
-        Div card = new Div();
-        card.getStyle()
-            .set("background", "#f0f4ff")
-            .set("border", "1px solid #c5d0e8")
-            .set("border-radius", "12px")
-            .set("padding", "16px")
-            .set("margin", "0 auto 4px auto")
-            .set("max-width", "80%")
-            .set("width", "fit-content");
-
-        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
-
-        Span title = new Span("📋 Deine Anfrage");
-        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#4a3428").set("display", "block").set("margin-bottom", "4px");
-
-        Span offerSpan = new Span("Angebot: " + offerTitle);
-        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "4px");
-
-        Span status = new Span("Status: Ausstehend");
-        status.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic");
-
-        card.add(title, offerSpan, status);
-        return card;
-    }
-
-    private Component buildDeniedCard(OfferRequest request) {
-        Div card = new Div();
-        card.getStyle()
-            .set("background", "#f5f5f5")
-            .set("border", "1px solid #d0c8c0")
-            .set("border-radius", "12px")
-            .set("padding", "16px")
-            .set("margin", "0 auto 4px auto")
-            .set("max-width", "80%")
-            .set("width", "fit-content");
-
-        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
-
-        Span title = new Span("❌ Anfrage abgelehnt");
-        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "4px");
-
-        Span offerSpan = new Span("Angebot: " + offerTitle);
-        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050");
-
-        card.add(title, offerSpan);
-        return card;
-    }
-
-    private Component buildAcceptedCard(OfferRequest request) {
-        Div card = new Div();
-        card.getStyle()
-            .set("background", "#edf7ed")
-            .set("border", "1px solid #b8ddb8")
-            .set("border-radius", "12px")
-            .set("padding", "16px")
-            .set("margin", "0 auto 4px auto")
-            .set("max-width", "80%")
-            .set("width", "fit-content");
-
-        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
-
-        Span title = new Span("✅ Anfrage angenommen");
-        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#2e7d32").set("display", "block").set("margin-bottom", "4px");
-
-        Span offerSpan = new Span("Angebot: " + offerTitle);
-        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050");
-
-        card.add(title, offerSpan);
-        return card;
-    }
-
     private Component buildMessageBubble(ChatMessageDto msg) {
+        if ("REQUEST_CARD".equals(msg.type())) {
+            return buildRequestCardBubble(msg);
+        }
+
         HorizontalLayout row = new HorizontalLayout();
         row.setWidthFull();
         row.setAlignItems(FlexComponent.Alignment.END);
         row.setSpacing(true);
 
         if (msg.senderId().equals(currentUserId)) {
-            // Own message (right side)
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
             row.add(buildAvatar("Ich"), createBubble(msg.message(), true));
         } else {
-            // Other's message (left side)
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
             row.add(buildAvatar(activeCounterpartName), createBubble(msg.message(), false));
         }
 
         return row;
+    }
+
+    private Component buildRequestCardBubble(ChatMessageDto msg) {
+        boolean isOwnRequest = msg.senderId().equals(currentUserId);
+        boolean isRecipient = msg.recipientId().equals(currentUserId);
+
+        Div card = new Div();
+        card.getStyle()
+            .set("border-radius", "12px")
+            .set("padding", "14px 16px")
+            .set("max-width", "60%")
+            .set("width", "fit-content");
+
+        String offerTitle = msg.offerTitle() != null ? msg.offerTitle() : "Angebot";
+        String requestId = msg.requestId();
+
+        // Determine current request status
+        RequestStatus status = null;
+        if (requestId != null) {
+            try {
+                status = requestService.findById(UUID.fromString(requestId)).getStatus();
+            } catch (Exception e) {
+                log.warn("Could not load request status for card: {}", e.getMessage());
+            }
+        }
+
+        // Styling and content based on status
+        if (status == RequestStatus.ACCEPTED) {
+            card.getStyle().set("background", "#edf7ed").set("border", "1px solid #b8ddb8");
+            card.add(makeCardTitle("✅ Anfrage angenommen", "#2e7d32"));
+            card.add(makeCardOfferSpan(offerTitle));
+        } else if (status == RequestStatus.DENIED) {
+            card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
+            card.add(makeCardTitle("❌ Anfrage abgelehnt", "#7a6050"));
+            card.add(makeCardOfferSpan(offerTitle));
+        } else if (status == RequestStatus.PENDING && isRecipient) {
+            card.getStyle().set("background", "#fff8ec").set("border", "1px solid #f0d8a8");
+            card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
+            card.add(makeCardOfferSpan(offerTitle));
+
+            HorizontalLayout buttons = new HorizontalLayout();
+            buttons.getStyle().set("margin-top", "10px");
+
+            UUID reqId = UUID.fromString(requestId);
+            Button acceptBtn = new Button("Annehmen", e -> {
+                try {
+                    bookingService.acceptRequest(reqId, currentUserId);
+                    Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
+                    n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    selectConversation(activeConversationId);
+                } catch (Exception ex) {
+                    Notification.show("Fehler: " + ex.getMessage());
+                }
+            });
+            acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
+
+            Button denyBtn = new Button("Ablehnen", e -> {
+                try {
+                    requestService.denyRequest(reqId, currentUserId);
+                    selectConversation(activeConversationId);
+                } catch (Exception ex) {
+                    Notification.show("Fehler: " + ex.getMessage());
+                }
+            });
+            denyBtn.getStyle().set("border-radius", "8px");
+
+            buttons.add(acceptBtn, denyBtn);
+            card.add(buttons);
+        } else {
+            // PENDING as sender, or unknown status
+            card.getStyle().set("background", "#f0f4ff").set("border", "1px solid #c5d0e8");
+            card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
+            card.add(makeCardOfferSpan(offerTitle));
+            Span statusSpan = new Span(status == RequestStatus.PENDING ? "Status: Ausstehend" : "Status: Unbekannt");
+            statusSpan.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic").set("display", "block").set("margin-top", "4px");
+            card.add(statusSpan);
+        }
+
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.END);
+        row.setSpacing(true);
+
+        if (isOwnRequest) {
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+            row.add(buildAvatar("Ich"), card);
+        } else {
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
+            row.add(buildAvatar(activeCounterpartName), card);
+        }
+
+        return row;
+    }
+
+    private Span makeCardTitle(String text, String color) {
+        Span s = new Span(text);
+        s.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", color)
+            .set("display", "block").set("margin-bottom", "4px");
+        return s;
+    }
+
+    private Span makeCardOfferSpan(String offerTitle) {
+        Span s = new Span("Angebot: " + offerTitle);
+        s.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block");
+        return s;
     }
 
     private Div createBubble(String text, boolean isOwn) {

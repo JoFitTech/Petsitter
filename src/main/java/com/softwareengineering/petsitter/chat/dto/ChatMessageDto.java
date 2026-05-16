@@ -18,6 +18,9 @@ public record ChatMessageDto(
     UUID recipientId,
     String message,
     LocalDateTime createdAt,
-    boolean read
+    boolean read,
+    String type,
+    String requestId,
+    String offerTitle
 ) { }
 

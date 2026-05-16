@@ -27,7 +27,10 @@ class ChatEventBusTest {
                 recipientId,
                 "Hallo",
                 LocalDateTime.now(),
-                false
+                false,
+                null,
+                null,
+                null
         );
 
         eventBus.publish(dto);
@@ -55,7 +58,10 @@ class ChatEventBusTest {
                 recipientId,
                 "Test",
                 LocalDateTime.now(),
-                false
+                false,
+                null,
+                null,
+                null
         );
 
         eventBus.publish(dto);

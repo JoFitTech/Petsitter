@@ -115,39 +115,41 @@ public class ChatService {
 
         String pairKey = buildUserPairKey(owner.getId(), sitter.getId());
 
+        String convId;
+
         var existing = conversationRepository.findByUserPairKey(pairKey);
         if (existing.isPresent()) {
             log.info("Conversation for user pair {} already exists. Reusing {}.", pairKey, existing.get().getId());
-            if (initialMessage != null && !initialMessage.isBlank()) {
-                sendMessage(existing.get().getId(), initialMessage);
-            }
-            return existing.get().getId();
+            convId = existing.get().getId();
+        } else {
+            ChatConversationDocument conversation = new ChatConversationDocument();
+            conversation.setOwnerId(owner.getId());
+            conversation.setSitterId(sitter.getId());
+            conversation.setOwnerDisplayName(getDisplayName(owner));
+            conversation.setSitterDisplayName(getDisplayName(sitter));
+            conversation.setRequestId(requestId.toString());
+            conversation.setOfferId(offer.getOfferId().toString());
+            conversation.setUserPairKey(pairKey);
+            conversation.setCreatedAt(LocalDateTime.now());
+            conversation = conversationRepository.save(conversation);
+            convId = conversation.getId();
+            log.info("Chat conversation created for request {} with id {}", requestId, convId);
         }
 
-        ChatConversationDocument conversation = new ChatConversationDocument();
-        conversation.setOwnerId(owner.getId());
-        conversation.setSitterId(sitter.getId());
-        conversation.setOwnerDisplayName(getDisplayName(owner));
-        conversation.setSitterDisplayName(getDisplayName(sitter));
-        conversation.setRequestId(requestId.toString());
-        conversation.setOfferId(offer.getOfferId().toString());
-        conversation.setUserPairKey(pairKey);
-        conversation.setCreatedAt(LocalDateTime.now());
+        saveRequestCardMessage(convId, requester.getId(), creator.getId(), requestId, offer.getTitle());
 
-        conversation = conversationRepository.save(conversation);
-        log.info("Chat conversation created for request {} with id {}", requestId, conversation.getId());
-
-        if (initialMessage != null && !initialMessage.isBlank()) {
-            sendMessage(conversation.getId(), initialMessage);
-        }
+        String msgText = (initialMessage != null && !initialMessage.isBlank())
+            ? initialMessage
+            : "Guten Tag, ich interessiere mich für dieses Angebot.";
+        sendMessage(convId, msgText);
 
         try {
-            notificationService.createRequestNotification(creator, requester, conversation.getId());
+            notificationService.createRequestNotification(creator, requester, convId);
         } catch (Exception e) {
             log.warn("Failed to create request notification: {}", e.getMessage(), e);
         }
 
-        return conversation.getId();
+        return convId;
     }
 
     @Transactional
@@ -439,7 +441,10 @@ public class ChatService {
             doc.getRecipientId(),
             doc.getMessage(),
             doc.getCreatedAt(),
-            doc.isRead()
+            doc.isRead(),
+            doc.getType(),
+            doc.getRequestId(),
+            doc.getOfferTitle()
         );
     }
 
@@ -447,6 +452,21 @@ public class ChatService {
         return (user.getFirstName() != null ? user.getFirstName().trim() : "")
             + " "
             + (user.getLastName() != null ? user.getLastName().trim() : "");
+    }
+
+    private void saveRequestCardMessage(String conversationId, UUID requesterId, UUID creatorId,
+                                        UUID requestId, String offerTitle) {
+        ChatMessageDocument card = new ChatMessageDocument();
+        card.setConversationId(conversationId);
+        card.setSenderId(requesterId);
+        card.setRecipientId(creatorId);
+        card.setType("REQUEST_CARD");
+        card.setRequestId(requestId.toString());
+        card.setOfferTitle(offerTitle != null ? offerTitle : "Angebot");
+        card.setCreatedAt(LocalDateTime.now());
+        card.setRead(false);
+        ChatMessageDocument saved = messageRepository.save(card);
+        eventBus.publish(toMessageDto(saved));
     }
 
     private String buildUserPairKey(UUID a, UUID b) {

@@ -116,7 +116,10 @@ class ChatViewIntegrationTest {
                         currentUserId,
                         "Bestehende Nachricht",
                         LocalDateTime.now(),
-                        false
+                        false,
+                        null,
+                        null,
+                        null
                 )
         ));
 
@@ -137,7 +140,10 @@ class ChatViewIntegrationTest {
                 currentUserId,
                 "Neue Event-Nachricht",
                 LocalDateTime.now(),
-                false
+                false,
+                null,
+                null,
+                null
         );
 
         // simulate delivery by same logic as listener callback

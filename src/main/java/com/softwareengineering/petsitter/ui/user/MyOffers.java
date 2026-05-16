@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
@@ -31,6 +32,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.UUID;
 
 public class MyOffers extends Div {
 
@@ -42,14 +45,17 @@ public class MyOffers extends Div {
     private final OfferService offerService;
     private final RequestService requestService;
     private final ChatService chatService;
+    private final BookingService bookingService;
     private final AuthenticatedUser authenticatedUser;
     private final Div offersContainer = new Div();
 
     public MyOffers(OfferService offerService, RequestService requestService,
-                    ChatService chatService, AuthenticatedUser authenticatedUser) {
+                    ChatService chatService, BookingService bookingService,
+                    AuthenticatedUser authenticatedUser) {
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
+        this.bookingService = bookingService;
         this.authenticatedUser = authenticatedUser;
 
         setWidthFull();
@@ -262,6 +268,39 @@ public class MyOffers extends Div {
         );
 
         card.add(imagePlaceholder, titleRow, subtitle, detailsRow);
+
+        if (offer.status() == OfferStatus.BOOKED) {
+            Span cancelLink = new Span("Buchung stornieren");
+            cancelLink.getStyle()
+                    .set("display", "block")
+                    .set("margin-top", "14px")
+                    .set("font-size", "13px")
+                    .set("font-weight", "600")
+                    .set("color", "#9a4f36")
+                    .set("cursor", "pointer")
+                    .set("text-align", "center")
+                    .set("text-decoration", "underline");
+            cancelLink.getElement().executeJs("this.addEventListener('click', event => event.stopPropagation());");
+            cancelLink.addClickListener(e -> {
+                UUID userId = authenticatedUser.get().map(u -> u.getId()).orElse(null);
+                if (userId == null) return;
+                Optional<UUID> bookingId = bookingService.findActiveBookingIdForOffer(offer.id());
+                if (bookingId.isEmpty()) {
+                    Notification.show("Keine aktive Buchung gefunden.").addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    return;
+                }
+                try {
+                    bookingService.cancelBooking(bookingId.get(), userId);
+                    Notification n = Notification.show("Buchung storniert.");
+                    n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    renderOffers();
+                } catch (Exception ex) {
+                    Notification.show("Fehler: " + ex.getMessage()).addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }
+            });
+            card.add(cancelLink);
+        }
+
         return card;
     }
 

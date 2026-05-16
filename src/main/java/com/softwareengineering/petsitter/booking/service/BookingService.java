@@ -158,6 +158,12 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
+    public java.util.Optional<UUID> findActiveBookingIdForOffer(UUID offerId) {
+        return bookingRepository.findByOffer_OfferIdAndStatus(offerId, BookingStatus.CREATED)
+                .map(Booking::getId);
+    }
+
+    @Transactional(readOnly = true)
     public boolean isBookingCancelledForRequest(UUID requestId) {
         List<Booking> bookings = bookingRepository.findAllByAcceptedRequest_Id(requestId);
         if (bookings.isEmpty()) return false;

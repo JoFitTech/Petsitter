@@ -621,7 +621,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineAuftraege() {
         contentPanel.removeAll();
-        contentPanel.add(new MyOffers(offerService, requestService, chatService, authenticatedUser));
+        contentPanel.add(new MyOffers(offerService, requestService, chatService, bookingService, authenticatedUser));
     }
 
     private void showMeineBuchungen() {

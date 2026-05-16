@@ -153,6 +153,7 @@ public class BookingService {
      * @param userId ID des Users
      * @return Liste der BookingDtos
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<BookingDto> getBookings(UUID userId) {
         return bookingRepository.findAllByOwnerIdOrSitterId(userId, userId)
                 .stream()
@@ -204,6 +205,7 @@ public class BookingService {
 
         return new BookingDto(
                 booking.getId(),
+                booking.getOwner().getId(),
                 offerTitle,
                 ownerName,
                 sitterName,

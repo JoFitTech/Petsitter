@@ -20,6 +20,7 @@ import java.util.UUID;
  */
 public record BookingDto(
         UUID id,
+        UUID ownerId,
         String offerTitle,
         String ownerName,
         String sitterName,

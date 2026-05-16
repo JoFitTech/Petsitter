@@ -143,12 +143,6 @@ public class ChatService {
             : "Guten Tag, ich interessiere mich für dieses Angebot.";
         sendMessage(convId, msgText);
 
-        try {
-            notificationService.createRequestNotification(creator, requester, convId);
-        } catch (Exception e) {
-            log.warn("Failed to create request notification: {}", e.getMessage(), e);
-        }
-
         return convId;
     }
 

@@ -25,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Chat-Service – zentrale Businesslogik für Chat-Operationen.
@@ -111,9 +113,14 @@ public class ChatService {
             owner = requester;
         }
 
-        var existing = conversationRepository.findByRequestId(requestId.toString());
+        String pairKey = buildUserPairKey(owner.getId(), sitter.getId());
+
+        var existing = conversationRepository.findByUserPairKey(pairKey);
         if (existing.isPresent()) {
-            log.info("Conversation for request {} already exists. Returning existing.", requestId);
+            log.info("Conversation for user pair {} already exists. Reusing {}.", pairKey, existing.get().getId());
+            if (initialMessage != null && !initialMessage.isBlank()) {
+                sendMessage(existing.get().getId(), initialMessage);
+            }
             return existing.get().getId();
         }
 
@@ -124,6 +131,7 @@ public class ChatService {
         conversation.setSitterDisplayName(getDisplayName(sitter));
         conversation.setRequestId(requestId.toString());
         conversation.setOfferId(offer.getOfferId().toString());
+        conversation.setUserPairKey(pairKey);
         conversation.setCreatedAt(LocalDateTime.now());
 
         conversation = conversationRepository.save(conversation);
@@ -155,18 +163,15 @@ public class ChatService {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
 
-        // Reuse conversation created at request time if it exists
-        UUID acceptedRequestId = booking.getAcceptedRequest() != null
-            ? booking.getAcceptedRequest().getId() : null;
-        if (acceptedRequestId != null) {
-            var byRequest = conversationRepository.findByRequestId(acceptedRequestId.toString());
-            if (byRequest.isPresent()) {
-                ChatConversationDocument conv = byRequest.get();
-                conv.setBookingId(bookingId);
-                conversationRepository.save(conv);
-                log.info("Linked existing conversation {} to booking {}", conv.getId(), bookingId);
-                return toConversationDto(conv);
-            }
+        // Reuse conversation created at request time if it exists (look up by user pair)
+        String pairKey = buildUserPairKey(booking.getOwner().getId(), booking.getSitter().getId());
+        var byPair = conversationRepository.findByUserPairKey(pairKey);
+        if (byPair.isPresent()) {
+            ChatConversationDocument conv = byPair.get();
+            conv.setBookingId(bookingId);
+            conversationRepository.save(conv);
+            log.info("Linked existing conversation {} to booking {}", conv.getId(), bookingId);
+            return toConversationDto(conv);
         }
 
         ChatConversationDocument conversation = new ChatConversationDocument();
@@ -307,13 +312,17 @@ public class ChatService {
         // Notification erstellen (mit Fallback auf direkte User-Lookups, falls Booking nicht mehr aufloesbar ist)
         User sender = null;
         User recipient = null;
-        try {
-            Booking booking = accessService.verifyBookingAccess(conversation.getBookingId(), currentUserId);
-            sender = booking.getOwner().getId().equals(currentUserId) ? booking.getOwner() : booking.getSitter();
-            recipient = booking.getOwner().getId().equals(currentUserId) ? booking.getSitter() : booking.getOwner();
-        } catch (Exception e) {
-            log.warn("Booking lookup failed for conversation {}. Falling back to user lookup: {}",
-                conversationId, e.getMessage());
+        if (conversation.getBookingId() != null) {
+            try {
+                Booking booking = accessService.verifyBookingAccess(conversation.getBookingId(), currentUserId);
+                sender = booking.getOwner().getId().equals(currentUserId) ? booking.getOwner() : booking.getSitter();
+                recipient = booking.getOwner().getId().equals(currentUserId) ? booking.getSitter() : booking.getOwner();
+            } catch (Exception e) {
+                log.warn("Booking lookup failed for conversation {}. Falling back to user lookup: {}",
+                    conversationId, e.getMessage());
+            }
+        }
+        if (sender == null || recipient == null) {
             sender = userRepository.findById(currentUserId).orElse(null);
             recipient = userRepository.findById(recipientId).orElse(null);
         }
@@ -391,6 +400,18 @@ public class ChatService {
         return messageRepository.countByRecipientIdAndReadFalse(currentUserId);
     }
 
+    public Map<String, Long> getUnreadCountsByConversation() {
+        UUID userId = authenticatedUser.get().map(User::getId).orElse(null);
+        if (userId == null) {
+            return Map.of();
+        }
+        return messageRepository.findAllByRecipientIdAndReadFalse(userId).stream()
+            .collect(Collectors.groupingBy(
+                ChatMessageDocument::getConversationId,
+                Collectors.counting()
+            ));
+    }
+
     // ── Private Hilfsmethoden ────────────────────────────────────────────
 
     private ChatConversationDto toConversationDto(ChatConversationDocument doc) {
@@ -426,6 +447,11 @@ public class ChatService {
         return (user.getFirstName() != null ? user.getFirstName().trim() : "")
             + " "
             + (user.getLastName() != null ? user.getLastName().trim() : "");
+    }
+
+    private String buildUserPairKey(UUID a, UUID b) {
+        String s1 = a.toString(), s2 = b.toString();
+        return s1.compareTo(s2) <= 0 ? s1 + "_" + s2 : s2 + "_" + s1;
     }
 
     private String truncatePreview(String text) {

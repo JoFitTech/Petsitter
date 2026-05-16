@@ -32,5 +32,7 @@ public interface ChatMessageRepository extends MongoRepository<ChatMessageDocume
             UUID recipientId
     );
 
+    List<ChatMessageDocument> findAllByRecipientIdAndReadFalse(UUID recipientId);
+
 }
 

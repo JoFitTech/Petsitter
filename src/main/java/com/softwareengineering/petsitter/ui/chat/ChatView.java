@@ -8,7 +8,6 @@ import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
-import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
@@ -33,6 +32,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -67,7 +67,6 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     // UI Components
     private VerticalLayout conversationList;
     private VerticalLayout messageList;
-    private Div requestActionBar;
     private TextArea messageInput;
     private Button sendButton;
     private Span chatTitle;
@@ -178,12 +177,6 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         // Header
         layout.add(buildChatHeader());
 
-        // Request action bar (shown when conversation has a pending request for the offer creator)
-        this.requestActionBar = new Div();
-        requestActionBar.setWidthFull();
-        requestActionBar.setVisible(false);
-        layout.add(requestActionBar);
-
         // Messages area
         this.messageList = new VerticalLayout();
         messageList.setWidthFull();
@@ -279,6 +272,8 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
                 return;
             }
 
+            Map<String, Long> unreadCounts = chatService.getUnreadCountsByConversation();
+
             for (ChatConversationDto conv : conversations) {
                 if (conv == null || conv.conversationId() == null || conv.conversationId().isBlank()) {
                     log.warn("Skipping invalid conversation entry: {}", conv);
@@ -287,7 +282,8 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
                 try {
                     conversationsById.put(conv.conversationId(), conv);
-                    conversationList.add(buildConversationItem(conv));
+                    long unread = unreadCounts.getOrDefault(conv.conversationId(), 0L);
+                    conversationList.add(buildConversationItem(conv, unread));
                 } catch (Exception itemException) {
                     log.warn("Skipping conversation {} due to rendering error: {}",
                         conv.conversationId(), itemException.getMessage(), itemException);
@@ -303,7 +299,7 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
     }
 
-    private Component buildConversationItem(ChatConversationDto conv) {
+    private Component buildConversationItem(ChatConversationDto conv, long unreadCount) {
         Div item = new Div();
         item.getStyle()
             .set("padding", "14px 16px")
@@ -314,7 +310,9 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
                 ? "#ebd7c0"
                 : "#fcfaf6")
             .set("border", "1px solid #f0e6da")
-            .set("box-sizing", "border-box");
+            .set("box-sizing", "border-box")
+            .set("display", "flex")
+            .set("align-items", "center");
 
         // Determine counterpart name
         String counterpartName = currentUserId.equals(conv.ownerId())
@@ -327,6 +325,7 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
         content.setSpacing(false);
+        content.getStyle().set("flex", "1");
 
         Span name = new Span(counterpartName);
         name.getStyle().set("font-weight", "700").set("color", DARK).set("font-size", "14px");
@@ -343,6 +342,18 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
 
         item.add(content);
+
+        if (unreadCount > 0) {
+            Span dot = new Span();
+            dot.getStyle()
+                .set("width", "10px").set("height", "10px")
+                .set("border-radius", "50%")
+                .set("background", "#e74c3c")
+                .set("flex-shrink", "0")
+                .set("margin-left", "8px");
+            item.add(dot);
+        }
+
         item.addClickListener(e -> selectConversation(conv.conversationId()));
 
         return item;
@@ -356,9 +367,6 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             activeRecipientId = currentUserIsOwner ? selected.sitterId() : selected.ownerId();
             activeCounterpartName = currentUserIsOwner ? selected.sitterDisplayName() : selected.ownerDisplayName();
             chatTitle.setText(activeCounterpartName != null ? activeCounterpartName : "Chat");
-            refreshRequestActionBar(selected);
-        } else {
-            requestActionBar.setVisible(false);
         }
         typingIndicator.setText("");
         typingIndicator.getStyle().set("display", "none");
@@ -372,7 +380,15 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             List<ChatMessageDto> messages = chatService.getMessages(conversationId);
             messageList.removeAll();
 
-            if (messages.isEmpty()) {
+            // Request card as first item (if a request exists between these users)
+            if (selected != null) {
+                Component card = buildRequestCard(selected);
+                if (card != null) {
+                    messageList.add(card);
+                }
+            }
+
+            if (messages.isEmpty() && messageList.getComponentCount() == 0) {
                 messageList.add(new Paragraph("Keine Nachrichten in diesem Chat."));
             } else {
                 for (ChatMessageDto msg : messages) {
@@ -396,76 +412,144 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
     }
 
-    private void refreshRequestActionBar(ChatConversationDto conv) {
-        requestActionBar.removeAll();
-        requestActionBar.setVisible(false);
-
-        if (conv.requestId() == null) {
-            return;
-        }
+    private Component buildRequestCard(ChatConversationDto conv) {
+        UUID otherUserId = currentUserId.equals(conv.ownerId()) ? conv.sitterId() : conv.ownerId();
 
         try {
-            OfferRequest request = requestService.findByIdWithDetails(UUID.fromString(conv.requestId()));
-            boolean isOfferCreator = request.getOffer().getCreator().getId().equals(currentUserId);
-
-            if (request.getStatus() == RequestStatus.PENDING && isOfferCreator) {
-                HorizontalLayout bar = new HorizontalLayout();
-                bar.setWidthFull();
-                bar.setAlignItems(FlexComponent.Alignment.CENTER);
-                bar.getStyle()
-                    .set("padding", "10px 20px")
-                    .set("background", "#fff8ec")
-                    .set("border-bottom", "1px solid #f0d8a8");
-
-                String requesterName = request.getRequester().getFirstName() + " "
-                        + request.getRequester().getLastName();
-                String offerTitle = request.getOffer().getTitle() != null
-                        ? request.getOffer().getTitle() : "Angebot";
-                Span label = new Span("Anfrage von " + requesterName + " für Angebot '" + offerTitle + "'");
-                label.getStyle().set("flex", "1").set("font-size", "13px").set("color", "#4a3428");
-
-                Button acceptBtn = new Button("Annehmen", e -> {
-                    try {
-                        bookingService.acceptRequest(request.getId(), currentUserId);
-                        Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
-                        n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                        refreshRequestActionBar(conv);
-                    } catch (Exception ex) {
-                        Notification.show("Fehler: " + ex.getMessage());
-                    }
-                });
-                acceptBtn.getStyle().set("background", "#4a3428").set("color", "white")
-                        .set("border-radius", "8px").set("margin-left", "12px");
-
-                Button denyBtn = new Button("Ablehnen", e -> {
-                    try {
-                        requestService.denyRequest(request.getId(), currentUserId);
-                        refreshRequestActionBar(conv);
-                    } catch (Exception ex) {
-                        Notification.show("Fehler: " + ex.getMessage());
-                    }
-                });
-                denyBtn.getStyle().set("border-radius", "8px");
-
-                bar.add(label, acceptBtn, denyBtn);
-                requestActionBar.add(bar);
-                requestActionBar.setVisible(true);
-
-            } else if (request.getStatus() == RequestStatus.ACCEPTED) {
-                Div info = new Div();
-                info.getStyle()
-                    .set("padding", "10px 20px")
-                    .set("background", "#edf7ed")
-                    .set("border-bottom", "1px solid #b8ddb8")
-                    .set("font-size", "13px")
-                    .set("color", "#2e7d32");
-                info.add(new Span("Anfrage angenommen – Booking erstellt"));
-                requestActionBar.add(info);
-                requestActionBar.setVisible(true);
+            // Current user is the offer creator → they received the request
+            Optional<OfferRequest> pendingAsCreator =
+                requestService.findPendingRequestFromRequesterToCreator(currentUserId, otherUserId);
+            if (pendingAsCreator.isPresent()) {
+                return buildActionableRequestCard(pendingAsCreator.get(), conv);
             }
+
+            // Current user is the requester → they sent the request
+            Optional<OfferRequest> pendingAsRequester =
+                requestService.findPendingRequestFromRequesterToCreator(otherUserId, currentUserId);
+            if (pendingAsRequester.isPresent()) {
+                return buildPendingRequesterCard(pendingAsRequester.get());
+            }
+
+            // Accepted — current user was the creator
+            Optional<OfferRequest> acceptedAsCreator =
+                requestService.findAcceptedRequestFromRequesterToCreator(currentUserId, otherUserId);
+            if (acceptedAsCreator.isPresent()) {
+                return buildAcceptedCard(acceptedAsCreator.get());
+            }
+
+            // Accepted — current user was the requester
+            Optional<OfferRequest> acceptedAsRequester =
+                requestService.findAcceptedRequestFromRequesterToCreator(otherUserId, currentUserId);
+            if (acceptedAsRequester.isPresent()) {
+                return buildAcceptedCard(acceptedAsRequester.get());
+            }
+
         } catch (Exception e) {
-            log.warn("Could not load request for action bar: {}", e.getMessage());
+            log.warn("Could not build request card: {}", e.getMessage());
         }
+        return null;
+    }
+
+    private Component buildActionableRequestCard(OfferRequest request, ChatConversationDto conv) {
+        Div card = new Div();
+        card.getStyle()
+            .set("background", "#fff8ec")
+            .set("border", "1px solid #f0d8a8")
+            .set("border-radius", "12px")
+            .set("padding", "16px")
+            .set("margin", "0 auto 4px auto")
+            .set("max-width", "80%")
+            .set("width", "fit-content");
+
+        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
+        String requesterName = request.getRequester().getFirstName() + " " + request.getRequester().getLastName();
+
+        Span title = new Span("📋 Angebotsanfrage");
+        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#4a3428").set("display", "block").set("margin-bottom", "4px");
+
+        Span offerSpan = new Span("Angebot: " + offerTitle);
+        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "4px");
+
+        Span fromSpan = new Span("Von: " + requesterName);
+        fromSpan.getStyle().set("font-size", "12px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "12px");
+
+        HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setSpacing(true);
+
+        Button acceptBtn = new Button("Annehmen", e -> {
+            try {
+                bookingService.acceptRequest(request.getId(), currentUserId);
+                Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
+                n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                selectConversation(activeConversationId);
+            } catch (Exception ex) {
+                Notification.show("Fehler: " + ex.getMessage());
+            }
+        });
+        acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
+
+        Button denyBtn = new Button("Ablehnen", e -> {
+            try {
+                requestService.denyRequest(request.getId(), currentUserId);
+                selectConversation(activeConversationId);
+            } catch (Exception ex) {
+                Notification.show("Fehler: " + ex.getMessage());
+            }
+        });
+        denyBtn.getStyle().set("border-radius", "8px");
+
+        buttons.add(acceptBtn, denyBtn);
+        card.add(title, offerSpan, fromSpan, buttons);
+        return card;
+    }
+
+    private Component buildPendingRequesterCard(OfferRequest request) {
+        Div card = new Div();
+        card.getStyle()
+            .set("background", "#f0f4ff")
+            .set("border", "1px solid #c5d0e8")
+            .set("border-radius", "12px")
+            .set("padding", "16px")
+            .set("margin", "0 auto 4px auto")
+            .set("max-width", "80%")
+            .set("width", "fit-content");
+
+        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
+
+        Span title = new Span("📋 Deine Anfrage");
+        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#4a3428").set("display", "block").set("margin-bottom", "4px");
+
+        Span offerSpan = new Span("Angebot: " + offerTitle);
+        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block").set("margin-bottom", "4px");
+
+        Span status = new Span("Status: Ausstehend");
+        status.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic");
+
+        card.add(title, offerSpan, status);
+        return card;
+    }
+
+    private Component buildAcceptedCard(OfferRequest request) {
+        Div card = new Div();
+        card.getStyle()
+            .set("background", "#edf7ed")
+            .set("border", "1px solid #b8ddb8")
+            .set("border-radius", "12px")
+            .set("padding", "16px")
+            .set("margin", "0 auto 4px auto")
+            .set("max-width", "80%")
+            .set("width", "fit-content");
+
+        String offerTitle = request.getOffer().getTitle() != null ? request.getOffer().getTitle() : "Angebot";
+
+        Span title = new Span("✅ Anfrage angenommen");
+        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", "#2e7d32").set("display", "block").set("margin-bottom", "4px");
+
+        Span offerSpan = new Span("Angebot: " + offerTitle);
+        offerSpan.getStyle().set("font-size", "13px").set("color", "#7a6050");
+
+        card.add(title, offerSpan);
+        return card;
     }
 
     private Component buildMessageBubble(ChatMessageDto msg) {

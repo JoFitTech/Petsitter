@@ -33,6 +33,9 @@ public class ChatConversationDocument {
 
     private String offerId;
 
+    @Indexed(unique = true, sparse = true)
+    private String userPairKey;
+
     /**
      * ID des Pet-Besitzers (Owner).
      */
@@ -157,6 +160,14 @@ public class ChatConversationDocument {
 
     public void setOfferId(String offerId) {
         this.offerId = offerId;
+    }
+
+    public String getUserPairKey() {
+        return userPairKey;
+    }
+
+    public void setUserPairKey(String userPairKey) {
+        this.userPairKey = userPairKey;
     }
 }
 

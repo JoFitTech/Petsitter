@@ -211,7 +211,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             .set("height", "42px");
 
         Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
-        mailBtn.addClickListener(e -> openNotificationDialog());
+        mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
         container.add(mailBtn);
 
         // Badge with unread count

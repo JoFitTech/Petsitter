@@ -24,6 +24,8 @@ public interface ChatConversationRepository extends MongoRepository<ChatConversa
 
     Optional<ChatConversationDocument> findByRequestId(String requestId);
 
+    Optional<ChatConversationDocument> findByUserPairKey(String userPairKey);
+
     /**
      * Findet alle Konversationen eines Users (als Owner oder Sitter),
      * sortiert nach letzter Nachricht (neueste zuerst).

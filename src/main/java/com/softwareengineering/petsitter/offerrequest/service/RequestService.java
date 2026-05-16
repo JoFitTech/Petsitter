@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -246,6 +247,37 @@ public class RequestService {
 
         request.setStatus(RequestStatus.DENIED);
         offerRequestRepository.save(request);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OfferRequest> findPendingRequestFromRequesterToCreator(UUID creatorId, UUID requesterId) {
+        List<OfferRequest> pending = offerRequestRepository
+            .findAllByOffer_CreateUser_IdAndRequester_IdAndStatus(creatorId, requesterId, RequestStatus.PENDING);
+        if (pending.isEmpty()) {
+            return Optional.empty();
+        }
+        OfferRequest req = pending.get(0);
+        req.getOffer().getOfferId();
+        req.getOffer().getTitle();
+        req.getOffer().getCreator().getId();
+        req.getOffer().getCreator().getFirstName();
+        req.getRequester().getId();
+        req.getRequester().getFirstName();
+        req.getRequester().getLastName();
+        return Optional.of(req);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OfferRequest> findAcceptedRequestFromRequesterToCreator(UUID creatorId, UUID requesterId) {
+        List<OfferRequest> accepted = offerRequestRepository
+            .findAllByOffer_CreateUser_IdAndRequester_IdAndStatus(creatorId, requesterId, RequestStatus.ACCEPTED);
+        if (accepted.isEmpty()) {
+            return Optional.empty();
+        }
+        OfferRequest req = accepted.get(0);
+        req.getOffer().getOfferId();
+        req.getRequester().getId();
+        return Optional.of(req);
     }
 
     private void requireId(UUID value, String message) {

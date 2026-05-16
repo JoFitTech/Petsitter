@@ -114,10 +114,17 @@ public class RequestService {
             throw new BusinessRuleViolationException("Requests sind nur auf OPEN Offers erlaubt");
         }
 
-        offerRequestRepository.findByOfferOfferIdAndRequesterId(offerId, requesterId)
-                .ifPresent(existing -> {
-                    throw new DuplicateRequestException("Es existiert bereits ein Request fuer dieses Offer und diesen User");
-                });
+        var existingOpt = offerRequestRepository.findByOfferOfferIdAndRequesterId(offerId, requesterId);
+        if (existingOpt.isPresent()) {
+            OfferRequest existing = existingOpt.get();
+            if (existing.getStatus() == RequestStatus.PENDING) {
+                throw new DuplicateRequestException("Es existiert bereits ein Request fuer dieses Offer und diesen User");
+            }
+            // DENIED or ACCEPTED (booking was cancelled, offer is OPEN again) → reuse row
+            existing.setStatus(RequestStatus.PENDING);
+            existing.setMessage(normalizeMessage(message));
+            return offerRequestRepository.save(existing);
+        }
 
         OfferRequest request = new OfferRequest();
         request.setOffer(offer);

@@ -907,6 +907,12 @@ public class OfferService {
                         "Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden."));
     }
 
+    public boolean isOfferOpen(UUID offerId) {
+        return findOfferById(offerId)
+                .map(o -> o.getStatus() == OfferStatus.OPEN)
+                .orElse(false);
+    }
+
     private java.util.Optional<Offer> findOfferById(UUID offerId) {
         if (offerId == null) {
             return java.util.Optional.empty();

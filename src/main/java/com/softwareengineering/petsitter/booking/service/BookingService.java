@@ -143,6 +143,12 @@ public class BookingService {
                     "Nur Owner oder Sitter dürfen ein Booking stornieren.");
         }
 
+        if (booking.getStartDate() != null
+                && !booking.getStartDate().isAfter(java.time.LocalDate.now().plusDays(1))) {
+            throw new BusinessRuleViolationException(
+                    "Stornierung nicht möglich: Das Angebot beginnt morgen oder früher.");
+        }
+
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 

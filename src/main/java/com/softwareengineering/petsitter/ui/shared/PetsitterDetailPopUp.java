@@ -246,10 +246,13 @@ public class PetsitterDetailPopUp extends Dialog {
                 return btn;
             }
             if (existingStatus == RequestStatus.ACCEPTED) {
-                Button btn = styledButton("Angebot gebucht");
-                btn.setEnabled(false);
-                btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
-                return btn;
+                if (!offerService.isOfferOpen(dto.id())) {
+                    Button btn = styledButton("Angebot gebucht");
+                    btn.setEnabled(false);
+                    btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
+                    return btn;
+                }
+                // Offer is OPEN again (booking was cancelled) → allow re-requesting
             }
             if (existingStatus == RequestStatus.DENIED) {
                 Button btn = styledButton("Anfrage abgelehnt");

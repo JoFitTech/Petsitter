@@ -1,11 +1,17 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.router.QueryParameters;
 
 import java.util.UUID;
@@ -23,9 +29,17 @@ public class PetsitterDetailPopUp extends Dialog {
     private static final String BROWN = "#7b5236";
 
     private final OfferService offerService;
+    private final RequestService requestService;
+    private final ChatService chatService;
+    private final AuthenticatedUser authenticatedUser;
 
-    public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars, OfferService offerService) {
+    public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars, OfferService offerService,
+                                RequestService requestService, ChatService chatService,
+                                AuthenticatedUser authenticatedUser) {
         this.offerService = offerService;
+        this.requestService = requestService;
+        this.chatService = chatService;
+        this.authenticatedUser = authenticatedUser;
 
         setWidth("520px");
         setCloseOnOutsideClick(true);
@@ -193,9 +207,61 @@ public class PetsitterDetailPopUp extends Dialog {
     private Button createActionButton(OfferCardDto dto) {
         boolean ownOffer = offerService.isCurrentUserOffer(dto.id());
         boolean editable = offerService.canCurrentUserEditOffer(dto.id());
-        Button actionButton = new Button(editable ? "Auftrag bearbeiten" : ownOffer ? "Nicht bearbeitbar" : "Auftrag anfragen");
-        actionButton.setWidthFull();
-        actionButton.getStyle()
+
+        if (editable) {
+            Button btn = styledButton("Auftrag bearbeiten");
+            btn.addClickListener(e -> {
+                close();
+                UI ui = UI.getCurrent();
+                if (ui != null) {
+                    ui.navigate("auftrag-erstellen", QueryParameters.of("edit", dto.id().toString()));
+                }
+            });
+            return btn;
+        }
+
+        if (ownOffer) {
+            Button btn = styledButton("Nicht bearbeitbar");
+            btn.setEnabled(false);
+            btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
+            return btn;
+        }
+
+        // Check existing request state for this offer
+        UUID currentUserId = authenticatedUser.get()
+                .map(com.softwareengineering.petsitter.user.domain.User::getId)
+                .orElse(null);
+
+        if (currentUserId != null) {
+            RequestStatus existingStatus = requestService.findMyRequests(currentUserId).stream()
+                    .filter(r -> r.getOffer().getOfferId().equals(dto.id()))
+                    .map(OfferRequest::getStatus)
+                    .findFirst()
+                    .orElse(null);
+
+            if (existingStatus == RequestStatus.PENDING) {
+                Button btn = styledButton("Anfrage ausstehend");
+                btn.setEnabled(false);
+                btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
+                return btn;
+            }
+            if (existingStatus == RequestStatus.ACCEPTED) {
+                Button btn = styledButton("Angebot gebucht");
+                btn.setEnabled(false);
+                btn.getStyle().set("background", "#d8cec6").set("color", "#7a6050").set("cursor", "default");
+                return btn;
+            }
+        }
+
+        Button btn = styledButton("Auftrag anfragen");
+        btn.addClickListener(e -> onAuftragAnfragenClicked(dto.id()));
+        return btn;
+    }
+
+    private Button styledButton(String label) {
+        Button btn = new Button(label);
+        btn.setWidthFull();
+        btn.getStyle()
                 .set("background", DARK)
                 .set("color", "white")
                 .set("height", "52px")
@@ -205,38 +271,58 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
                 .set("margin-top", "8px");
+        return btn;
+    }
 
-        if (editable) {
-            actionButton.addClickListener(e -> {
+    private void onAuftragAnfragenClicked(UUID offerId) {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("400px");
+
+        VerticalLayout dialogContent = new VerticalLayout();
+        dialogContent.setPadding(true);
+        dialogContent.setSpacing(true);
+
+        H2 dialogTitle = new H2("Anfrage senden");
+        dialogTitle.getStyle().set("font-size", "18px").set("margin", "0 0 8px 0").set("color", DARK);
+
+        TextArea messageArea = new TextArea("Nachricht (optional)");
+        messageArea.setWidthFull();
+        messageArea.setPlaceholder("Schreibe dem Anbieter eine kurze Nachricht...");
+        messageArea.setMaxLength(1000);
+
+        HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+
+        Button cancelBtn = new Button("Abbrechen", e -> dialog.close());
+        Button submitBtn = new Button("Anfragen", e -> {
+            UUID currentUserId = authenticatedUser.get()
+                    .map(com.softwareengineering.petsitter.user.domain.User::getId)
+                    .orElse(null);
+            if (currentUserId == null) {
+                Notification.show("Bitte melde dich an.");
+                return;
+            }
+            try {
+                var request = requestService.createRequest(offerId, currentUserId, messageArea.getValue());
+                String conversationId = chatService.createConversationForRequest(
+                        request.getId(), messageArea.getValue());
+                dialog.close();
                 close();
                 UI ui = UI.getCurrent();
                 if (ui != null) {
-                    ui.navigate("auftrag-erstellen", QueryParameters.of("edit", dto.id().toString()));
+                    ui.navigate("chat", QueryParameters.of("conversation", conversationId));
                 }
-            });
-            return actionButton;
-        }
-
-        if (ownOffer) {
-            actionButton.setEnabled(false);
-            actionButton.getStyle()
-                    .set("background", "#d8cec6")
-                    .set("color", "#7a6050")
-                    .set("cursor", "default");
-            return actionButton;
-        }
-
-        actionButton.addClickListener(e -> {
-            onAuftragAnfragenClicked(dto.id());
-            close();
+            } catch (Exception ex) {
+                Notification.show("Fehler: " + ex.getMessage());
+            }
         });
-        return actionButton;
-    }
+        submitBtn.getStyle().set("background", DARK).set("color", "white").set("border-radius", "8px");
 
-    // ── Backend-Interface hook ────────────────────────────────────────────
-    private void onAuftragAnfragenClicked(UUID offerId) {
-        System.out.println("Auftrag anfragen geklickt für Offer-ID: " + offerId);
-        // TODO: requestService.createRequest(offerId);
+        buttons.add(cancelBtn, submitBtn);
+        dialogContent.add(dialogTitle, messageArea, buttons);
+        dialog.add(dialogContent);
+        dialog.open();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────

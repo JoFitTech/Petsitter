@@ -9,6 +9,9 @@ import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.repository.ChatConversationRepository;
 import com.softwareengineering.petsitter.chat.repository.ChatMessageRepository;
 import com.softwareengineering.petsitter.notification.service.NotificationService;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
@@ -48,6 +51,7 @@ public class ChatService {
     private final ChatConversationRepository conversationRepository;
     private final ChatMessageRepository messageRepository;
     private final BookingRepository bookingRepository;
+    private final OfferRequestRepository offerRequestRepository;
     private final ChatAccessService accessService;
     private final ChatEventBus eventBus;
     private final NotificationService notificationService;
@@ -58,6 +62,7 @@ public class ChatService {
             ChatConversationRepository conversationRepository,
             ChatMessageRepository messageRepository,
             BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
             ChatAccessService accessService,
             ChatEventBus eventBus,
             NotificationService notificationService,
@@ -67,6 +72,7 @@ public class ChatService {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.bookingRepository = bookingRepository;
+        this.offerRequestRepository = offerRequestRepository;
         this.accessService = accessService;
         this.eventBus = eventBus;
         this.notificationService = notificationService;
@@ -85,21 +91,84 @@ public class ChatService {
      * @throws NotFoundException wenn Booking nicht existiert
      */
     @Transactional
+    public String createConversationForRequest(UUID requestId, String initialMessage) {
+        log.info("Creating chat conversation for request {}", requestId);
+
+        OfferRequest request = offerRequestRepository.findById(requestId)
+            .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+
+        var offer = request.getOffer();
+        User creator = offer.getCreator();
+        User requester = request.getRequester();
+
+        User owner;
+        User sitter;
+        if (offer.getType() == OfferType.OWNER_OFFER) {
+            owner = creator;
+            sitter = requester;
+        } else {
+            sitter = creator;
+            owner = requester;
+        }
+
+        var existing = conversationRepository.findByRequestId(requestId.toString());
+        if (existing.isPresent()) {
+            log.info("Conversation for request {} already exists. Returning existing.", requestId);
+            return existing.get().getId();
+        }
+
+        ChatConversationDocument conversation = new ChatConversationDocument();
+        conversation.setOwnerId(owner.getId());
+        conversation.setSitterId(sitter.getId());
+        conversation.setOwnerDisplayName(getDisplayName(owner));
+        conversation.setSitterDisplayName(getDisplayName(sitter));
+        conversation.setRequestId(requestId.toString());
+        conversation.setOfferId(offer.getOfferId().toString());
+        conversation.setCreatedAt(LocalDateTime.now());
+
+        conversation = conversationRepository.save(conversation);
+        log.info("Chat conversation created for request {} with id {}", requestId, conversation.getId());
+
+        if (initialMessage != null && !initialMessage.isBlank()) {
+            sendMessage(conversation.getId(), initialMessage);
+        }
+
+        try {
+            notificationService.createRequestNotification(creator, requester, conversation.getId());
+        } catch (Exception e) {
+            log.warn("Failed to create request notification: {}", e.getMessage(), e);
+        }
+
+        return conversation.getId();
+    }
+
+    @Transactional
     public ChatConversationDto createConversationForBooking(UUID bookingId) {
         log.info("Creating chat conversation for booking {}", bookingId);
 
-        // Existiert die Konversation schon?
         var existing = conversationRepository.findByBookingId(bookingId);
         if (existing.isPresent()) {
             log.info("Conversation for booking {} already exists. Returning existing.", bookingId);
             return toConversationDto(existing.get());
         }
 
-        // Booking laden
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
 
-        // Konversation anlegen
+        // Reuse conversation created at request time if it exists
+        UUID acceptedRequestId = booking.getAcceptedRequest() != null
+            ? booking.getAcceptedRequest().getId() : null;
+        if (acceptedRequestId != null) {
+            var byRequest = conversationRepository.findByRequestId(acceptedRequestId.toString());
+            if (byRequest.isPresent()) {
+                ChatConversationDocument conv = byRequest.get();
+                conv.setBookingId(bookingId);
+                conversationRepository.save(conv);
+                log.info("Linked existing conversation {} to booking {}", conv.getId(), bookingId);
+                return toConversationDto(conv);
+            }
+        }
+
         ChatConversationDocument conversation = new ChatConversationDocument();
         conversation.setBookingId(booking.getId());
         conversation.setOwnerId(booking.getOwner().getId());
@@ -334,7 +403,9 @@ public class ChatService {
             doc.getSitterDisplayName(),
             doc.getCreatedAt(),
             doc.getLastMessageAt(),
-            doc.getLastMessagePreview()
+            doc.getLastMessagePreview(),
+            doc.getRequestId(),
+            doc.getOfferId()
         );
     }
 

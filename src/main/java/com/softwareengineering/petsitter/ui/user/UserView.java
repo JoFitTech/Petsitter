@@ -1,7 +1,10 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
@@ -48,6 +51,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private final PetService petService;
     private final OfferService offerService;
     private final FavoriteService favoriteService;
+    private final RequestService requestService;
+    private final ChatService chatService;
+    private final AuthenticatedUser authenticatedUser;
     private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
@@ -62,11 +68,17 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             UserService userService,
             PetService petService,
             OfferService offerService,
-            FavoriteService favoriteService) {
+            FavoriteService favoriteService,
+            RequestService requestService,
+            ChatService chatService,
+            AuthenticatedUser authenticatedUser) {
         this.userService = userService;
         this.petService = petService;
         this.offerService = offerService;
         this.favoriteService = favoriteService;
+        this.requestService = requestService;
+        this.chatService = chatService;
+        this.authenticatedUser = authenticatedUser;
         reloadProfile();
 
         setSizeFull();
@@ -597,12 +609,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineAuftraege() {
         contentPanel.removeAll();
-        contentPanel.add(new MyOffers(offerService));
+        contentPanel.add(new MyOffers(offerService, requestService, chatService, authenticatedUser));
     }
 
     private void showMeineFavoriten() {
         contentPanel.removeAll();
-        contentPanel.add(new MyFavoritesView(favoriteService, offerService));
+        contentPanel.add(new MyFavoritesView(favoriteService, offerService, requestService, chatService, authenticatedUser));
     }
 
     private void showPersAngaben() {

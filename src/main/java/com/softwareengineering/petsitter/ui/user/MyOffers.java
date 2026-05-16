@@ -1,7 +1,10 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
@@ -37,10 +40,17 @@ public class MyOffers extends Div {
     private static final String BORDER = "#ead5ae";
 
     private final OfferService offerService;
+    private final RequestService requestService;
+    private final ChatService chatService;
+    private final AuthenticatedUser authenticatedUser;
     private final Div offersContainer = new Div();
 
-    public MyOffers(OfferService offerService) {
+    public MyOffers(OfferService offerService, RequestService requestService,
+                    ChatService chatService, AuthenticatedUser authenticatedUser) {
         this.offerService = offerService;
+        this.requestService = requestService;
+        this.chatService = chatService;
+        this.authenticatedUser = authenticatedUser;
 
         setWidthFull();
         getStyle()
@@ -413,7 +423,7 @@ public class MyOffers extends Div {
     }
 
     private void openOfferDialog(MyOfferCardDto offer) {
-        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4, offerService).open();
+        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4, offerService, requestService, chatService, authenticatedUser).open();
     }
 
     private boolean isExpiredOpenOffer(MyOfferCardDto offer) {

@@ -15,7 +15,7 @@ class PetsitterFilterViewTest {
 
     @Test
     void constructorInitializesDefaultCriteriaAfterOfferServiceIsAssigned() {
-        assertDoesNotThrow(() -> new PetsitterFilterView(new TestOfferService(), new TestFavoriteService()));
+        assertDoesNotThrow(() -> new PetsitterFilterView(new TestOfferService(), new TestFavoriteService(), null, null, null));
     }
 
     private static final class TestOfferService extends OfferService {

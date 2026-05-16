@@ -1,17 +1,23 @@
 package com.softwareengineering.petsitter.ui.chat;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -55,10 +61,13 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
     private final ChatService chatService;
     private final ChatEventBus eventBus;
+    private final RequestService requestService;
+    private final BookingService bookingService;
 
     // UI Components
     private VerticalLayout conversationList;
     private VerticalLayout messageList;
+    private Div requestActionBar;
     private TextArea messageInput;
     private Button sendButton;
     private Span chatTitle;
@@ -79,10 +88,14 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     public ChatView(
             ChatService chatService,
             ChatEventBus eventBus,
-            AuthenticatedUser authenticatedUser
+            AuthenticatedUser authenticatedUser,
+            RequestService requestService,
+            BookingService bookingService
     ) {
         this.chatService = chatService;
         this.eventBus = eventBus;
+        this.requestService = requestService;
+        this.bookingService = bookingService;
 
         setSizeFull();
         setPadding(false);
@@ -164,6 +177,12 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
         // Header
         layout.add(buildChatHeader());
+
+        // Request action bar (shown when conversation has a pending request for the offer creator)
+        this.requestActionBar = new Div();
+        requestActionBar.setWidthFull();
+        requestActionBar.setVisible(false);
+        layout.add(requestActionBar);
 
         // Messages area
         this.messageList = new VerticalLayout();
@@ -337,6 +356,9 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             activeRecipientId = currentUserIsOwner ? selected.sitterId() : selected.ownerId();
             activeCounterpartName = currentUserIsOwner ? selected.sitterDisplayName() : selected.ownerDisplayName();
             chatTitle.setText(activeCounterpartName != null ? activeCounterpartName : "Chat");
+            refreshRequestActionBar(selected);
+        } else {
+            requestActionBar.setVisible(false);
         }
         typingIndicator.setText("");
         typingIndicator.getStyle().set("display", "none");
@@ -371,6 +393,78 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             log.error("Failed to load messages: {}", e.getMessage());
             messageList.removeAll();
             messageList.add(new Paragraph("Fehler beim Laden der Nachrichten."));
+        }
+    }
+
+    private void refreshRequestActionBar(ChatConversationDto conv) {
+        requestActionBar.removeAll();
+        requestActionBar.setVisible(false);
+
+        if (conv.requestId() == null) {
+            return;
+        }
+
+        try {
+            OfferRequest request = requestService.findByIdWithDetails(UUID.fromString(conv.requestId()));
+            boolean isOfferCreator = request.getOffer().getCreator().getId().equals(currentUserId);
+
+            if (request.getStatus() == RequestStatus.PENDING && isOfferCreator) {
+                HorizontalLayout bar = new HorizontalLayout();
+                bar.setWidthFull();
+                bar.setAlignItems(FlexComponent.Alignment.CENTER);
+                bar.getStyle()
+                    .set("padding", "10px 20px")
+                    .set("background", "#fff8ec")
+                    .set("border-bottom", "1px solid #f0d8a8");
+
+                String requesterName = request.getRequester().getFirstName() + " "
+                        + request.getRequester().getLastName();
+                String offerTitle = request.getOffer().getTitle() != null
+                        ? request.getOffer().getTitle() : "Angebot";
+                Span label = new Span("Anfrage von " + requesterName + " für Angebot '" + offerTitle + "'");
+                label.getStyle().set("flex", "1").set("font-size", "13px").set("color", "#4a3428");
+
+                Button acceptBtn = new Button("Annehmen", e -> {
+                    try {
+                        bookingService.acceptRequest(request.getId(), currentUserId);
+                        Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
+                        n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                        refreshRequestActionBar(conv);
+                    } catch (Exception ex) {
+                        Notification.show("Fehler: " + ex.getMessage());
+                    }
+                });
+                acceptBtn.getStyle().set("background", "#4a3428").set("color", "white")
+                        .set("border-radius", "8px").set("margin-left", "12px");
+
+                Button denyBtn = new Button("Ablehnen", e -> {
+                    try {
+                        requestService.denyRequest(request.getId(), currentUserId);
+                        refreshRequestActionBar(conv);
+                    } catch (Exception ex) {
+                        Notification.show("Fehler: " + ex.getMessage());
+                    }
+                });
+                denyBtn.getStyle().set("border-radius", "8px");
+
+                bar.add(label, acceptBtn, denyBtn);
+                requestActionBar.add(bar);
+                requestActionBar.setVisible(true);
+
+            } else if (request.getStatus() == RequestStatus.ACCEPTED) {
+                Div info = new Div();
+                info.getStyle()
+                    .set("padding", "10px 20px")
+                    .set("background", "#edf7ed")
+                    .set("border-bottom", "1px solid #b8ddb8")
+                    .set("font-size", "13px")
+                    .set("color", "#2e7d32");
+                info.add(new Span("Anfrage angenommen – Booking erstellt"));
+                requestActionBar.add(info);
+                requestActionBar.setVisible(true);
+            }
+        } catch (Exception e) {
+            log.warn("Could not load request for action bar: {}", e.getMessage());
         }
     }
 

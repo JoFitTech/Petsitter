@@ -204,6 +204,50 @@ public class RequestService {
         return offerRequestRepository.findAllByRequesterId(userId);
     }
 
+    public OfferRequest findById(UUID requestId) {
+        requireId(requestId, "requestId darf nicht null sein");
+        return offerRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+    }
+
+    @Transactional(readOnly = true)
+    public OfferRequest findByIdWithDetails(UUID requestId) {
+        OfferRequest req = findById(requestId);
+        // Initialize lazy associations within transaction so they remain accessible after it closes
+        if (req.getOffer() != null) {
+            req.getOffer().getOfferId();
+            req.getOffer().getTitle();
+            if (req.getOffer().getCreator() != null) {
+                req.getOffer().getCreator().getId();
+                req.getOffer().getCreator().getFirstName();
+            }
+        }
+        if (req.getRequester() != null) {
+            req.getRequester().getId();
+            req.getRequester().getFirstName();
+            req.getRequester().getLastName();
+        }
+        return req;
+    }
+
+    @Transactional
+    public void denyRequest(UUID requestId, UUID offerCreatorId) {
+        requireId(requestId, "requestId darf nicht null sein");
+        requireId(offerCreatorId, "offerCreatorId darf nicht null sein");
+
+        OfferRequest request = findById(requestId);
+
+        if (!request.getOffer().getCreator().getId().equals(offerCreatorId)) {
+            throw new ForbiddenOperationException("Nur der Offer-Creator darf eine Anfrage ablehnen");
+        }
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new BusinessRuleViolationException("Nur PENDING Requests koennen abgelehnt werden");
+        }
+
+        request.setStatus(RequestStatus.DENIED);
+        offerRequestRepository.save(request);
+    }
+
     private void requireId(UUID value, String message) {
         if (value == null) {
             throw new BusinessRuleViolationException(message);

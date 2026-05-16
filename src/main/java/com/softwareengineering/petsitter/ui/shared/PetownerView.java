@@ -1,7 +1,10 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
@@ -31,11 +34,19 @@ public class PetownerView extends VerticalLayout {
 
     private final OfferService offerService;
     private final FavoriteService favoriteService;
+    private final RequestService requestService;
+    private final ChatService chatService;
+    private final AuthenticatedUser authenticatedUser;
 
     @Autowired
-    public PetownerView(OfferService offerService, FavoriteService favoriteService) {
+    public PetownerView(OfferService offerService, FavoriteService favoriteService,
+                        RequestService requestService, ChatService chatService,
+                        AuthenticatedUser authenticatedUser) {
         this.offerService = offerService;
         this.favoriteService = favoriteService;
+        this.requestService = requestService;
+        this.chatService = chatService;
+        this.authenticatedUser = authenticatedUser;
         setWidthFull();
         setPadding(false);
         setSpacing(false);
@@ -282,7 +293,7 @@ public class PetownerView extends VerticalLayout {
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService, requestService, chatService, authenticatedUser).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

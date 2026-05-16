@@ -12,7 +12,10 @@ import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.FilterPopUp;
 import com.softwareengineering.petsitter.ui.shared.FilterSearchBar;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
@@ -71,6 +74,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
 
     private final OfferService offerService;
     private final FavoriteService favoriteService;
+    private final RequestService requestService;
+    private final ChatService chatService;
+    private final AuthenticatedUser authenticatedUser;
 
     private H1 pageTitle;
     private Div leftBlob;
@@ -83,9 +89,14 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private OfferSearchCriteria currentCriteria;
 
     @Autowired
-    public PetsitterFilterView(OfferService offerService, FavoriteService favoriteService) {
+    public PetsitterFilterView(OfferService offerService, FavoriteService favoriteService,
+                               RequestService requestService, ChatService chatService,
+                               AuthenticatedUser authenticatedUser) {
         this.offerService = offerService;
         this.favoriteService = favoriteService;
+        this.requestService = requestService;
+        this.chatService = chatService;
+        this.authenticatedUser = authenticatedUser;
         this.currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
 
         setSizeFull();
@@ -627,7 +638,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService, requestService, chatService, authenticatedUser).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

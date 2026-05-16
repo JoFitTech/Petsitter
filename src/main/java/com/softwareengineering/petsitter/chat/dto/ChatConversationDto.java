@@ -18,6 +18,8 @@ public record ChatConversationDto(
     String sitterDisplayName,
     LocalDateTime createdAt,
     LocalDateTime lastMessageAt,
-    String lastMessagePreview
+    String lastMessagePreview,
+    String requestId,
+    String offerId
 ) { }
 

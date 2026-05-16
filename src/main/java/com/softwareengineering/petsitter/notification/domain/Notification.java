@@ -38,6 +38,14 @@ public class Notification {
     @Column(name = "is_read", nullable = false)
     private boolean read;
 
+    /**
+     * Optional: Referenz-ID für bestimmte Notification-Typen.
+     * Für CHAT_MESSAGE: conversationId.
+     * Für andere: auch booking ID oder ähnlich.
+     */
+    @Column(name = "reference_id")
+    private String referenceId;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -82,6 +90,14 @@ public class Notification {
 
     public void setRead(boolean read) {
         this.read = read;
+    }
+
+    public String getReferenceId() {
+        return referenceId;
+    }
+
+    public void setReferenceId(String referenceId) {
+        this.referenceId = referenceId;
     }
 
     public LocalDateTime getCreatedAt() {

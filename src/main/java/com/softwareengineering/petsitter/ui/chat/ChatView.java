@@ -1,405 +1,559 @@
 package com.softwareengineering.petsitter.ui.chat;
 
+import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
+import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
+import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
+import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
+import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.DetachEvent;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.*;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.router.PageTitle;
-import com.vaadin.flow.router.Route;
+import com.vaadin.flow.component.textfield.TextArea;
+import com.vaadin.flow.data.value.ValueChangeMode;
+import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.router.*;
 import jakarta.annotation.security.PermitAll;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Chat-View – Echtzeit-Chatfenster für Bookings.
+ *
+ * Layout:
+ * - Linke Spalte: Liste der Konversationen
+ * - Rechte Spalte: Chat-Verlauf + Input
+ *
+ * Automatische Updates via Vaadin Push + ChatEventBus.
+ */
 @Route(value = "chat", layout = MainLayout.class)
 @PageTitle("Chat | Pawsitter")
 @PermitAll
-public class ChatView extends VerticalLayout {
+public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
-    private static final String DARK     = "#4a3428";
-    private static final String CREAM    = "#fbf8f1";
-    private static final String CARD_BG  = "#ffffff";
+    private static final Logger log = LoggerFactory.getLogger(ChatView.class);
 
-    public ChatView(ChatService chatService) {
+    private static final String DARK = "#4a3428";
+    private static final String CREAM = "#fbf8f1";
+    private static final String CARD_BG = "#ffffff";
+
+    private final ChatService chatService;
+    private final ChatEventBus eventBus;
+
+    // UI Components
+    private VerticalLayout conversationList;
+    private VerticalLayout messageList;
+    private TextArea messageInput;
+    private Button sendButton;
+    private Span chatTitle;
+    private Span typingIndicator;
+
+    // State
+    private String activeConversationId;
+    private UUID activeRecipientId;
+    private String activeCounterpartName;
+    private UUID currentUserId;
+    private final Map<String, ChatConversationDto> conversationsById = new HashMap<>();
+    private final Map<String, Boolean> typingByConversationId = new HashMap<>();
+    private Registration eventBusRegistration;
+    private Registration typingRegistration;
+    private final ScheduledExecutorService typingScheduler = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> stopTypingFuture;
+
+    public ChatView(
+            ChatService chatService,
+            ChatEventBus eventBus,
+            AuthenticatedUser authenticatedUser
+    ) {
+        this.chatService = chatService;
+        this.eventBus = eventBus;
+
         setSizeFull();
         setPadding(false);
         setSpacing(false);
-        getStyle().set("position", "relative")
-                  .set("overflow", "hidden");
 
-        // Decorative circles
-        add(buildDecorativeCircles());
+        // Determine current user
+        this.currentUserId = authenticatedUser.get()
+            .map(com.softwareengineering.petsitter.user.domain.User::getId)
+            .orElse(null);
 
-        // Main content wrapper
-        VerticalLayout mainContent = new VerticalLayout();
-        mainContent.setWidthFull();
-        mainContent.setPadding(false);
-        mainContent.setSpacing(false);
-        mainContent.getStyle()
-            .set("padding", "48px 48px 64px 48px")
-            .set("position", "relative")
-            .set("z-index", "1")
-            .set("box-sizing", "border-box")
-            .set("max-width", "1200px")
-            .set("margin", "0 auto");
+        if (currentUserId == null) {
+            add(new Paragraph("Bitte melde dich an."));
+            return;
+        }
 
-        mainContent.add(buildPageHeader());
-        mainContent.add(buildChatContainer());
+        // Build layout
+        add(buildConversationList());
+        add(buildChatWindow());
 
-        add(mainContent);
+        // Load conversations
+        refreshConversationList();
+
+        // Register for chat events
+        registerEventBusListener();
     }
 
-    private Component buildDecorativeCircles() {
-        Div circles = new Div();
-        circles.getStyle()
-            .set("position", "absolute")
-            .set("top", "0").set("left", "0")
-            .set("width", "100%").set("height", "100%")
-            .set("pointer-events", "none")
-            .set("z-index", "0");
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        // ensure user is logged in
+        if (currentUserId == null) {
+            event.rerouteTo("login");
+            return;
+        }
 
-        // Left beige circle
-        Div leftCircle = new Div();
-        leftCircle.getStyle()
-            .set("position", "absolute")
-            .set("width", "400px")
-            .set("height", "400px")
-            .set("border-radius", "50%")
-            .set("background", "#e8ddd4")
-            .set("opacity", "0.6")
-            .set("top", "-100px")
-            .set("left", "-100px");
-
-        // Right mint circle
-        Div rightCircle = new Div();
-        rightCircle.getStyle()
-            .set("position", "absolute")
-            .set("width", "600px")
-            .set("height", "600px")
-            .set("border-radius", "50%")
-            .set("background", "#c8dde6")
-            .set("opacity", "0.6")
-            .set("top", "-200px")
-            .set("right", "-150px");
-
-        circles.add(leftCircle, rightCircle);
-        return circles;
+        // support query parameter: ?conversation=<conversationId>
+        event.getLocation().getQueryParameters()
+            .getParameters()
+            .getOrDefault("conversation", List.of())
+            .stream()
+            .findFirst()
+            .ifPresent(this::selectConversation);
     }
 
-    private Component buildPageHeader() {
-        Div wrapper = new Div();
-        wrapper.getStyle()
-            .set("margin-bottom", "32px");
 
-        H1 title = new H1("Inbox");
-        title.getStyle()
-            .set("margin", "0 0 6px 0")
-            .set("font-size", "28px")
-            .set("font-weight", "800")
-            .set("color", DARK);
+    // ── Private Methods: UI Building ──
 
-        Paragraph subtitle = new Paragraph("Verwalte hier deine eingehenden Nachrichten und behalte alle wichtigen Unterhaltungen im Blick.");
-        subtitle.getStyle()
-            .set("margin", "0")
-            .set("font-size", "14px")
-            .set("color", "#7a6050");
-
-        wrapper.add(title, subtitle);
-        return wrapper;
-    }
-
-    private Component buildChatContainer() {
-        HorizontalLayout container = new HorizontalLayout();
-        container.setWidthFull();
-        container.setHeight("650px"); // Fixed height for the chat area
-        container.setSpacing(false);
-        container.setPadding(false);
-        container.getStyle()
-            .set("background", CARD_BG)
-            .set("border-radius", "20px")
-            .set("box-shadow", "0 8px 32px rgba(74,52,40,0.09)")
-            .set("overflow", "hidden");
-
-        // Left sidebar (Chat list)
-        VerticalLayout chatList = new VerticalLayout();
-        chatList.setWidth("320px");
-        chatList.setHeightFull();
-        chatList.setPadding(false);
-        chatList.setSpacing(false);
-        chatList.getStyle()
+    private Component buildConversationList() {
+        VerticalLayout layout = new VerticalLayout();
+        layout.setWidth("320px");
+        layout.setHeightFull();
+        layout.setPadding(true);
+        layout.setSpacing(false);
+        layout.getStyle()
             .set("border-right", "1px solid #f0e6da")
             .set("overflow-y", "auto")
             .set("background", "#ffffff")
-            .set("padding", "20px 16px");
+            .set("box-sizing", "border-box");
 
-        // Add dummy chat list items
-        chatList.add(chatListItem("max3010", "★★★★★", "2 Hunde", true, true));
-        chatList.add(chatListItem("lis20", "★★★", "2 Skorpione", false, true));
-        chatList.add(chatListItem("lada000", "★★★★", "29 Jahre", false, false));
-        chatList.add(chatListItem("xxisax", "★★★★★", "21 Jahre", false, false));
-        chatList.add(chatListItem("melanie20", "★★★★", "1 Katze", false, true));
+        H2 title = new H2("Gespräche");
+        title.getStyle().set("margin", "0 0 16px 0").set("font-size", "18px");
+        layout.add(title);
 
-        // Right main area (Chat window)
-        VerticalLayout chatWindow = new VerticalLayout();
-        chatWindow.setWidthFull();
-        chatWindow.setHeightFull();
-        chatWindow.setPadding(false);
-        chatWindow.setSpacing(false);
-        chatWindow.getStyle().set("padding", "24px 32px");
-        
-        chatWindow.add(buildChatHeader("max3010"));
-        
-        VerticalLayout messagesArea = buildMessagesArea();
-        chatWindow.add(messagesArea);
-        chatWindow.setFlexGrow(1, messagesArea);
+        this.conversationList = new VerticalLayout();
+        conversationList.setPadding(false);
+        conversationList.setSpacing(false);
+        layout.add(conversationList);
+        layout.setFlexGrow(1, conversationList);
 
-        chatWindow.add(buildMessageInput());
-
-        container.add(chatList, chatWindow);
-        return container;
+        return layout;
     }
 
-    private Component chatListItem(String name, String stars, String secondaryInfo, boolean selected, boolean isSitter) {
+    private Component buildChatWindow() {
+        VerticalLayout layout = new VerticalLayout();
+        layout.setWidthFull();
+        layout.setHeightFull();
+        layout.setPadding(false);
+        layout.setSpacing(false);
+        layout.getStyle().set("background", CARD_BG);
+
+        // Header
+        layout.add(buildChatHeader());
+
+        // Messages area
+        this.messageList = new VerticalLayout();
+        messageList.setWidthFull();
+        messageList.setPadding(true);
+        messageList.setSpacing(false);
+        messageList.getStyle()
+            .set("overflow-y", "auto")
+            .set("background", CREAM)
+            .set("gap", "12px");
+        layout.add(messageList);
+        layout.setFlexGrow(1, messageList);
+
+        // Input area
+        layout.add(buildInputArea());
+
+        return layout;
+    }
+
+    private Component buildChatHeader() {
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setHeight("60px");
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.getStyle()
+            .set("padding", "0 20px")
+            .set("background", CARD_BG)
+            .set("border-bottom", "1px solid #e8ddd4");
+
+        VerticalLayout titleWrap = new VerticalLayout();
+        titleWrap.setPadding(false);
+        titleWrap.setSpacing(false);
+
+        chatTitle = new Span("Wähle ein Gespräch");
+        chatTitle.getStyle().set("font-size", "16px").set("font-weight", "700").set("color", DARK);
+
+        typingIndicator = new Span("");
+        typingIndicator.getStyle().set("font-size", "12px").set("color", "#7a6050").set("display", "none");
+
+        titleWrap.add(chatTitle, typingIndicator);
+        header.add(titleWrap);
+        return header;
+    }
+
+    private Component buildInputArea() {
+        HorizontalLayout layout = new HorizontalLayout();
+        layout.setWidthFull();
+        layout.setHeight("120px");
+        layout.setAlignItems(FlexComponent.Alignment.STRETCH);
+        layout.setPadding(true);
+        layout.setSpacing(true);
+        layout.getStyle()
+            .set("background", "#fcfaf6")
+            .set("border-top", "1px solid #e8ddd4")
+            .set("box-sizing", "border-box");
+
+        this.messageInput = new TextArea();
+        messageInput.setPlaceholder("Schreibe deine Nachricht...");
+        messageInput.getStyle()
+            .set("flex", "1")
+            .set("background", CARD_BG)
+            .set("border", "1px solid #e8ddd4")
+            .set("border-radius", "12px")
+            .set("font-size", "14px")
+            .set("color", DARK);
+        messageInput.setValueChangeMode(ValueChangeMode.LAZY);
+        messageInput.setValueChangeTimeout(350);
+        messageInput.addValueChangeListener(e -> handleTyping());
+
+        this.sendButton = new Button("Senden");
+        sendButton.setWidth("100px");
+        sendButton.getStyle()
+            .set("background", "#8db3c3")
+            .set("color", "white")
+            .set("border-radius", "12px");
+        sendButton.addClickListener(e -> sendMessage());
+        sendButton.setEnabled(false); // disabled until conversation selected
+
+        layout.add(messageInput, sendButton);
+        return layout;
+    }
+
+    // ── Conversation & Message Loading ──
+
+    private void refreshConversationList() {
+        conversationList.removeAll();
+        conversationsById.clear();
+
+        try {
+            List<ChatConversationDto> conversations = chatService.getCurrentUserConversations();
+
+            if (conversations.isEmpty()) {
+                conversationList.add(new Paragraph("Noch keine Chats vorhanden."));
+                return;
+            }
+
+            for (ChatConversationDto conv : conversations) {
+                if (conv == null || conv.conversationId() == null || conv.conversationId().isBlank()) {
+                    log.warn("Skipping invalid conversation entry: {}", conv);
+                    continue;
+                }
+
+                try {
+                    conversationsById.put(conv.conversationId(), conv);
+                    conversationList.add(buildConversationItem(conv));
+                } catch (Exception itemException) {
+                    log.warn("Skipping conversation {} due to rendering error: {}",
+                        conv.conversationId(), itemException.getMessage(), itemException);
+                }
+            }
+
+            if (conversationList.getComponentCount() == 0) {
+                conversationList.add(new Paragraph("Noch keine nutzbaren Chats vorhanden."));
+            }
+        } catch (Exception e) {
+            log.error("Failed to load conversations", e);
+            conversationList.add(new Paragraph("Fehler beim Laden der Gespräche."));
+        }
+    }
+
+    private Component buildConversationItem(ChatConversationDto conv) {
         Div item = new Div();
         item.getStyle()
             .set("padding", "14px 16px")
             .set("border-radius", "12px")
             .set("margin-bottom", "10px")
             .set("cursor", "pointer")
-            .set("display", "flex")
-            .set("gap", "14px")
-            .set("align-items", "center")
-            .set("width", "100%")
+            .set("background", activeConversationId != null && activeConversationId.equals(conv.conversationId())
+                ? "#ebd7c0"
+                : "#fcfaf6")
+            .set("border", "1px solid #f0e6da")
             .set("box-sizing", "border-box");
 
-        if (selected) {
-            item.getStyle().set("background", "#ebd7c0"); // darker beige
-        } else {
-            item.getStyle().set("background", "#fcfaf6") // very light beige
-                         .set("border", "1px solid #f0e6da");
+        // Determine counterpart name
+        String counterpartName = currentUserId.equals(conv.ownerId())
+            ? conv.sitterDisplayName()
+            : conv.ownerDisplayName();
+        if (counterpartName == null || counterpartName.isBlank()) {
+            counterpartName = "Unbekannter Kontakt";
         }
 
-        // Avatar
-        Div avatar = createAvatar(44);
-
-        // Content
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
         content.setSpacing(false);
-        
-        HorizontalLayout topRow = new HorizontalLayout();
-        topRow.setWidthFull();
-        topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        topRow.setAlignItems(FlexComponent.Alignment.CENTER);
-        
-        Span nameSpan = new Span(name);
-        nameSpan.getStyle().set("font-weight", "700").set("color", DARK).set("font-size", "15px");
-        
-        Span starsSpan = new Span(stars);
-        starsSpan.getStyle().set("color", "#f5c842").set("font-size", "11px").set("letter-spacing", "1px");
-        
-        topRow.add(nameSpan, starsSpan);
 
-        HorizontalLayout bottomRow = new HorizontalLayout();
-        bottomRow.setWidthFull();
-        bottomRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        bottomRow.setAlignItems(FlexComponent.Alignment.CENTER);
-        bottomRow.getStyle().set("margin-top", "6px");
-        
-        Span infoSpan = new Span(secondaryInfo);
-        infoSpan.getStyle().set("color", "#7a6050").set("font-size", "13px");
-        
-        Icon typeIcon = isSitter ? new Icon(VaadinIcon.HEART) : new Icon(VaadinIcon.HOME);
-        typeIcon.setSize("12px");
-        typeIcon.getStyle().set("color", "#a08060");
-        
-        bottomRow.add(infoSpan, typeIcon);
-        
-        content.add(topRow, bottomRow);
-        item.add(avatar, content);
+        Span name = new Span(counterpartName);
+        name.getStyle().set("font-weight", "700").set("color", DARK).set("font-size", "14px");
+        content.add(name);
 
-        item.addClickListener(e -> System.out.println("Chat item clicked: " + name));
+        String previewText = Boolean.TRUE.equals(typingByConversationId.get(conv.conversationId()))
+                ? "schreibt gerade..."
+                : conv.lastMessagePreview();
+
+        if (previewText != null) {
+            Span preview = new Span(previewText);
+            preview.getStyle().set("color", "#7a6050").set("font-size", "12px").set("margin-top", "4px");
+            content.add(preview);
+        }
+
+        item.add(content);
+        item.addClickListener(e -> selectConversation(conv.conversationId()));
 
         return item;
     }
 
-    private Div createAvatar(int size) {
-        Div avatar = new Div();
-        avatar.getStyle()
-            .set("width", size + "px")
-            .set("height", size + "px")
-            .set("min-width", size + "px")
-            .set("border-radius", "50%")
-            .set("background", "#8db3c3") // blue matching the user view avatar color
-            .set("display", "flex")
-            .set("align-items", "center")
-            .set("justify-content", "center")
-            .set("overflow", "hidden");
+    private void selectConversation(String conversationId) {
+        this.activeConversationId = conversationId;
+        ChatConversationDto selected = conversationsById.get(conversationId);
+        if (selected != null) {
+            boolean currentUserIsOwner = currentUserId.equals(selected.ownerId());
+            activeRecipientId = currentUserIsOwner ? selected.sitterId() : selected.ownerId();
+            activeCounterpartName = currentUserIsOwner ? selected.sitterDisplayName() : selected.ownerDisplayName();
+            chatTitle.setText(activeCounterpartName != null ? activeCounterpartName : "Chat");
+        }
+        typingIndicator.setText("");
+        typingIndicator.getStyle().set("display", "none");
+        log.info("Selected conversation: {}", conversationId);
 
-        Div svgWrap = new Div();
-        svgWrap.getElement().setProperty("innerHTML",
-            "<svg width='" + (size*0.6) + "' height='" + (size*0.6) + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
-            "<circle cx='12' cy='8' r='4' fill='white'/>" +
-            "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='white'/></svg>");
-        avatar.add(svgWrap);
+        // Refresh conversation list styling
+        refreshConversationList();
+
+        // Load messages
+        try {
+            List<ChatMessageDto> messages = chatService.getMessages(conversationId);
+            messageList.removeAll();
+
+            if (messages.isEmpty()) {
+                messageList.add(new Paragraph("Keine Nachrichten in diesem Chat."));
+            } else {
+                for (ChatMessageDto msg : messages) {
+                    messageList.add(buildMessageBubble(msg));
+                }
+                // Auto-scroll to bottom
+                messageList.getElement().executeJs("this.scrollTop = this.scrollHeight");
+            }
+
+            // Mark as read
+            chatService.markConversationAsRead(conversationId);
+
+            // Enable send button
+            sendButton.setEnabled(true);
+            messageInput.focus();
+
+        } catch (Exception e) {
+            log.error("Failed to load messages: {}", e.getMessage());
+            messageList.removeAll();
+            messageList.add(new Paragraph("Fehler beim Laden der Nachrichten."));
+        }
+    }
+
+    private Component buildMessageBubble(ChatMessageDto msg) {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.END);
+        row.setSpacing(true);
+
+        if (msg.senderId().equals(currentUserId)) {
+            // Own message (right side)
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+            row.add(buildAvatar("Ich"), createBubble(msg.message(), true));
+        } else {
+            // Other's message (left side)
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
+            row.add(buildAvatar(activeCounterpartName), createBubble(msg.message(), false));
+        }
+
+        return row;
+    }
+
+    private Div createBubble(String text, boolean isOwn) {
+        Div bubble = new Div();
+        bubble.getStyle()
+            .set("max-width", "60%")
+            .set("padding", "12px 16px")
+            .set("border-radius", "12px")
+            .set("word-wrap", "break-word")
+            .set("background", isOwn ? "#f7f5f0" : "#ebd7c0")
+            .set("border", "1px solid #e8ddd4")
+            .set("color", DARK)
+            .set("font-size", "14px")
+            .set("line-height", "1.4");
+
+        bubble.add(new Span(text));
+        return bubble;
+    }
+
+    private Component buildAvatar(String displayName) {
+        String initials = initials(displayName);
+        Span avatar = new Span(initials);
+        avatar.getStyle()
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("border-radius", "50%")
+                .set("display", "inline-flex")
+                .set("align-items", "center")
+                .set("justify-content", "center")
+                .set("font-size", "11px")
+                .set("font-weight", "700")
+                .set("background", "#8db3c3")
+                .set("color", "white");
         return avatar;
     }
 
-    private Component buildChatHeader(String name) {
-        VerticalLayout headerWrap = new VerticalLayout();
-        headerWrap.setPadding(false);
-        headerWrap.setSpacing(false);
-        headerWrap.setWidthFull();
-
-        HorizontalLayout header = new HorizontalLayout();
-        header.setAlignItems(FlexComponent.Alignment.CENTER);
-        header.getStyle().set("gap", "16px").set("padding-bottom", "16px");
-
-        Div avatar = createAvatar(48);
-        avatar.getStyle().set("cursor", "pointer");
-        avatar.addClickListener(e -> {
-            ProfilePopUp popUp = new ProfilePopUp();
-            popUp.open();
-        });
-        header.add(avatar);
-
-        H2 nameHeader = new H2(name);
-        nameHeader.getStyle().set("margin", "0").set("font-size", "28px").set("font-weight", "800").set("color", DARK);
-        header.add(nameHeader);
-
-        Hr divider = new Hr();
-        divider.getStyle().set("margin", "0").set("border-color", "#e8ddd4").set("width", "100%");
-
-        headerWrap.add(header, divider);
-        return headerWrap;
+    private String initials(String displayName) {
+        if (displayName == null || displayName.isBlank()) {
+            return "?";
+        }
+        String[] parts = displayName.trim().split("\\s+");
+        if (parts.length == 1) {
+            return parts[0].substring(0, 1).toUpperCase();
+        }
+        return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
     }
 
-    private VerticalLayout buildMessagesArea() {
-        VerticalLayout messagesArea = new VerticalLayout();
-        messagesArea.setWidthFull();
-        messagesArea.setPadding(false);
-        messagesArea.getStyle()
-            .set("overflow-y", "auto")
-            .set("padding", "32px 0")
-            .set("gap", "40px");
+    private void sendMessage() {
+        String text = messageInput.getValue().trim();
 
-        // Top right message
-        HorizontalLayout rightMsgRow = new HorizontalLayout();
-        rightMsgRow.setWidthFull();
-        rightMsgRow.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        
-        Div rightBubbleWrap = new Div();
-        rightBubbleWrap.getStyle()
-            .set("position", "relative")
-            .set("margin-right", "18px")
-            .set("margin-bottom", "18px");
-        
-        Div rightBubble = new Div();
-        rightBubble.getStyle()
-            .set("background", "#f7f5f0")
-            .set("border", "1px solid #e8ddd4")
-            .set("border-radius", "16px")
-            .set("padding", "16px 20px")
-            .set("width", "360px")
-            .set("box-sizing", "border-box")
-            .set("color", DARK)
-            .set("font-size", "15px")
-            .set("line-height", "1.5");
-            
-        Span rightText = new Span("Hallo max3010, hast du morgen Nachmittag Zeit, auf meinen Hund aufzupassen?");
-        rightBubble.add(rightText);
-            
-        Div rightAvatar = createAvatar(36);
-        rightAvatar.getStyle()
-            .set("position", "absolute")
-            .set("bottom", "-18px")
-            .set("right", "-18px")
-            .set("border", "4px solid #ffffff");
-            
-        rightBubbleWrap.add(rightBubble, rightAvatar);
-        rightMsgRow.add(rightBubbleWrap);
+        if (text.isEmpty() || activeConversationId == null) {
+            return;
+        }
 
-        // Bottom left message
-        HorizontalLayout leftMsgRow = new HorizontalLayout();
-        leftMsgRow.setWidthFull();
-        leftMsgRow.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
-        
-        Div leftBubbleWrap = new Div();
-        leftBubbleWrap.getStyle()
-            .set("position", "relative")
-            .set("margin-top", "12px")
-            .set("margin-left", "18px")
-            .set("margin-bottom", "18px");
-        
-        Div leftBubble = new Div();
-        leftBubble.getStyle()
-            .set("background", "#ebd7c0")
-            .set("border-radius", "16px")
-            .set("padding", "16px 20px")
-            .set("width", "360px")
-            .set("box-sizing", "border-box")
-            .set("color", DARK)
-            .set("font-size", "15px")
-            .set("line-height", "1.5");
-            
-        Span leftText = new Span("Hallo! Ja, ich habe morgen ab 14 Uhr Zeit. Sollen wir uns vorher noch kurz treffen?");
-        leftBubble.add(leftText);
-            
-        Div leftAvatar = createAvatar(36);
-        leftAvatar.getStyle()
-            .set("position", "absolute")
-            .set("bottom", "-18px")
-            .set("left", "-18px")
-            .set("border", "4px solid #ffffff");
-            
-        leftBubbleWrap.add(leftBubble, leftAvatar);
-        leftMsgRow.add(leftBubbleWrap);
-
-        messagesArea.add(rightMsgRow, leftMsgRow);
-        return messagesArea;
-    }
-
-    private Component buildMessageInput() {
-        HorizontalLayout inputArea = new HorizontalLayout();
-        inputArea.setWidthFull();
-        inputArea.setAlignItems(FlexComponent.Alignment.CENTER);
-        inputArea.getStyle()
-            .set("background", "#fcfaf6")
-            .set("border", "1px solid #e8ddd4")
-            .set("border-radius", "12px")
-            .set("padding", "14px 20px")
-            .set("margin-top", "16px")
-            .set("gap", "16px");
-
-        Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
-        cameraIcon.getStyle().set("color", "#a08060").set("cursor", "pointer");
-        cameraIcon.setSize("24px");
-        cameraIcon.addClickListener(e -> System.out.println("Camera icon clicked"));
-
-        Input messageInput = new Input();
-        messageInput.setPlaceholder("Schreibe hier deine Nachricht");
-        messageInput.getStyle()
-            .set("flex", "1")
-            .set("border", "none")
-            .set("background", "transparent")
-            .set("outline", "none")
-            .set("font-size", "15px")
-            .set("color", DARK)
-            .set("font-family", "Inter, Arial, sans-serif");
-            
-        Icon sendIcon = new Icon(VaadinIcon.PAPERPLANE_O);
-        sendIcon.getStyle().set("color", "#a08060").set("cursor", "pointer");
-        sendIcon.setSize("24px");
-        sendIcon.addClickListener(e -> {
-            System.out.println("Send clicked, message: " + messageInput.getValue());
+        try {
+            ChatMessageDto sent = chatService.sendMessage(activeConversationId, text);
             messageInput.setValue("");
+            publishTyping(false);
+
+            // Add sender's message immediately to UI (don't wait for EventBus)
+            messageList.add(buildMessageBubble(sent));
+            messageList.getElement().executeJs("this.scrollTop = this.scrollHeight");
+
+            // Refresh conversation list for updated timestamp
+            refreshConversationList();
+        } catch (Exception e) {
+            log.error("Failed to send message: {}", e.getMessage());
+            messageInput.setValue("Fehler: Nachricht konnte nicht gesendet werden.");
+        }
+    }
+
+    // ── Event Bus Listener ──
+
+    private void registerEventBusListener() {
+        this.eventBusRegistration = eventBus.register(currentUserId, message -> {
+            UI ui = getUI().orElse(null);
+            if (ui != null) {
+                ui.access(() -> {
+                    // If the message is for the active conversation, add it to the view
+                    if (message.conversationId().equals(activeConversationId)) {
+                        messageList.add(buildMessageBubble(message));
+                        messageList.getElement().executeJs("this.scrollTop = this.scrollHeight");
+                    } else {
+                        // Otherwise, just refresh the conversation list
+                        refreshConversationList();
+                    }
+                });
+            }
         });
 
-        inputArea.add(cameraIcon, messageInput, sendIcon);
+        this.typingRegistration = eventBus.registerTyping(currentUserId, event -> {
+            UI ui = getUI().orElse(null);
+            if (ui != null) {
+                ui.access(() -> {
+                    typingByConversationId.put(event.conversationId(), event.typing());
+                    refreshConversationList();
 
-        return inputArea;
+                    if (!event.conversationId().equals(activeConversationId)) {
+                        return;
+                    }
+                    if (event.typing()) {
+                        typingIndicator.setText(initials(activeCounterpartName) + " schreibt gerade...");
+                        typingIndicator.getStyle().set("display", "block");
+                    } else {
+                        typingIndicator.setText("");
+                        typingIndicator.getStyle().set("display", "none");
+                    }
+                });
+            }
+        });
     }
+
+    private void handleTyping() {
+        if (activeConversationId == null || activeRecipientId == null) {
+            return;
+        }
+        if (messageInput.getValue() == null || messageInput.getValue().isBlank()) {
+            publishTyping(false);
+            return;
+        }
+
+        publishTyping(true);
+
+        if (stopTypingFuture != null) {
+            stopTypingFuture.cancel(false);
+        }
+        stopTypingFuture = typingScheduler.schedule(() -> {
+            UI ui = getUI().orElse(null);
+            if (ui != null) {
+                ui.access(() -> publishTyping(false));
+            }
+        }, 1200, TimeUnit.MILLISECONDS);
+    }
+
+    private void publishTyping(boolean typing) {
+        if (activeConversationId == null || activeRecipientId == null) {
+            return;
+        }
+        eventBus.publishTyping(new ChatTypingEventDto(
+                activeConversationId,
+                currentUserId,
+                activeRecipientId,
+                typing,
+                LocalDateTime.now()
+        ));
+    }
+
+    @Override
+    protected void onDetach(DetachEvent event) {
+        super.onDetach(event);
+        // Cleanup: remove listener from event bus
+        if (eventBusRegistration != null) {
+            eventBusRegistration.remove();
+            log.info("EventBus listener unregistered");
+        }
+        if (typingRegistration != null) {
+            typingRegistration.remove();
+        }
+        if (stopTypingFuture != null) {
+            stopTypingFuture.cancel(true);
+        }
+        typingScheduler.shutdownNow();
+    }
+
 }
 

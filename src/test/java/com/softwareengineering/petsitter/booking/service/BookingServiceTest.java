@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class BookingServiceTest {
 
@@ -241,7 +242,8 @@ class BookingServiceTest {
             OfferRepository offerRepo,
             BookingRepository bookingRepo
     ) {
-        return new BookingService(bookingRepo, requestRepo, offerRepo);
+        ApplicationEventPublisher eventPublisher = event -> { };
+        return new BookingService(bookingRepo, requestRepo, offerRepo, eventPublisher);
     }
 
     // ── Repository test doubles ──────────────────────────────────────────

@@ -1,10 +1,22 @@
 package com.softwareengineering.petsitter.offerrequest.service;
 
+import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
-import java.util.Collections;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
+import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
+import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
+import com.softwareengineering.petsitter.shared.exception.DuplicateRequestException;
+import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
+import com.softwareengineering.petsitter.shared.exception.NotFoundException;
+import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * RequestService – verwaltet Requests (Anfragen) von Usern auf existierende Offers.
@@ -39,6 +51,22 @@ import org.springframework.stereotype.Service;
 @Service
 public class RequestService {
 
+    private static final int MAX_MESSAGE_LENGTH = 1000;
+
+    private final OfferRequestRepository offerRequestRepository;
+    private final OfferRepository offerRepository;
+    private final UserRepository userRepository;
+
+    public RequestService(
+            OfferRequestRepository offerRequestRepository,
+            OfferRepository offerRepository,
+            UserRepository userRepository
+    ) {
+        this.offerRequestRepository = offerRequestRepository;
+        this.offerRepository = offerRepository;
+        this.userRepository = userRepository;
+    }
+
     /**
      * Erstellt einen neuen Request von {@code requesterId} auf das Offer {@code offerId}.
      *
@@ -62,8 +90,41 @@ public class RequestService {
      * @throws com.softwareengineering.petsitter.shared.exception.DuplicateRequestException
      *         wenn es bereits einen Request von dieser User auf dieses Offer gibt
      */
+    @Transactional
     public OfferRequest createRequest(UUID offerId, UUID requesterId, String message) {
-        throw new UnsupportedOperationException("createRequest noch nicht implementiert");
+        requireId(offerId, "offerId darf nicht null sein");
+        requireId(requesterId, "requesterId darf nicht null sein");
+
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden: " + offerId));
+
+        User requester = userRepository.findById(requesterId)
+                .orElseThrow(() -> new NotFoundException("User nicht gefunden: " + requesterId));
+
+        if (offer.getCreator() == null || offer.getCreator().getId() == null) {
+            throw new BusinessRuleViolationException("Offer hat keinen gueltigen Creator");
+        }
+
+        if (offer.getCreator().getId().equals(requesterId)) {
+            throw new ForbiddenOperationException("Du kannst keinen Request auf dein eigenes Offer erstellen");
+        }
+
+        if (offer.getStatus() != OfferStatus.OPEN) {
+            throw new BusinessRuleViolationException("Requests sind nur auf OPEN Offers erlaubt");
+        }
+
+        offerRequestRepository.findByOfferOfferIdAndRequesterId(offerId, requesterId)
+                .ifPresent(existing -> {
+                    throw new DuplicateRequestException("Es existiert bereits ein Request fuer dieses Offer und diesen User");
+                });
+
+        OfferRequest request = new OfferRequest();
+        request.setOffer(offer);
+        request.setRequester(requester);
+        request.setStatus(RequestStatus.PENDING);
+        request.setMessage(normalizeMessage(message));
+
+        return offerRequestRepository.save(request);
     }
 
     /**
@@ -79,8 +140,28 @@ public class RequestService {
      * @throws com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException
      *         wenn {@code requesterId} != Request.requester.id
      */
+    @Transactional
     public void cancelRequest(UUID requestId, UUID requesterId) {
-        throw new UnsupportedOperationException("cancelRequest noch nicht implementiert");
+        requireId(requestId, "requestId darf nicht null sein");
+        requireId(requesterId, "requesterId darf nicht null sein");
+
+        OfferRequest request = offerRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+
+        if (request.getRequester() == null || request.getRequester().getId() == null) {
+            throw new BusinessRuleViolationException("Request hat keinen gueltigen Requester");
+        }
+
+        if (!requesterId.equals(request.getRequester().getId())) {
+            throw new ForbiddenOperationException("Nur der Requester darf den Request stornieren");
+        }
+
+        if (request.getStatus() != RequestStatus.PENDING && request.getStatus() != RequestStatus.ACCEPTED) {
+            throw new BusinessRuleViolationException("Nur PENDING oder ACCEPTED Requests duerfen storniert werden");
+        }
+
+        request.setStatus(RequestStatus.CANCELLED);
+        offerRequestRepository.save(request);
     }
 
     /**
@@ -95,7 +176,21 @@ public class RequestService {
      *         wenn {@code creatorId} != Offer.creator.id
      */
     public List<OfferRequest> findRequestsForOffer(UUID offerId, UUID creatorId) {
-        return Collections.emptyList();
+        requireId(offerId, "offerId darf nicht null sein");
+        requireId(creatorId, "creatorId darf nicht null sein");
+
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden: " + offerId));
+
+        if (offer.getCreator() == null || offer.getCreator().getId() == null) {
+            throw new BusinessRuleViolationException("Offer hat keinen gueltigen Creator");
+        }
+
+        if (!Objects.equals(offer.getCreator().getId(), creatorId)) {
+            throw new ForbiddenOperationException("Nur der Offer-Creator darf Requests sehen");
+        }
+
+        return offerRequestRepository.findAllByOfferOfferId(offerId);
     }
 
     /**
@@ -105,7 +200,28 @@ public class RequestService {
      * @return Liste aller Requests von diesem User (als Requester)
      */
     public List<OfferRequest> findMyRequests(UUID userId) {
-        return Collections.emptyList();
+        requireId(userId, "userId darf nicht null sein");
+        return offerRequestRepository.findAllByRequesterId(userId);
+    }
+
+    private void requireId(UUID value, String message) {
+        if (value == null) {
+            throw new BusinessRuleViolationException(message);
+        }
+    }
+
+    private String normalizeMessage(String message) {
+        if (message == null) {
+            return null;
+        }
+        String normalized = message.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if (normalized.length() > MAX_MESSAGE_LENGTH) {
+            throw new BusinessRuleViolationException("Nachricht darf maximal " + MAX_MESSAGE_LENGTH + " Zeichen haben");
+        }
+        return normalized;
     }
 }
 

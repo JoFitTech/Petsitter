@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,10 +114,17 @@ public class RequestService {
             throw new BusinessRuleViolationException("Requests sind nur auf OPEN Offers erlaubt");
         }
 
-        offerRequestRepository.findByOfferOfferIdAndRequesterId(offerId, requesterId)
-                .ifPresent(existing -> {
-                    throw new DuplicateRequestException("Es existiert bereits ein Request fuer dieses Offer und diesen User");
-                });
+        var existingOpt = offerRequestRepository.findByOfferOfferIdAndRequesterId(offerId, requesterId);
+        if (existingOpt.isPresent()) {
+            OfferRequest existing = existingOpt.get();
+            if (existing.getStatus() == RequestStatus.PENDING) {
+                throw new DuplicateRequestException("Es existiert bereits ein Request fuer dieses Offer und diesen User");
+            }
+            // DENIED or ACCEPTED (booking was cancelled, offer is OPEN again) → reuse row
+            existing.setStatus(RequestStatus.PENDING);
+            existing.setMessage(normalizeMessage(message));
+            return offerRequestRepository.save(existing);
+        }
 
         OfferRequest request = new OfferRequest();
         request.setOffer(offer);
@@ -202,6 +210,96 @@ public class RequestService {
     public List<OfferRequest> findMyRequests(UUID userId) {
         requireId(userId, "userId darf nicht null sein");
         return offerRequestRepository.findAllByRequesterId(userId);
+    }
+
+    public OfferRequest findById(UUID requestId) {
+        requireId(requestId, "requestId darf nicht null sein");
+        return offerRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+    }
+
+    @Transactional(readOnly = true)
+    public OfferRequest findByIdWithDetails(UUID requestId) {
+        OfferRequest req = findById(requestId);
+        // Initialize lazy associations within transaction so they remain accessible after it closes
+        if (req.getOffer() != null) {
+            req.getOffer().getOfferId();
+            req.getOffer().getTitle();
+            if (req.getOffer().getCreator() != null) {
+                req.getOffer().getCreator().getId();
+                req.getOffer().getCreator().getFirstName();
+            }
+        }
+        if (req.getRequester() != null) {
+            req.getRequester().getId();
+            req.getRequester().getFirstName();
+            req.getRequester().getLastName();
+        }
+        return req;
+    }
+
+    @Transactional
+    public void denyRequest(UUID requestId, UUID offerCreatorId) {
+        requireId(requestId, "requestId darf nicht null sein");
+        requireId(offerCreatorId, "offerCreatorId darf nicht null sein");
+
+        OfferRequest request = findById(requestId);
+
+        if (!request.getOffer().getCreator().getId().equals(offerCreatorId)) {
+            throw new ForbiddenOperationException("Nur der Offer-Creator darf eine Anfrage ablehnen");
+        }
+        if (request.getStatus() != RequestStatus.PENDING) {
+            throw new BusinessRuleViolationException("Nur PENDING Requests koennen abgelehnt werden");
+        }
+
+        request.setStatus(RequestStatus.DENIED);
+        offerRequestRepository.save(request);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OfferRequest> findPendingRequestFromRequesterToCreator(UUID creatorId, UUID requesterId) {
+        List<OfferRequest> pending = offerRequestRepository
+            .findAllByOffer_CreateUser_IdAndRequester_IdAndStatus(creatorId, requesterId, RequestStatus.PENDING);
+        if (pending.isEmpty()) {
+            return Optional.empty();
+        }
+        OfferRequest req = pending.get(0);
+        req.getOffer().getOfferId();
+        req.getOffer().getTitle();
+        req.getOffer().getCreator().getId();
+        req.getOffer().getCreator().getFirstName();
+        req.getRequester().getId();
+        req.getRequester().getFirstName();
+        req.getRequester().getLastName();
+        return Optional.of(req);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OfferRequest> findAcceptedRequestFromRequesterToCreator(UUID creatorId, UUID requesterId) {
+        List<OfferRequest> accepted = offerRequestRepository
+            .findAllByOffer_CreateUser_IdAndRequester_IdAndStatus(creatorId, requesterId, RequestStatus.ACCEPTED);
+        if (accepted.isEmpty()) {
+            return Optional.empty();
+        }
+        OfferRequest req = accepted.get(0);
+        req.getOffer().getOfferId();
+        req.getOffer().getTitle();
+        req.getRequester().getId();
+        return Optional.of(req);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<OfferRequest> findDeniedRequestFromRequesterToCreator(UUID creatorId, UUID requesterId) {
+        List<OfferRequest> denied = offerRequestRepository
+            .findAllByOffer_CreateUser_IdAndRequester_IdAndStatus(creatorId, requesterId, RequestStatus.DENIED);
+        if (denied.isEmpty()) {
+            return Optional.empty();
+        }
+        OfferRequest req = denied.get(0);
+        req.getOffer().getOfferId();
+        req.getOffer().getTitle();
+        req.getRequester().getId();
+        return Optional.of(req);
     }
 
     private void requireId(UUID value, String message) {

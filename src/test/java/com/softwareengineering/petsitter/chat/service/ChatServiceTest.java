@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import com.softwareengineering.petsitter.booking.domain.Booking;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
 import com.softwareengineering.petsitter.chat.domain.ChatConversationDocument;
+import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
 import com.softwareengineering.petsitter.chat.domain.ChatMessageDocument;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
@@ -36,6 +37,7 @@ class ChatServiceTest {
     private ChatConversationRepository conversationRepository;
     private ChatMessageRepository messageRepository;
     private BookingRepository bookingRepository;
+    private OfferRequestRepository offerRequestRepository;
     private ChatAccessService accessService;
     private ChatEventBus eventBus;
     private NotificationService notificationService;
@@ -48,6 +50,7 @@ class ChatServiceTest {
         conversationRepository = Mockito.mock(ChatConversationRepository.class);
         messageRepository = Mockito.mock(ChatMessageRepository.class);
         bookingRepository = Mockito.mock(BookingRepository.class);
+        offerRequestRepository = Mockito.mock(OfferRequestRepository.class);
         accessService = Mockito.mock(ChatAccessService.class);
         eventBus = Mockito.mock(ChatEventBus.class);
         notificationService = Mockito.mock(NotificationService.class);
@@ -58,6 +61,7 @@ class ChatServiceTest {
                 conversationRepository,
                 messageRepository,
                 bookingRepository,
+                offerRequestRepository,
                 accessService,
                 eventBus,
                 notificationService,

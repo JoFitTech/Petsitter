@@ -143,8 +143,31 @@ public class BookingService {
                     "Nur Owner oder Sitter dürfen ein Booking stornieren.");
         }
 
+        if (booking.getStartDate() != null
+                && !booking.getStartDate().isAfter(java.time.LocalDate.now().plusDays(1))) {
+            throw new BusinessRuleViolationException(
+                    "Stornierung nicht möglich: Das Angebot beginnt morgen oder früher.");
+        }
+
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
+
+        Offer offer = booking.getOffer();
+        offer.setStatus(OfferStatus.OPEN);
+        offerRepository.save(offer);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Optional<UUID> findActiveBookingIdForOffer(UUID offerId) {
+        return bookingRepository.findByOffer_OfferIdAndStatus(offerId, BookingStatus.CREATED)
+                .map(Booking::getId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isBookingCancelledForRequest(UUID requestId) {
+        List<Booking> bookings = bookingRepository.findAllByAcceptedRequest_Id(requestId);
+        if (bookings.isEmpty()) return false;
+        return bookings.stream().allMatch(b -> b.getStatus() == BookingStatus.CANCELLED);
     }
 
     /**
@@ -153,6 +176,7 @@ public class BookingService {
      * @param userId ID des Users
      * @return Liste der BookingDtos
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<BookingDto> getBookings(UUID userId) {
         return bookingRepository.findAllByOwnerIdOrSitterId(userId, userId)
                 .stream()
@@ -204,6 +228,7 @@ public class BookingService {
 
         return new BookingDto(
                 booking.getId(),
+                booking.getOwner().getId(),
                 offerTitle,
                 ownerName,
                 sitterName,
@@ -211,7 +236,8 @@ public class BookingService {
                 booking.getStartDate(),
                 booking.getEndDate(),
                 booking.getPricePerWeek(),
-                booking.getStatus()
+                booking.getStatus(),
+                booking.getCreatedAt()
         );
     }
 

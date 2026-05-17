@@ -1,7 +1,10 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
@@ -26,11 +29,19 @@ public class MyFavoritesView extends Div {
 
     private final FavoriteService favoriteService;
     private final OfferService offerService;
+    private final RequestService requestService;
+    private final ChatService chatService;
+    private final AuthenticatedUser authenticatedUser;
     private final Div favoritesContainer = new Div();
 
-    public MyFavoritesView(FavoriteService favoriteService, OfferService offerService) {
+    public MyFavoritesView(FavoriteService favoriteService, OfferService offerService,
+                           RequestService requestService, ChatService chatService,
+                           AuthenticatedUser authenticatedUser) {
         this.favoriteService = favoriteService;
         this.offerService = offerService;
+        this.requestService = requestService;
+        this.chatService = chatService;
+        this.authenticatedUser = authenticatedUser;
 
         setWidthFull();
         getStyle()
@@ -151,7 +162,7 @@ public class MyFavoritesView extends Div {
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService, requestService, chatService, authenticatedUser).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

@@ -26,8 +26,15 @@ public class ChatConversationDocument {
      * Eindeutige Zuordnung zum Booking.
      * Unique Index: pro Booking maximal eine Conversation.
      */
-    @Indexed(unique = true)
+    @Indexed(unique = true, sparse = true)
     private UUID bookingId;
+
+    private String requestId;
+
+    private String offerId;
+
+    @Indexed(unique = true, sparse = true)
+    private String userPairKey;
 
     /**
      * ID des Pet-Besitzers (Owner).
@@ -137,6 +144,30 @@ public class ChatConversationDocument {
 
     public void setLastMessagePreview(String lastMessagePreview) {
         this.lastMessagePreview = lastMessagePreview;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public String getOfferId() {
+        return offerId;
+    }
+
+    public void setOfferId(String offerId) {
+        this.offerId = offerId;
+    }
+
+    public String getUserPairKey() {
+        return userPairKey;
+    }
+
+    public void setUserPairKey(String userPairKey) {
+        this.userPairKey = userPairKey;
     }
 }
 

@@ -73,8 +73,11 @@ class RequestServiceTest {
         UUID requesterId = UUID.randomUUID();
         Offer offer = offer(offerId, creatorId, OfferStatus.OPEN);
 
+        OfferRequest pending = new OfferRequest();
+        pending.setStatus(RequestStatus.PENDING);
+
         RequestService requestService = new RequestService(
-                offerRequestRepository(new AtomicReference<>(), Optional.of(new OfferRequest()), new ArrayList<>(), new ArrayList<>()),
+                offerRequestRepository(new AtomicReference<>(), Optional.of(pending), new ArrayList<>(), new ArrayList<>()),
                 offerRepository(Optional.of(offer)),
                 userRepository(Optional.of(user(requesterId)))
         );

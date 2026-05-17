@@ -95,6 +95,28 @@ public class NotificationService {
             recipient.getId(), sender.getId(), conversationId);
     }
 
+    @Transactional
+    public void createRequestNotification(User recipient, User requester, String conversationId) {
+        if (recipient == null || requester == null || conversationId == null) {
+            log.warn("Cannot create request notification: recipient={}, requester={}, conversationId={}",
+                recipient, requester, conversationId);
+            return;
+        }
+
+        Notification notification = new Notification();
+        notification.setRecipient(recipient);
+        notification.setType(NotificationType.REQUEST_RECEIVED);
+        notification.setMessage(
+            requester.getFirstName() + " " + requester.getLastName() + " hat dein Angebot angefragt."
+        );
+        notification.setReferenceId(conversationId);
+        notification.setRead(false);
+
+        notificationRepository.save(notification);
+        log.info("Request notification created for recipient {} from requester {} in conversation {}",
+            recipient.getId(), requester.getId(), conversationId);
+    }
+
     /**
      * Markiert eine einzelne Notification als gelesen.
      *

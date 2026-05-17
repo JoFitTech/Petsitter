@@ -9,6 +9,9 @@ import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.repository.ChatConversationRepository;
 import com.softwareengineering.petsitter.chat.repository.ChatMessageRepository;
 import com.softwareengineering.petsitter.notification.service.NotificationService;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
@@ -22,7 +25,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Chat-Service – zentrale Businesslogik für Chat-Operationen.
@@ -48,6 +53,7 @@ public class ChatService {
     private final ChatConversationRepository conversationRepository;
     private final ChatMessageRepository messageRepository;
     private final BookingRepository bookingRepository;
+    private final OfferRequestRepository offerRequestRepository;
     private final ChatAccessService accessService;
     private final ChatEventBus eventBus;
     private final NotificationService notificationService;
@@ -58,6 +64,7 @@ public class ChatService {
             ChatConversationRepository conversationRepository,
             ChatMessageRepository messageRepository,
             BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
             ChatAccessService accessService,
             ChatEventBus eventBus,
             NotificationService notificationService,
@@ -67,6 +74,7 @@ public class ChatService {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.bookingRepository = bookingRepository;
+        this.offerRequestRepository = offerRequestRepository;
         this.accessService = accessService;
         this.eventBus = eventBus;
         this.notificationService = notificationService;
@@ -85,21 +93,83 @@ public class ChatService {
      * @throws NotFoundException wenn Booking nicht existiert
      */
     @Transactional
+    public String createConversationForRequest(UUID requestId, String initialMessage) {
+        log.info("Creating chat conversation for request {}", requestId);
+
+        OfferRequest request = offerRequestRepository.findById(requestId)
+            .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+
+        var offer = request.getOffer();
+        User creator = offer.getCreator();
+        User requester = request.getRequester();
+
+        User owner;
+        User sitter;
+        if (offer.getType() == OfferType.OWNER_OFFER) {
+            owner = creator;
+            sitter = requester;
+        } else {
+            sitter = creator;
+            owner = requester;
+        }
+
+        String pairKey = buildUserPairKey(owner.getId(), sitter.getId());
+
+        String convId;
+
+        var existing = conversationRepository.findByUserPairKey(pairKey);
+        if (existing.isPresent()) {
+            log.info("Conversation for user pair {} already exists. Reusing {}.", pairKey, existing.get().getId());
+            convId = existing.get().getId();
+        } else {
+            ChatConversationDocument conversation = new ChatConversationDocument();
+            conversation.setOwnerId(owner.getId());
+            conversation.setSitterId(sitter.getId());
+            conversation.setOwnerDisplayName(getDisplayName(owner));
+            conversation.setSitterDisplayName(getDisplayName(sitter));
+            conversation.setRequestId(requestId.toString());
+            conversation.setOfferId(offer.getOfferId().toString());
+            conversation.setUserPairKey(pairKey);
+            conversation.setCreatedAt(LocalDateTime.now());
+            conversation = conversationRepository.save(conversation);
+            convId = conversation.getId();
+            log.info("Chat conversation created for request {} with id {}", requestId, convId);
+        }
+
+        saveRequestCardMessage(convId, requester.getId(), creator.getId(), requestId, offer.getTitle());
+
+        String msgText = (initialMessage != null && !initialMessage.isBlank())
+            ? initialMessage
+            : "Guten Tag, ich interessiere mich für dieses Angebot.";
+        sendMessage(convId, msgText);
+
+        return convId;
+    }
+
+    @Transactional
     public ChatConversationDto createConversationForBooking(UUID bookingId) {
         log.info("Creating chat conversation for booking {}", bookingId);
 
-        // Existiert die Konversation schon?
         var existing = conversationRepository.findByBookingId(bookingId);
         if (existing.isPresent()) {
             log.info("Conversation for booking {} already exists. Returning existing.", bookingId);
             return toConversationDto(existing.get());
         }
 
-        // Booking laden
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
 
-        // Konversation anlegen
+        // Reuse conversation created at request time if it exists (look up by user pair)
+        String pairKey = buildUserPairKey(booking.getOwner().getId(), booking.getSitter().getId());
+        var byPair = conversationRepository.findByUserPairKey(pairKey);
+        if (byPair.isPresent()) {
+            ChatConversationDocument conv = byPair.get();
+            conv.setBookingId(bookingId);
+            conversationRepository.save(conv);
+            log.info("Linked existing conversation {} to booking {}", conv.getId(), bookingId);
+            return toConversationDto(conv);
+        }
+
         ChatConversationDocument conversation = new ChatConversationDocument();
         conversation.setBookingId(booking.getId());
         conversation.setOwnerId(booking.getOwner().getId());
@@ -238,13 +308,17 @@ public class ChatService {
         // Notification erstellen (mit Fallback auf direkte User-Lookups, falls Booking nicht mehr aufloesbar ist)
         User sender = null;
         User recipient = null;
-        try {
-            Booking booking = accessService.verifyBookingAccess(conversation.getBookingId(), currentUserId);
-            sender = booking.getOwner().getId().equals(currentUserId) ? booking.getOwner() : booking.getSitter();
-            recipient = booking.getOwner().getId().equals(currentUserId) ? booking.getSitter() : booking.getOwner();
-        } catch (Exception e) {
-            log.warn("Booking lookup failed for conversation {}. Falling back to user lookup: {}",
-                conversationId, e.getMessage());
+        if (conversation.getBookingId() != null) {
+            try {
+                Booking booking = accessService.verifyBookingAccess(conversation.getBookingId(), currentUserId);
+                sender = booking.getOwner().getId().equals(currentUserId) ? booking.getOwner() : booking.getSitter();
+                recipient = booking.getOwner().getId().equals(currentUserId) ? booking.getSitter() : booking.getOwner();
+            } catch (Exception e) {
+                log.warn("Booking lookup failed for conversation {}. Falling back to user lookup: {}",
+                    conversationId, e.getMessage());
+            }
+        }
+        if (sender == null || recipient == null) {
             sender = userRepository.findById(currentUserId).orElse(null);
             recipient = userRepository.findById(recipientId).orElse(null);
         }
@@ -322,6 +396,27 @@ public class ChatService {
         return messageRepository.countByRecipientIdAndReadFalse(currentUserId);
     }
 
+    public Map<String, Long> getUnreadCountsByConversation() {
+        UUID userId = authenticatedUser.get().map(User::getId).orElse(null);
+        if (userId == null) {
+            return Map.of();
+        }
+        return messageRepository.findAllByRecipientIdAndReadFalse(userId).stream()
+            .collect(Collectors.groupingBy(
+                ChatMessageDocument::getConversationId,
+                Collectors.counting()
+            ));
+    }
+
+    public java.util.Optional<String> getConversationIdForBooking(UUID bookingId) {
+        return conversationRepository.findByBookingId(bookingId)
+            .map(ChatConversationDocument::getId)
+            .or(() -> {
+                // Fallback: find by user pair using booking data
+                return java.util.Optional.empty();
+            });
+    }
+
     // ── Private Hilfsmethoden ────────────────────────────────────────────
 
     private ChatConversationDto toConversationDto(ChatConversationDocument doc) {
@@ -334,7 +429,9 @@ public class ChatService {
             doc.getSitterDisplayName(),
             doc.getCreatedAt(),
             doc.getLastMessageAt(),
-            doc.getLastMessagePreview()
+            doc.getLastMessagePreview(),
+            doc.getRequestId(),
+            doc.getOfferId()
         );
     }
 
@@ -347,7 +444,10 @@ public class ChatService {
             doc.getRecipientId(),
             doc.getMessage(),
             doc.getCreatedAt(),
-            doc.isRead()
+            doc.isRead(),
+            doc.getType(),
+            doc.getRequestId(),
+            doc.getOfferTitle()
         );
     }
 
@@ -355,6 +455,26 @@ public class ChatService {
         return (user.getFirstName() != null ? user.getFirstName().trim() : "")
             + " "
             + (user.getLastName() != null ? user.getLastName().trim() : "");
+    }
+
+    private void saveRequestCardMessage(String conversationId, UUID requesterId, UUID creatorId,
+                                        UUID requestId, String offerTitle) {
+        ChatMessageDocument card = new ChatMessageDocument();
+        card.setConversationId(conversationId);
+        card.setSenderId(requesterId);
+        card.setRecipientId(creatorId);
+        card.setType("REQUEST_CARD");
+        card.setRequestId(requestId.toString());
+        card.setOfferTitle(offerTitle != null ? offerTitle : "Angebot");
+        card.setCreatedAt(LocalDateTime.now());
+        card.setRead(false);
+        ChatMessageDocument saved = messageRepository.save(card);
+        eventBus.publish(toMessageDto(saved));
+    }
+
+    private String buildUserPairKey(UUID a, UUID b) {
+        String s1 = a.toString(), s2 = b.toString();
+        return s1.compareTo(s2) <= 0 ? s1 + "_" + s2 : s2 + "_" + s1;
     }
 
     private String truncatePreview(String text) {

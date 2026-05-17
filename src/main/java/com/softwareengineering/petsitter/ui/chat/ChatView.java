@@ -1,17 +1,23 @@
 package com.softwareengineering.petsitter.ui.chat;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.html.*;
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -27,6 +33,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -55,6 +62,8 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
     private final ChatService chatService;
     private final ChatEventBus eventBus;
+    private final RequestService requestService;
+    private final BookingService bookingService;
 
     // UI Components
     private VerticalLayout conversationList;
@@ -79,10 +88,14 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     public ChatView(
             ChatService chatService,
             ChatEventBus eventBus,
-            AuthenticatedUser authenticatedUser
+            AuthenticatedUser authenticatedUser,
+            RequestService requestService,
+            BookingService bookingService
     ) {
         this.chatService = chatService;
         this.eventBus = eventBus;
+        this.requestService = requestService;
+        this.bookingService = bookingService;
 
         setSizeFull();
         setPadding(false);
@@ -260,6 +273,8 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
                 return;
             }
 
+            Map<String, Long> unreadCounts = chatService.getUnreadCountsByConversation();
+
             for (ChatConversationDto conv : conversations) {
                 if (conv == null || conv.conversationId() == null || conv.conversationId().isBlank()) {
                     log.warn("Skipping invalid conversation entry: {}", conv);
@@ -268,7 +283,8 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
                 try {
                     conversationsById.put(conv.conversationId(), conv);
-                    conversationList.add(buildConversationItem(conv));
+                    long unread = unreadCounts.getOrDefault(conv.conversationId(), 0L);
+                    conversationList.add(buildConversationItem(conv, unread));
                 } catch (Exception itemException) {
                     log.warn("Skipping conversation {} due to rendering error: {}",
                         conv.conversationId(), itemException.getMessage(), itemException);
@@ -284,7 +300,7 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
     }
 
-    private Component buildConversationItem(ChatConversationDto conv) {
+    private Component buildConversationItem(ChatConversationDto conv, long unreadCount) {
         Div item = new Div();
         item.getStyle()
             .set("padding", "14px 16px")
@@ -295,7 +311,9 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
                 ? "#ebd7c0"
                 : "#fcfaf6")
             .set("border", "1px solid #f0e6da")
-            .set("box-sizing", "border-box");
+            .set("box-sizing", "border-box")
+            .set("display", "flex")
+            .set("align-items", "center");
 
         // Determine counterpart name
         String counterpartName = currentUserId.equals(conv.ownerId())
@@ -308,6 +326,7 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
         content.setSpacing(false);
+        content.getStyle().set("flex", "1");
 
         Span name = new Span(counterpartName);
         name.getStyle().set("font-weight", "700").set("color", DARK).set("font-size", "14px");
@@ -324,6 +343,18 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         }
 
         item.add(content);
+
+        if (unreadCount > 0) {
+            Span dot = new Span();
+            dot.getStyle()
+                .set("width", "10px").set("height", "10px")
+                .set("border-radius", "50%")
+                .set("background", "#e74c3c")
+                .set("flex-shrink", "0")
+                .set("margin-left", "8px");
+            item.add(dot);
+        }
+
         item.addClickListener(e -> selectConversation(conv.conversationId()));
 
         return item;
@@ -375,22 +406,143 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     }
 
     private Component buildMessageBubble(ChatMessageDto msg) {
+        if ("REQUEST_CARD".equals(msg.type())) {
+            return buildRequestCardBubble(msg);
+        }
+
         HorizontalLayout row = new HorizontalLayout();
         row.setWidthFull();
         row.setAlignItems(FlexComponent.Alignment.END);
         row.setSpacing(true);
 
         if (msg.senderId().equals(currentUserId)) {
-            // Own message (right side)
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
             row.add(buildAvatar("Ich"), createBubble(msg.message(), true));
         } else {
-            // Other's message (left side)
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
             row.add(buildAvatar(activeCounterpartName), createBubble(msg.message(), false));
         }
 
         return row;
+    }
+
+    private Component buildRequestCardBubble(ChatMessageDto msg) {
+        boolean isOwnRequest = msg.senderId().equals(currentUserId);
+        boolean isRecipient = msg.recipientId().equals(currentUserId);
+
+        Div card = new Div();
+        card.getStyle()
+            .set("border-radius", "12px")
+            .set("padding", "14px 16px")
+            .set("max-width", "60%")
+            .set("width", "fit-content");
+
+        String offerTitle = msg.offerTitle() != null ? msg.offerTitle() : "Angebot";
+        String requestId = msg.requestId();
+
+        // Determine current request status
+        RequestStatus status = null;
+        if (requestId != null) {
+            try {
+                status = requestService.findById(UUID.fromString(requestId)).getStatus();
+            } catch (Exception e) {
+                log.warn("Could not load request status for card: {}", e.getMessage());
+            }
+        }
+
+        // Styling and content based on status
+        if (status == RequestStatus.ACCEPTED) {
+            boolean cancelled = false;
+            if (requestId != null) {
+                try {
+                    cancelled = bookingService.isBookingCancelledForRequest(UUID.fromString(requestId));
+                } catch (Exception e) {
+                    log.warn("Could not check booking cancellation: {}", e.getMessage());
+                }
+            }
+            if (cancelled) {
+                card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
+                card.add(makeCardTitle("🚫 Buchung storniert", "#7a6050"));
+                card.add(makeCardOfferSpan(offerTitle));
+            } else {
+                card.getStyle().set("background", "#edf7ed").set("border", "1px solid #b8ddb8");
+                card.add(makeCardTitle("✅ Anfrage angenommen", "#2e7d32"));
+                card.add(makeCardOfferSpan(offerTitle));
+            }
+        } else if (status == RequestStatus.DENIED) {
+            card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
+            card.add(makeCardTitle("❌ Anfrage abgelehnt", "#7a6050"));
+            card.add(makeCardOfferSpan(offerTitle));
+        } else if (status == RequestStatus.PENDING && isRecipient) {
+            card.getStyle().set("background", "#fff8ec").set("border", "1px solid #f0d8a8");
+            card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
+            card.add(makeCardOfferSpan(offerTitle));
+
+            HorizontalLayout buttons = new HorizontalLayout();
+            buttons.getStyle().set("margin-top", "10px");
+
+            UUID reqId = UUID.fromString(requestId);
+            Button acceptBtn = new Button("Annehmen", e -> {
+                try {
+                    bookingService.acceptRequest(reqId, currentUserId);
+                    Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
+                    n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    selectConversation(activeConversationId);
+                } catch (Exception ex) {
+                    Notification.show("Fehler: " + ex.getMessage());
+                }
+            });
+            acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
+
+            Button denyBtn = new Button("Ablehnen", e -> {
+                try {
+                    requestService.denyRequest(reqId, currentUserId);
+                    selectConversation(activeConversationId);
+                } catch (Exception ex) {
+                    Notification.show("Fehler: " + ex.getMessage());
+                }
+            });
+            denyBtn.getStyle().set("border-radius", "8px");
+
+            buttons.add(acceptBtn, denyBtn);
+            card.add(buttons);
+        } else {
+            // PENDING as sender, or unknown status
+            card.getStyle().set("background", "#f0f4ff").set("border", "1px solid #c5d0e8");
+            card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
+            card.add(makeCardOfferSpan(offerTitle));
+            Span statusSpan = new Span(status == RequestStatus.PENDING ? "Status: Ausstehend" : "Status: Unbekannt");
+            statusSpan.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic").set("display", "block").set("margin-top", "4px");
+            card.add(statusSpan);
+        }
+
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.END);
+        row.setSpacing(true);
+
+        if (isOwnRequest) {
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+            row.add(buildAvatar("Ich"), card);
+        } else {
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
+            row.add(buildAvatar(activeCounterpartName), card);
+        }
+
+        return row;
+    }
+
+    private Span makeCardTitle(String text, String color) {
+        Span s = new Span(text);
+        s.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", color)
+            .set("display", "block").set("margin-bottom", "4px");
+        return s;
+    }
+
+    private Span makeCardOfferSpan(String offerTitle) {
+        Span s = new Span("Angebot: " + offerTitle);
+        s.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block");
+        return s;
     }
 
     private Div createBubble(String text, boolean isOwn) {

@@ -9,7 +9,9 @@ import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.vaadin.flow.component.Component;
@@ -33,6 +35,8 @@ class ChatViewIntegrationTest {
         ChatService chatService = Mockito.mock(ChatService.class);
         ChatEventBus eventBus = Mockito.mock(ChatEventBus.class);
         AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
+        RequestService requestService = Mockito.mock(RequestService.class);
+        BookingService bookingService = Mockito.mock(BookingService.class);
 
         UUID currentUserId = UUID.randomUUID();
         User currentUser = new User();
@@ -52,11 +56,13 @@ class ChatViewIntegrationTest {
                         "Ben Sitter",
                         LocalDateTime.now(),
                         LocalDateTime.now(),
-                        "Hallo"
+                        "Hallo",
+                        null,
+                        null
                 )
         ));
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService);
 
         assertThat(containsText(view, "Ben Sitter")).isTrue();
     }
@@ -67,6 +73,8 @@ class ChatViewIntegrationTest {
         ChatService chatService = Mockito.mock(ChatService.class);
         ChatEventBus eventBus = Mockito.mock(ChatEventBus.class);
         AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
+        RequestService requestService = Mockito.mock(RequestService.class);
+        BookingService bookingService = Mockito.mock(BookingService.class);
 
         UUID currentUserId = UUID.randomUUID();
         UUID otherUserId = UUID.randomUUID();
@@ -93,7 +101,9 @@ class ChatViewIntegrationTest {
                 "Ben Sitter",
                 LocalDateTime.now(),
                 LocalDateTime.now(),
-                "Preview"
+                "Preview",
+                null,
+                null
         );
 
         when(chatService.getCurrentUserConversations()).thenReturn(List.of(conversation));
@@ -106,11 +116,14 @@ class ChatViewIntegrationTest {
                         currentUserId,
                         "Bestehende Nachricht",
                         LocalDateTime.now(),
-                        false
+                        false,
+                        null,
+                        null,
+                        null
                 )
         ));
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService);
 
         Method selectConversation = ChatView.class.getDeclaredMethod("selectConversation", String.class);
         selectConversation.setAccessible(true);
@@ -127,7 +140,10 @@ class ChatViewIntegrationTest {
                 currentUserId,
                 "Neue Event-Nachricht",
                 LocalDateTime.now(),
-                false
+                false,
+                null,
+                null,
+                null
         );
 
         // simulate delivery by same logic as listener callback

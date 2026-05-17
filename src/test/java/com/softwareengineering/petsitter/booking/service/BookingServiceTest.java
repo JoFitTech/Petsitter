@@ -162,6 +162,7 @@ class BookingServiceTest {
         User owner  = user(UUID.randomUUID());
         User sitter = user(UUID.randomUUID());
         Booking booking = existingBooking(UUID.randomUUID(), owner, sitter, BookingStatus.CREATED);
+        booking.setOffer(offer(UUID.randomUUID(), owner, OfferStatus.BOOKED, OfferType.OWNER_OFFER));
 
         AtomicReference<Booking> savedBooking = new AtomicReference<>();
 

@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.booking.dto;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -28,6 +29,7 @@ public record BookingDto(
         LocalDate startDate,
         LocalDate endDate,
         BigDecimal pricePerWeek,
-        BookingStatus status
+        BookingStatus status,
+        LocalDateTime bookedAt
 ) {}
 

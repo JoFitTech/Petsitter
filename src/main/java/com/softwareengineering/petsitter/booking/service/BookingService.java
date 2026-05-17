@@ -236,7 +236,8 @@ public class BookingService {
                 booking.getStartDate(),
                 booking.getEndDate(),
                 booking.getPricePerWeek(),
-                booking.getStatus()
+                booking.getStatus(),
+                booking.getCreatedAt()
         );
     }
 

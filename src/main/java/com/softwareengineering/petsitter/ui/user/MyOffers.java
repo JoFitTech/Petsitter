@@ -26,14 +26,17 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.router.QueryParameters;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class MyOffers extends Div {
 
@@ -48,6 +51,9 @@ public class MyOffers extends Div {
     private final BookingService bookingService;
     private final AuthenticatedUser authenticatedUser;
     private final Div offersContainer = new Div();
+
+    private String activeStatusFilter = "ALLE";  // ALLE | OFFEN | GEBUCHT | VERGANGEN
+    private String activeTypeFilter   = "ALLE";  // ALLE | HALTER | SITTER
 
     public MyOffers(OfferService offerService, RequestService requestService,
                     ChatService chatService, BookingService bookingService,
@@ -73,32 +79,58 @@ public class MyOffers extends Div {
 
     private void renderOffers() {
         offersContainer.removeAll();
-        List<MyOfferCardDto> offers = offerService.getCurrentUserOffers();
-        List<MyOfferCardDto> expiredOpenOffers = offers.stream()
-                .filter(this::isExpiredOpenOffer)
-                .toList();
-        List<MyOfferCardDto> regularOffers = offers.stream()
-                .filter(offer -> !isExpiredOpenOffer(offer))
-                .toList();
+        List<MyOfferCardDto> all = offerService.getCurrentUserOffers();
 
-        if (offers.isEmpty()) {
+        List<MyOfferCardDto> filtered = all.stream()
+                .filter(this::matchesStatusFilter)
+                .filter(this::matchesTypeFilter)
+                .sorted(Comparator.comparing(
+                        (MyOfferCardDto o) -> o.startDate() != null ? o.startDate() : LocalDate.MIN).reversed())
+                .collect(Collectors.toList());
+
+        if (filtered.isEmpty()) {
             offersContainer.add(buildEmptyState());
+            return;
+        }
+
+        if ("ALLE".equals(activeStatusFilter)) {
+            List<MyOfferCardDto> expired  = filtered.stream().filter(this::isExpiredOpenOffer).toList();
+            List<MyOfferCardDto> regular  = filtered.stream().filter(o -> !isExpiredOpenOffer(o)).toList();
+            if (!regular.isEmpty())  offersContainer.add(buildCardsGrid(regular));
+            if (!expired.isEmpty())  offersContainer.add(buildExpiredSection(expired));
         } else {
-            if (!regularOffers.isEmpty()) {
-                offersContainer.add(buildCardsGrid(regularOffers));
-            }
-            if (!expiredOpenOffers.isEmpty()) {
-                offersContainer.add(buildExpiredSection(expiredOpenOffers));
-            }
+            offersContainer.add(buildCardsGrid(filtered));
         }
     }
 
+    private boolean matchesStatusFilter(MyOfferCardDto o) {
+        return switch (activeStatusFilter) {
+            case "OFFEN"     -> o.status() == OfferStatus.OPEN && (o.startDate() == null || !o.startDate().isBefore(LocalDate.now()));
+            case "GEBUCHT"   -> o.status() == OfferStatus.BOOKED;
+            case "VERGANGEN" -> o.startDate() != null && o.startDate().isBefore(LocalDate.now());
+            default          -> true;
+        };
+    }
+
+    private boolean matchesTypeFilter(MyOfferCardDto o) {
+        return switch (activeTypeFilter) {
+            case "HALTER" -> o.offerType() == OfferType.OWNER_OFFER;
+            case "SITTER" -> o.offerType() == OfferType.SITTER_OFFER;
+            default       -> true;
+        };
+    }
+
     private Component buildHeader() {
-        HorizontalLayout row = new HorizontalLayout();
-        row.setWidthFull();
-        row.setAlignItems(FlexComponent.Alignment.CENTER);
-        row.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        row.getStyle().set("margin-bottom", "36px");
+        VerticalLayout wrapper = new VerticalLayout();
+        wrapper.setPadding(false);
+        wrapper.setSpacing(false);
+        wrapper.getStyle().set("margin-bottom", "36px").set("gap", "16px");
+
+        // Title row
+        HorizontalLayout titleRow = new HorizontalLayout();
+        titleRow.setWidthFull();
+        titleRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        titleRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
         H2 title = new H2("Meine Aufträge");
         title.getStyle()
@@ -106,9 +138,45 @@ public class MyOffers extends Div {
                 .set("font-size", "28px")
                 .set("font-weight", "800")
                 .set("color", DARK);
+        titleRow.add(title, createAddButton());
 
-        row.add(title, createAddButton());
-        return row;
+        // Filter/sort row
+        HorizontalLayout controls = new HorizontalLayout();
+        controls.setAlignItems(FlexComponent.Alignment.CENTER);
+        controls.getStyle().set("gap", "12px").set("flex-wrap", "wrap");
+
+        Select<String> statusSelect = new Select<>();
+        statusSelect.setItems("Alle", "Offen", "Gebucht", "Vergangen");
+        statusSelect.setValue("Alle");
+        statusSelect.setLabel("Status");
+        statusSelect.getStyle().set("min-width", "120px");
+        statusSelect.addValueChangeListener(e -> {
+            activeStatusFilter = switch (e.getValue()) {
+                case "Offen"     -> "OFFEN";
+                case "Gebucht"   -> "GEBUCHT";
+                case "Vergangen" -> "VERGANGEN";
+                default          -> "ALLE";
+            };
+            renderOffers();
+        });
+
+        Select<String> typeSelect = new Select<>();
+        typeSelect.setItems("Alle", "Halter", "Sitter");
+        typeSelect.setValue("Alle");
+        typeSelect.setLabel("Perspektive");
+        typeSelect.getStyle().set("min-width", "120px");
+        typeSelect.addValueChangeListener(e -> {
+            activeTypeFilter = switch (e.getValue()) {
+                case "Halter" -> "HALTER";
+                case "Sitter" -> "SITTER";
+                default       -> "ALLE";
+            };
+            renderOffers();
+        });
+
+        controls.add(statusSelect, typeSelect);
+        wrapper.add(titleRow, controls);
+        return wrapper;
     }
 
     private Button createAddButton() {
@@ -580,7 +648,7 @@ public class MyOffers extends Div {
     }
 
     private String typeLabel(OfferType offerType) {
-        return offerType == OfferType.OWNER_OFFER ? "Auftrag" : "Angebot";
+        return offerType == OfferType.OWNER_OFFER ? "Halter" : "Sitter";
     }
 
     private String statusLabel(OfferStatus status) {

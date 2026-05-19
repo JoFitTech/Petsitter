@@ -21,9 +21,12 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.textfield.TextArea;
+import com.vaadin.flow.component.Key;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.router.*;
 import jakarta.annotation.security.PermitAll;
 import org.slf4j.Logger;
@@ -52,13 +55,17 @@ import java.util.concurrent.TimeUnit;
 @Route(value = "chat", layout = MainLayout.class)
 @PageTitle("Chat | Pawsitter")
 @PermitAll
-public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
+public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final Logger log = LoggerFactory.getLogger(ChatView.class);
 
     private static final String DARK = "#4a3428";
     private static final String CREAM = "#fbf8f1";
     private static final String CARD_BG = "#ffffff";
+    private static final String SIDEBAR_ITEM_BG = "#fdf6e8";
+    private static final String SIDEBAR_ITEM_ACTIVE = "#f0e0c4";
+    private static final String BUBBLE_SENT = "#f5ead6";
+    private static final String BUBBLE_RECEIVED = "#e8d4b4";
 
     private final ChatService chatService;
     private final ChatEventBus eventBus;
@@ -68,10 +75,11 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     // UI Components
     private VerticalLayout conversationList;
     private VerticalLayout messageList;
-    private TextArea messageInput;
+    private TextField messageInput;
     private Button sendButton;
     private Span chatTitle;
     private Span typingIndicator;
+    private Div chatHeaderAvatar;
 
     // State
     private String activeConversationId;
@@ -98,8 +106,13 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         this.bookingService = bookingService;
 
         setSizeFull();
-        setPadding(false);
+        setPadding(true);
         setSpacing(false);
+        getStyle()
+            .set("background", CREAM)
+            .set("font-family", "Inter, Arial, sans-serif")
+            .set("padding", "30px 50px")
+            .set("box-sizing", "border-box");
 
         // Determine current user
         this.currentUserId = authenticatedUser.get()
@@ -111,9 +124,40 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             return;
         }
 
-        // Build layout
-        add(buildConversationList());
-        add(buildChatWindow());
+        // Inbox header
+        H2 inboxTitle = new H2("Inbox");
+        inboxTitle.getStyle()
+            .set("margin", "0 0 4px 0")
+            .set("font-size", "28px")
+            .set("font-weight", "800")
+            .set("color", DARK);
+        add(inboxTitle);
+
+        Paragraph subtitle = new Paragraph("Verwalte hier deine eingehenden Nachrichten und behalte alle wichtigen Unterhaltungen im Blick.");
+        subtitle.getStyle()
+            .set("margin", "0 0 20px 0")
+            .set("font-size", "14px")
+            .set("color", "#7a6050");
+        add(subtitle);
+
+        // Main container card with fixed height
+        HorizontalLayout chatContainer = new HorizontalLayout();
+        chatContainer.setWidthFull();
+        chatContainer.setHeight("600px");
+        chatContainer.setPadding(false);
+        chatContainer.setSpacing(false);
+        chatContainer.getStyle()
+            .set("background", CARD_BG)
+            .set("border-radius", "20px")
+            .set("box-shadow", "0 2px 16px rgba(74,52,40,0.07)")
+            .set("overflow", "hidden")
+            .set("flex-shrink", "0");
+
+        chatContainer.add(buildConversationList());
+        chatContainer.add(buildChatWindow());
+        chatContainer.setFlexGrow(1, chatContainer.getComponentAt(1));
+
+        add(chatContainer);
 
         // Load conversations
         refreshConversationList();
@@ -144,23 +188,22 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
 
     private Component buildConversationList() {
         VerticalLayout layout = new VerticalLayout();
-        layout.setWidth("320px");
+        layout.setWidth("280px");
         layout.setHeightFull();
         layout.setPadding(true);
         layout.setSpacing(false);
         layout.getStyle()
             .set("border-right", "1px solid #f0e6da")
             .set("overflow-y", "auto")
-            .set("background", "#ffffff")
-            .set("box-sizing", "border-box");
-
-        H2 title = new H2("Gespräche");
-        title.getStyle().set("margin", "0 0 16px 0").set("font-size", "18px");
-        layout.add(title);
+            .set("background", CARD_BG)
+            .set("box-sizing", "border-box")
+            .set("padding", "16px 12px")
+            .set("flex-shrink", "0");
 
         this.conversationList = new VerticalLayout();
         conversationList.setPadding(false);
         conversationList.setSpacing(false);
+        conversationList.getStyle().set("gap", "8px");
         layout.add(conversationList);
         layout.setFlexGrow(1, conversationList);
 
@@ -173,22 +216,35 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         layout.setHeightFull();
         layout.setPadding(false);
         layout.setSpacing(false);
-        layout.getStyle().set("background", CARD_BG);
+        layout.getStyle()
+            .set("background", CARD_BG)
+            .set("display", "flex")
+            .set("flex-direction", "column");
 
         // Header
         layout.add(buildChatHeader());
 
-        // Messages area
+        // Messages area (scrollable, fills remaining space)
         this.messageList = new VerticalLayout();
         messageList.setWidthFull();
         messageList.setPadding(true);
         messageList.setSpacing(false);
         messageList.getStyle()
             .set("overflow-y", "auto")
-            .set("background", CREAM)
-            .set("gap", "12px");
+            .set("background", CARD_BG)
+            .set("gap", "12px")
+            .set("padding", "20px 24px")
+            .set("flex", "1 1 0")
+            .set("min-height", "0");
         layout.add(messageList);
-        layout.setFlexGrow(1, messageList);
+
+        // Divider line
+        Div divider = new Div();
+        divider.getStyle()
+            .set("width", "100%")
+            .set("height", "1px")
+            .set("background", "#e8ddd4");
+        layout.add(divider);
 
         // Input area
         layout.add(buildInputArea());
@@ -199,22 +255,35 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     private Component buildChatHeader() {
         HorizontalLayout header = new HorizontalLayout();
         header.setWidthFull();
-        header.setHeight("60px");
+        header.setHeight("70px");
         header.setAlignItems(FlexComponent.Alignment.CENTER);
         header.getStyle()
-            .set("padding", "0 20px")
+            .set("padding", "0 24px")
             .set("background", CARD_BG)
-            .set("border-bottom", "1px solid #e8ddd4");
+            .set("border-bottom", "1px solid #e8ddd4")
+            .set("gap", "14px")
+            .set("flex-shrink", "0");
+
+        // Avatar in header
+        chatHeaderAvatar = createChatAvatar(38);
+        chatHeaderAvatar.getStyle().set("display", "none");
+        header.add(chatHeaderAvatar);
 
         VerticalLayout titleWrap = new VerticalLayout();
         titleWrap.setPadding(false);
         titleWrap.setSpacing(false);
 
         chatTitle = new Span("Wähle ein Gespräch");
-        chatTitle.getStyle().set("font-size", "16px").set("font-weight", "700").set("color", DARK);
+        chatTitle.getStyle()
+            .set("font-size", "20px")
+            .set("font-weight", "700")
+            .set("color", DARK);
 
         typingIndicator = new Span("");
-        typingIndicator.getStyle().set("font-size", "12px").set("color", "#7a6050").set("display", "none");
+        typingIndicator.getStyle()
+            .set("font-size", "12px")
+            .set("color", "#7a6050")
+            .set("display", "none");
 
         titleWrap.add(chatTitle, typingIndicator);
         header.add(titleWrap);
@@ -224,38 +293,65 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     private Component buildInputArea() {
         HorizontalLayout layout = new HorizontalLayout();
         layout.setWidthFull();
-        layout.setHeight("120px");
-        layout.setAlignItems(FlexComponent.Alignment.STRETCH);
-        layout.setPadding(true);
-        layout.setSpacing(true);
+        layout.setHeight("60px");
+        layout.setAlignItems(FlexComponent.Alignment.CENTER);
+        layout.setPadding(false);
+        layout.setSpacing(false);
         layout.getStyle()
-            .set("background", "#fcfaf6")
-            .set("border-top", "1px solid #e8ddd4")
-            .set("box-sizing", "border-box");
+            .set("background", CARD_BG)
+            .set("box-sizing", "border-box")
+            .set("padding", "10px 24px")
+            .set("gap", "12px")
+            .set("flex-shrink", "0");
 
-        this.messageInput = new TextArea();
-        messageInput.setPlaceholder("Schreibe deine Nachricht...");
+        // Camera icon button
+        Button cameraBtn = new Button(new Icon(VaadinIcon.CAMERA));
+        cameraBtn.getStyle()
+            .set("background", "transparent")
+            .set("color", "#a08060")
+            .set("width", "40px")
+            .set("height", "40px")
+            .set("min-width", "40px")
+            .set("border-radius", "50%")
+            .set("box-shadow", "none")
+            .set("cursor", "pointer")
+            .set("flex-shrink", "0");
+        cameraBtn.addClickListener(e -> System.out.println("Camera button clicked"));
+
+        // Single-line message input (Enter to send)
+        this.messageInput = new TextField();
+        messageInput.setPlaceholder("Schreibe hier deine Nachricht");
+        messageInput.setWidthFull();
         messageInput.getStyle()
             .set("flex", "1")
-            .set("background", CARD_BG)
-            .set("border", "1px solid #e8ddd4")
-            .set("border-radius", "12px")
+            .set("--vaadin-input-field-background", "#f8f4ee")
+            .set("--vaadin-input-field-border-radius", "20px")
             .set("font-size", "14px")
             .set("color", DARK);
         messageInput.setValueChangeMode(ValueChangeMode.LAZY);
         messageInput.setValueChangeTimeout(350);
         messageInput.addValueChangeListener(e -> handleTyping());
+        // Enter key sends message
+        messageInput.addKeyDownListener(Key.ENTER, e -> sendMessage());
 
-        this.sendButton = new Button("Senden");
-        sendButton.setWidth("100px");
+        // Send button as arrow icon
+        Icon sendIcon = new Icon(VaadinIcon.PAPERPLANE);
+        sendIcon.setSize("20px");
+        this.sendButton = new Button(sendIcon);
         sendButton.getStyle()
-            .set("background", "#8db3c3")
-            .set("color", "white")
-            .set("border-radius", "12px");
+            .set("background", "transparent")
+            .set("color", "#a08060")
+            .set("width", "40px")
+            .set("height", "40px")
+            .set("min-width", "40px")
+            .set("border-radius", "50%")
+            .set("box-shadow", "none")
+            .set("cursor", "pointer")
+            .set("flex-shrink", "0");
         sendButton.addClickListener(e -> sendMessage());
-        sendButton.setEnabled(false); // disabled until conversation selected
+        sendButton.setEnabled(false);
 
-        layout.add(messageInput, sendButton);
+        layout.add(cameraBtn, messageInput, sendButton);
         return layout;
     }
 
@@ -301,19 +397,24 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
     }
 
     private Component buildConversationItem(ChatConversationDto conv, long unreadCount) {
+        boolean isActive = activeConversationId != null && activeConversationId.equals(conv.conversationId());
+
         Div item = new Div();
         item.getStyle()
-            .set("padding", "14px 16px")
-            .set("border-radius", "12px")
-            .set("margin-bottom", "10px")
+            .set("padding", "12px 14px")
+            .set("border-radius", "14px")
             .set("cursor", "pointer")
-            .set("background", activeConversationId != null && activeConversationId.equals(conv.conversationId())
-                ? "#ebd7c0"
-                : "#fcfaf6")
-            .set("border", "1px solid #f0e6da")
+            .set("background", isActive ? SIDEBAR_ITEM_ACTIVE : SIDEBAR_ITEM_BG)
+            .set("border", "1px solid " + (isActive ? "#e0c8a0" : "#f0e6da"))
             .set("box-sizing", "border-box")
             .set("display", "flex")
-            .set("align-items", "center");
+            .set("align-items", "center")
+            .set("gap", "12px")
+            .set("transition", "background 0.15s ease");
+
+        // Avatar
+        Div avatar = createChatAvatar(42);
+        item.add(avatar);
 
         // Determine counterpart name
         String counterpartName = currentUserId.equals(conv.ownerId())
@@ -323,37 +424,84 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             counterpartName = "Unbekannter Kontakt";
         }
 
+        // Middle content
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
         content.setSpacing(false);
-        content.getStyle().set("flex", "1");
+        content.getStyle().set("flex", "1").set("gap", "2px");
+
+        // Name + stars row
+        HorizontalLayout nameRow = new HorizontalLayout();
+        nameRow.setPadding(false);
+        nameRow.setSpacing(false);
+        nameRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        nameRow.getStyle().set("gap", "6px");
 
         Span name = new Span(counterpartName);
-        name.getStyle().set("font-weight", "700").set("color", DARK).set("font-size", "14px");
-        content.add(name);
+        name.getStyle()
+            .set("font-weight", "700")
+            .set("color", DARK)
+            .set("font-size", "13px");
+        nameRow.add(name);
 
+        // Stars (placeholder, 4 stars)
+        HorizontalLayout stars = new HorizontalLayout();
+        stars.setPadding(false);
+        stars.setSpacing(false);
+        stars.getStyle().set("gap", "1px");
+        for (int i = 0; i < 4; i++) {
+            Icon star = new Icon(VaadinIcon.STAR);
+            star.setSize("10px");
+            star.getStyle().set("color", "#ffdf4a");
+            stars.add(star);
+        }
+        nameRow.add(stars);
+
+        content.add(nameRow);
+
+        // Preview text or typing indicator
         String previewText = Boolean.TRUE.equals(typingByConversationId.get(conv.conversationId()))
                 ? "schreibt gerade..."
                 : conv.lastMessagePreview();
 
         if (previewText != null) {
             Span preview = new Span(previewText);
-            preview.getStyle().set("color", "#7a6050").set("font-size", "12px").set("margin-top", "4px");
+            preview.getStyle()
+                .set("color", "#7a6050")
+                .set("font-size", "11px")
+                .set("white-space", "nowrap")
+                .set("overflow", "hidden")
+                .set("text-overflow", "ellipsis")
+                .set("max-width", "140px");
             content.add(preview);
         }
 
         item.add(content);
+
+        // Right side: role icon + unread dot
+        VerticalLayout rightSide = new VerticalLayout();
+        rightSide.setPadding(false);
+        rightSide.setSpacing(false);
+        rightSide.setAlignItems(FlexComponent.Alignment.END);
+        rightSide.getStyle().set("flex-shrink", "0").set("gap", "4px");
+
+        // Role icon (house for owner, heart for sitter)
+        boolean counterpartIsOwner = currentUserId.equals(conv.sitterId());
+        Icon roleIcon = new Icon(counterpartIsOwner ? VaadinIcon.HOME : VaadinIcon.HEART);
+        roleIcon.setSize("14px");
+        roleIcon.getStyle().set("color", DARK);
+        rightSide.add(roleIcon);
 
         if (unreadCount > 0) {
             Span dot = new Span();
             dot.getStyle()
                 .set("width", "10px").set("height", "10px")
                 .set("border-radius", "50%")
-                .set("background", "#e74c3c")
-                .set("flex-shrink", "0")
-                .set("margin-left", "8px");
-            item.add(dot);
+                .set("background", "#e74c3c");
+            rightSide.add(dot);
         }
+
+        item.add(rightSide);
 
         item.addClickListener(e -> selectConversation(conv.conversationId()));
 
@@ -368,6 +516,10 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
             activeRecipientId = currentUserIsOwner ? selected.sitterId() : selected.ownerId();
             activeCounterpartName = currentUserIsOwner ? selected.sitterDisplayName() : selected.ownerDisplayName();
             chatTitle.setText(activeCounterpartName != null ? activeCounterpartName : "Chat");
+            // Show avatar in header
+            if (chatHeaderAvatar != null) {
+                chatHeaderAvatar.getStyle().set("display", "flex");
+            }
         }
         typingIndicator.setText("");
         typingIndicator.getStyle().set("display", "none");
@@ -549,33 +701,43 @@ public class ChatView extends HorizontalLayout implements BeforeEnterObserver {
         Div bubble = new Div();
         bubble.getStyle()
             .set("max-width", "60%")
-            .set("padding", "12px 16px")
-            .set("border-radius", "12px")
+            .set("padding", "12px 18px")
+            .set("border-radius", isOwn ? "16px 16px 4px 16px" : "16px 16px 16px 4px")
             .set("word-wrap", "break-word")
-            .set("background", isOwn ? "#f7f5f0" : "#ebd7c0")
-            .set("border", "1px solid #e8ddd4")
+            .set("background", isOwn ? BUBBLE_SENT : BUBBLE_RECEIVED)
             .set("color", DARK)
             .set("font-size", "14px")
-            .set("line-height", "1.4");
+            .set("line-height", "1.5");
 
         bubble.add(new Span(text));
         return bubble;
     }
 
     private Component buildAvatar(String displayName) {
-        String initials = initials(displayName);
-        Span avatar = new Span(initials);
+        return createChatAvatar(32);
+    }
+
+    private Div createChatAvatar(int size) {
+        Div avatar = new Div();
         avatar.getStyle()
-                .set("width", "28px")
-                .set("height", "28px")
-                .set("border-radius", "50%")
-                .set("display", "inline-flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("font-size", "11px")
-                .set("font-weight", "700")
-                .set("background", "#8db3c3")
-                .set("color", "white");
+            .set("width", size + "px")
+            .set("height", size + "px")
+            .set("min-width", size + "px")
+            .set("border-radius", "50%")
+            .set("background-color", "#c8dce6")
+            .set("display", "flex")
+            .set("align-items", "center")
+            .set("justify-content", "center")
+            .set("overflow", "hidden")
+            .set("flex-shrink", "0");
+
+        int svgSize = (int)(size * 0.65);
+        Div svgWrap = new Div();
+        svgWrap.getElement().setProperty("innerHTML",
+            "<svg width='" + svgSize + "' height='" + svgSize + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
+            "<circle cx='12' cy='8' r='4' fill='#8db3c3'/>" +
+            "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='#8db3c3'/></svg>");
+        avatar.add(svgWrap);
         return avatar;
     }
 

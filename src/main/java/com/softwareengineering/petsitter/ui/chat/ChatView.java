@@ -291,68 +291,86 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private Component buildInputArea() {
-        HorizontalLayout layout = new HorizontalLayout();
-        layout.setWidthFull();
-        layout.setHeight("60px");
-        layout.setAlignItems(FlexComponent.Alignment.CENTER);
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle()
-            .set("background", CARD_BG)
+        // Outer wrapper with padding
+        HorizontalLayout wrapper = new HorizontalLayout();
+        wrapper.setWidthFull();
+        wrapper.setPadding(false);
+        wrapper.setSpacing(false);
+        wrapper.setAlignItems(FlexComponent.Alignment.CENTER);
+        wrapper.getStyle()
+            .set("padding", "12px 20px")
             .set("box-sizing", "border-box")
-            .set("padding", "10px 24px")
-            .set("gap", "12px")
-            .set("flex-shrink", "0");
+            .set("flex-shrink", "0")
+            .set("background", CARD_BG);
 
-        // Camera icon button
-        Button cameraBtn = new Button(new Icon(VaadinIcon.CAMERA));
-        cameraBtn.getStyle()
-            .set("background", "transparent")
-            .set("color", "#a08060")
-            .set("width", "40px")
-            .set("height", "40px")
-            .set("min-width", "40px")
-            .set("border-radius", "50%")
-            .set("box-shadow", "none")
+        // Unified input bar (single rounded container)
+        HorizontalLayout bar = new HorizontalLayout();
+        bar.setWidthFull();
+        bar.setAlignItems(FlexComponent.Alignment.CENTER);
+        bar.setPadding(false);
+        bar.setSpacing(false);
+        bar.getStyle()
+            .set("background", "#f5f0e8")
+            .set("border-radius", "28px")
+            .set("padding", "6px 16px")
+            .set("gap", "10px")
+            .set("box-sizing", "border-box");
+
+        // Camera icon
+        Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
+        cameraIcon.setSize("22px");
+        cameraIcon.getStyle()
+            .set("color", "#8a6d50")
             .set("cursor", "pointer")
             .set("flex-shrink", "0");
-        cameraBtn.addClickListener(e -> System.out.println("Camera button clicked"));
+        cameraIcon.addClickListener(e -> System.out.println("Camera button clicked"));
 
-        // Single-line message input (Enter to send)
+        // Text input (borderless, transparent bg)
         this.messageInput = new TextField();
         messageInput.setPlaceholder("Schreibe hier deine Nachricht");
         messageInput.setWidthFull();
         messageInput.getStyle()
             .set("flex", "1")
-            .set("--vaadin-input-field-background", "#f8f4ee")
-            .set("--vaadin-input-field-border-radius", "20px")
+            .set("--vaadin-input-field-background", "transparent")
+            .set("--vaadin-input-field-border-width", "0")
+            .set("--vaadin-input-field-border-radius", "0")
+            .set("--vaadin-focus-ring-width", "0")
+            .set("--vaadin-focus-ring-color", "transparent")
+            .set("--lumo-contrast-10pct", "transparent")
             .set("font-size", "14px")
-            .set("color", DARK);
+            .set("color", DARK)
+            .set("box-shadow", "none");
         messageInput.setValueChangeMode(ValueChangeMode.LAZY);
         messageInput.setValueChangeTimeout(350);
         messageInput.addValueChangeListener(e -> handleTyping());
-        // Enter key sends message
         messageInput.addKeyDownListener(Key.ENTER, e -> sendMessage());
 
-        // Send button as arrow icon
+        // Send icon
         Icon sendIcon = new Icon(VaadinIcon.PAPERPLANE);
-        sendIcon.setSize("20px");
+        sendIcon.setSize("22px");
+        sendIcon.getStyle()
+            .set("color", "#8a6d50")
+            .set("cursor", "pointer")
+            .set("flex-shrink", "0");
+
         this.sendButton = new Button(sendIcon);
         sendButton.getStyle()
             .set("background", "transparent")
-            .set("color", "#a08060")
-            .set("width", "40px")
-            .set("height", "40px")
-            .set("min-width", "40px")
-            .set("border-radius", "50%")
+            .set("color", "#8a6d50")
+            .set("width", "36px")
+            .set("height", "36px")
+            .set("min-width", "36px")
+            .set("padding", "0")
+            .set("border", "none")
             .set("box-shadow", "none")
             .set("cursor", "pointer")
             .set("flex-shrink", "0");
         sendButton.addClickListener(e -> sendMessage());
         sendButton.setEnabled(false);
 
-        layout.add(cameraBtn, messageInput, sendButton);
-        return layout;
+        bar.add(cameraIcon, messageInput, sendButton);
+        wrapper.add(bar);
+        return wrapper;
     }
 
     // ── Conversation & Message Loading ──
@@ -511,7 +529,14 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         typingIndicator.getStyle().set("display", "none");
         log.info("Selected conversation: {}", conversationId);
 
-        // Refresh conversation list styling
+        // Mark as read first, then refresh list so unread dot disappears
+        try {
+            chatService.markConversationAsRead(conversationId);
+        } catch (Exception e) {
+            log.warn("Failed to mark conversation as read: {}", e.getMessage());
+        }
+
+        // Refresh conversation list styling (after marking as read)
         refreshConversationList();
 
         // Load messages
@@ -528,9 +553,6 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                 // Auto-scroll to bottom
                 messageList.getElement().executeJs("this.scrollTop = this.scrollHeight");
             }
-
-            // Mark as read
-            chatService.markConversationAsRead(conversationId);
 
             // Enable send button
             sendButton.setEnabled(true);

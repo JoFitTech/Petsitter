@@ -478,30 +478,16 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         item.add(content);
 
-        // Right side: role icon + unread dot
-        VerticalLayout rightSide = new VerticalLayout();
-        rightSide.setPadding(false);
-        rightSide.setSpacing(false);
-        rightSide.setAlignItems(FlexComponent.Alignment.END);
-        rightSide.getStyle().set("flex-shrink", "0").set("gap", "4px");
-
-        // Role icon (house for owner, heart for sitter)
-        boolean counterpartIsOwner = currentUserId.equals(conv.sitterId());
-        Icon roleIcon = new Icon(counterpartIsOwner ? VaadinIcon.HOME : VaadinIcon.HEART);
-        roleIcon.setSize("14px");
-        roleIcon.getStyle().set("color", DARK);
-        rightSide.add(roleIcon);
-
+        // Unread dot (right side)
         if (unreadCount > 0) {
             Span dot = new Span();
             dot.getStyle()
                 .set("width", "10px").set("height", "10px")
                 .set("border-radius", "50%")
-                .set("background", "#e74c3c");
-            rightSide.add(dot);
+                .set("background", "#e74c3c")
+                .set("flex-shrink", "0");
+            item.add(dot);
         }
-
-        item.add(rightSide);
 
         item.addClickListener(e -> selectConversation(conv.conversationId()));
 

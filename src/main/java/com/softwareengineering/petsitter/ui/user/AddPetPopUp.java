@@ -58,18 +58,19 @@ public class AddPetPopUp extends Dialog {
                 .set("font-weight", "800")
                 .set("margin", "0 0 8px 0");
 
-        TextField nameField = new TextField("Name *");
+        TextField nameField = new TextField("Name");
         nameField.setWidthFull();
         nameField.setRequiredIndicatorVisible(true);
         styleInputField(nameField.getElement());
 
-        ComboBox<String> typeField = new ComboBox<>("Tierart *");
-        typeField.setItems(TYPE_DOG, TYPE_CAT, TYPE_BIRD, TYPE_RABBIT, TYPE_FISH, TYPE_REPTILE, TYPE_RODENT, TYPE_OTHER);
+        ComboBox<String> typeField = new ComboBox<>("Tierart");
+        typeField.setItems(TYPE_DOG, TYPE_CAT, TYPE_BIRD, TYPE_RABBIT, TYPE_FISH, TYPE_REPTILE, TYPE_RODENT,
+                TYPE_OTHER);
         typeField.setWidthFull();
         typeField.setRequiredIndicatorVisible(true);
         styleInputField(typeField.getElement());
 
-        TextField customTypeField = new TextField("Bitte Tierart angeben *");
+        TextField customTypeField = new TextField("Bitte Tierart angeben");
         customTypeField.setWidthFull();
         customTypeField.setVisible(false);
         styleInputField(customTypeField.getElement());
@@ -157,8 +158,7 @@ public class AddPetPopUp extends Dialog {
             TextField customTypeField,
             TextField breedField,
             DatePicker birthDateField,
-            TextArea infoField
-    ) {
+            TextArea infoField) {
         if (existing == null) {
             return;
         }
@@ -183,8 +183,7 @@ public class AddPetPopUp extends Dialog {
             TextField customTypeField,
             TextField breedField,
             DatePicker birthDateField,
-            TextArea infoField
-    ) {
+            TextArea infoField) {
         String name = nameField.getValue();
         String selectedType = typeField.getValue();
         if (name == null || name.isBlank()) {
@@ -265,12 +264,12 @@ public class AddPetPopUp extends Dialog {
 
     private void styleInputField(Element el) {
         el.getStyle()
-            .set("--vaadin-input-field-background", "#FCF9F2")
-            .set("--vaadin-input-field-border", "1px solid #efe4d3")
-            .set("--vaadin-input-field-border-radius", "12px")
-            .set("--vaadin-input-field-value-color", "#4a3428")
-            .set("--lumo-secondary-text-color", "#4a3428")
-            .set("--lumo-body-text-color", "#4a3428")
-            .set("color", "#4a3428");
+                .set("--vaadin-input-field-background", "#FCF9F2")
+                .set("--vaadin-input-field-border", "1px solid #efe4d3")
+                .set("--vaadin-input-field-border-radius", "12px")
+                .set("--vaadin-input-field-value-color", "#4a3428")
+                .set("--lumo-secondary-text-color", "#4a3428")
+                .set("--lumo-body-text-color", "#4a3428")
+                .set("color", "#4a3428");
     }
 }

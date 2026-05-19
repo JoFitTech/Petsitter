@@ -472,7 +472,10 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         for (int i = 0; i < 4; i++) {
             Icon star = new Icon(VaadinIcon.STAR);
             star.setSize("10px");
-            star.getStyle().set("color", "#ffdf4a");
+            star.getStyle()
+                .set("color", "#ffdf4a")
+                .set("stroke", "#000000")
+                .set("stroke-width", "0.5");
             stars.add(star);
         }
         nameRow.add(stars);

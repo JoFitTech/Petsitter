@@ -28,6 +28,8 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
 import com.vaadin.flow.router.QueryParameters;
+import jakarta.annotation.security.RolesAllowed;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -38,6 +40,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@RolesAllowed("ROLE_SIGNED_IN_USER")
 public class MyOffers extends Div {
 
     private static final String DARK = "#4a3428";

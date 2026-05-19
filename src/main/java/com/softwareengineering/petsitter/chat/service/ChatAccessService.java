@@ -13,8 +13,7 @@ import org.springframework.stereotype.Service;
 import java.util.UUID;
 
 /**
- * Zugriffschutz für Chat-Operationen.
- *
+ * Zugriffsschutz für Chat-Operationen.
  * Stellt sicher, dass nur Owner und Sitter eines Bookings den Chat sehen und darin
  * Nachrichten schreiben dürfen.
  */

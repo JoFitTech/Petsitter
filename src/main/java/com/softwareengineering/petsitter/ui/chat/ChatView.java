@@ -201,6 +201,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             .set("flex-shrink", "0");
 
         this.conversationList = new VerticalLayout();
+        conversationList.setWidthFull();
         conversationList.setPadding(false);
         conversationList.setSpacing(false);
         conversationList.getStyle().set("gap", "8px");
@@ -418,6 +419,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         boolean isActive = activeConversationId != null && activeConversationId.equals(conv.conversationId());
 
         Div item = new Div();
+        item.setWidthFull();
         item.getStyle()
             .set("padding", "12px 14px")
             .set("border-radius", "14px")

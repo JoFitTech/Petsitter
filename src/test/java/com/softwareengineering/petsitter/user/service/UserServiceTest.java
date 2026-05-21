@@ -16,8 +16,9 @@ import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
-import java.time.LocalDate;
 import java.lang.reflect.Proxy;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,14 +28,25 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 class UserServiceTest {
 
-    private static final String STRONG_PASSWORD = "StrongPassword1!";
-    private static final String PASSWORD_RULE_MESSAGE =
-            "Das Passwort muss mindestens 14 Zeichen lang sein und Groß- und Kleinbuchstaben, eine Zahl sowie ein Sonderzeichen enthalten.";
+    private static final String STRONG_PASSWORD = "Axiom-River8!Q";
+    private static final String LENGTH_MESSAGE =
+            "Das Passwort muss mindestens 14 Zeichen lang sein.";
+    private static final String UPPERCASE_MESSAGE =
+            "Das Passwort muss mindestens einen Großbuchstaben enthalten.";
+    private static final String LOWERCASE_MESSAGE =
+            "Das Passwort muss mindestens einen Kleinbuchstaben enthalten.";
+    private static final String DIGIT_MESSAGE =
+            "Das Passwort muss mindestens eine Zahl enthalten.";
+    private static final String SPECIAL_CHARACTER_MESSAGE =
+            "Das Passwort muss mindestens ein Sonderzeichen enthalten.";
+    private static final String FORBIDDEN_TERM_MESSAGE =
+            "Das Passwort darf keine schwachen Wörter enthalten.";
 
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
@@ -329,27 +341,47 @@ class UserServiceTest {
 
     @Test
     void startRegistrationRejectsPasswordShorterThan14Characters() {
-        assertWeakRegistrationPasswordRejected("Aa1!short");
+        assertWeakRegistrationPasswordRejected("Aa1!short", LENGTH_MESSAGE);
     }
 
     @Test
     void startRegistrationRejectsPasswordWithoutUppercaseLetter() {
-        assertWeakRegistrationPasswordRejected("strongpassword1!");
+        assertWeakRegistrationPasswordRejected("strongpassword1!", UPPERCASE_MESSAGE);
     }
 
     @Test
     void startRegistrationRejectsPasswordWithoutLowercaseLetter() {
-        assertWeakRegistrationPasswordRejected("STRONGPASSWORD1!");
+        assertWeakRegistrationPasswordRejected("STRONGPASSWORD1!", LOWERCASE_MESSAGE);
     }
 
     @Test
     void startRegistrationRejectsPasswordWithoutDigit() {
-        assertWeakRegistrationPasswordRejected("StrongPassword!!");
+        assertWeakRegistrationPasswordRejected("StrongPassword!!", DIGIT_MESSAGE);
     }
 
     @Test
     void startRegistrationRejectsPasswordWithoutSpecialCharacter() {
-        assertWeakRegistrationPasswordRejected("StrongPassword12");
+        assertWeakRegistrationPasswordRejected("StrongPassword12", SPECIAL_CHARACTER_MESSAGE);
+    }
+
+    @Test
+    void startRegistrationRejectsPasswordPatternFromPolicy() {
+        UserRepositoryFake userRepository = new UserRepositoryFake();
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        UserAuthResult result = service(
+                userRepository.repository(),
+                authenticatedUser(Optional.empty()),
+                loginCodeService,
+                petService("Keine Haustiere"),
+                postalCodeServiceReturning(PostalCodeValidationResult.success()),
+                passwordPolicyService("petsitter")
+        ).startRegistration(registrationRequest("blocked.pattern@petsitter.local", "Axiom-Petsitter8!Q"), "127.0.0.1");
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).isEqualTo(FORBIDDEN_TERM_MESSAGE);
+        assertThat(userRepository.savedUser).isNull();
+        assertThat(loginCodeService.requestedEmail).isNull();
     }
 
     @Test
@@ -492,7 +524,7 @@ class UserServiceTest {
         );
     }
 
-    private void assertWeakRegistrationPasswordRejected(String password) {
+    private void assertWeakRegistrationPasswordRejected(String password, String expectedMessage) {
         UserRepositoryFake userRepository = new UserRepositoryFake();
         LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
 
@@ -500,7 +532,7 @@ class UserServiceTest {
                 .startRegistration(registrationRequest("weak.password@petsitter.local", password), "127.0.0.1");
 
         assertThat(result.success()).isFalse();
-        assertThat(result.message()).isEqualTo(PASSWORD_RULE_MESSAGE);
+        assertThat(result.message()).isEqualTo(expectedMessage);
         assertThat(userRepository.savedUser).isNull();
         assertThat(loginCodeService.requestedEmail).isNull();
     }
@@ -549,8 +581,25 @@ class UserServiceTest {
             PetService petService,
             PostalCodeService postalCodeService
     ) {
+        return service(userRepository, authenticatedUser, loginCodeService, petService, postalCodeService,
+                passwordPolicyService());
+    }
+
+    private UserService service(
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            LoginCodeService loginCodeService,
+            PetService petService,
+            PostalCodeService postalCodeService,
+            PasswordPolicyService passwordPolicyService
+    ) {
         return new UserService(userRepository, authenticatedUser, passwordEncoder, loginCodeService,
-                petService, postalCodeService);
+                petService, postalCodeService, passwordPolicyService);
+    }
+
+    private PasswordPolicyService passwordPolicyService(String... forbiddenTerms) {
+        return new PasswordPolicyService(new ByteArrayResource(
+                String.join("\n", forbiddenTerms).getBytes(StandardCharsets.UTF_8)));
     }
 
     private PostalCodeService postalCodeServiceReturning(PostalCodeValidationResult validationResult) {

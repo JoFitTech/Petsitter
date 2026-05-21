@@ -6,6 +6,7 @@ import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
+import com.softwareengineering.petsitter.user.service.PasswordPolicyService;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -38,12 +39,10 @@ public class RegistrateView extends VerticalLayout {
     private static final String DANGER    = "#c73e1d";
     private static final String SUCCESS   = "#3f7d42";
     private static final String MUTED     = "#8a7060";
-    private static final int MIN_PASSWORD_LENGTH = 14;
-    private static final String PASSWORD_RULE_MESSAGE =
-            "Das Passwort muss mindestens 14 Zeichen lang sein und Groß- und Kleinbuchstaben, eine Zahl sowie ein Sonderzeichen enthalten.";
 
     private final UserService userService;
     private final PostalCodeService postalCodeService;
+    private final PasswordPolicyService passwordPolicyService;
     private final Paragraph errorMessage = new Paragraph();
     private final Paragraph statusMessage = new Paragraph();
 
@@ -52,9 +51,14 @@ public class RegistrateView extends VerticalLayout {
     private ComboBox<String> landField;
     private String currentRegistrationEmail = "";
 
-    public RegistrateView(UserService userService, PostalCodeService postalCodeService) {
+    public RegistrateView(
+            UserService userService,
+            PostalCodeService postalCodeService,
+            PasswordPolicyService passwordPolicyService
+    ) {
         this.userService = userService;
         this.postalCodeService = postalCodeService;
+        this.passwordPolicyService = passwordPolicyService;
 
         setSizeFull();
         setPadding(false);
@@ -392,9 +396,10 @@ public class RegistrateView extends VerticalLayout {
                     emailField.setErrorMessage("Gültige E-Mail eingeben");
                     valid = false;
                 }
-                if (!isValidPassword(passwortField.getValue())) {
+                PasswordPolicyService.PasswordPolicyResult passwordPolicy = passwordPolicyService.evaluate(passwortField.getValue());
+                if (!passwordPolicy.valid()) {
                     passwortField.setInvalid(true);
-                    passwortField.setErrorMessage(PASSWORD_RULE_MESSAGE);
+                    passwortField.setErrorMessage(passwordPolicy.errorMessage());
                     valid = false;
                 }
                 if (!passwortConfirmField.getValue().equals(passwortField.getValue())) {
@@ -582,6 +587,10 @@ public class RegistrateView extends VerticalLayout {
         Span lowercaseCriterion = passwordCriterion("Kleinbuchstabe");
         Span specialCriterion = passwordCriterion("Sonderzeichen");
         Span digitCriterion = passwordCriterion("Zahl");
+        Span noForbiddenTermCriterion = passwordCriterion("Keine schwachen Wörter");
+        Span noRepeatedCharacterCriterion = passwordCriterion("Keine 3 gleichen Zeichen");
+        Span noFourDigitNumberCriterion = passwordCriterion("Keine 4-stellige Zahl");
+        Span noNumericSequenceCriterion = passwordCriterion("Keine Zahlenfolge");
 
         VerticalLayout criteria = new VerticalLayout(
                 criteriaLabel,
@@ -589,7 +598,11 @@ public class RegistrateView extends VerticalLayout {
                 uppercaseCriterion,
                 lowercaseCriterion,
                 specialCriterion,
-                digitCriterion
+                digitCriterion,
+                noForbiddenTermCriterion,
+                noRepeatedCharacterCriterion,
+                noFourDigitNumberCriterion,
+                noNumericSequenceCriterion
         );
         criteria.setPadding(false);
         criteria.setSpacing(false);
@@ -609,7 +622,11 @@ public class RegistrateView extends VerticalLayout {
                 uppercaseCriterion,
                 lowercaseCriterion,
                 specialCriterion,
-                digitCriterion
+                digitCriterion,
+                noForbiddenTermCriterion,
+                noRepeatedCharacterCriterion,
+                noFourDigitNumberCriterion,
+                noNumericSequenceCriterion
         );
         passwordField.addValueChangeListener(e -> updatePasswordCriteria(
                 e.getValue(),
@@ -617,7 +634,11 @@ public class RegistrateView extends VerticalLayout {
                 uppercaseCriterion,
                 lowercaseCriterion,
                 specialCriterion,
-                digitCriterion
+                digitCriterion,
+                noForbiddenTermCriterion,
+                noRepeatedCharacterCriterion,
+                noFourDigitNumberCriterion,
+                noNumericSequenceCriterion
         ));
 
         return criteria;
@@ -647,14 +668,22 @@ public class RegistrateView extends VerticalLayout {
             Span uppercaseCriterion,
             Span lowercaseCriterion,
             Span specialCriterion,
-            Span digitCriterion
+            Span digitCriterion,
+            Span noForbiddenTermCriterion,
+            Span noRepeatedCharacterCriterion,
+            Span noFourDigitNumberCriterion,
+            Span noNumericSequenceCriterion
     ) {
-        String value = password == null ? "" : password;
-        updatePasswordCriterion(lengthCriterion, "Mindestens 14 Zeichen", value.length() >= MIN_PASSWORD_LENGTH);
-        updatePasswordCriterion(uppercaseCriterion, "Großbuchstabe", containsUppercase(value));
-        updatePasswordCriterion(lowercaseCriterion, "Kleinbuchstabe", containsLowercase(value));
-        updatePasswordCriterion(specialCriterion, "Sonderzeichen", containsSpecialCharacter(value));
-        updatePasswordCriterion(digitCriterion, "Zahl", containsDigit(value));
+        PasswordPolicyService.PasswordPolicyResult result = passwordPolicyService.evaluate(password);
+        updatePasswordCriterion(lengthCriterion, "Mindestens 14 Zeichen", result.minimumLength());
+        updatePasswordCriterion(uppercaseCriterion, "Großbuchstabe", result.uppercase());
+        updatePasswordCriterion(lowercaseCriterion, "Kleinbuchstabe", result.lowercase());
+        updatePasswordCriterion(specialCriterion, "Sonderzeichen", result.specialCharacter());
+        updatePasswordCriterion(digitCriterion, "Zahl", result.digit());
+        updatePasswordCriterion(noForbiddenTermCriterion, "Keine schwachen Wörter", result.noForbiddenTerm());
+        updatePasswordCriterion(noRepeatedCharacterCriterion, "Keine 3 gleichen Zeichen", result.noRepeatedCharacter());
+        updatePasswordCriterion(noFourDigitNumberCriterion, "Keine 4-stellige Zahl", result.noFourDigitNumber());
+        updatePasswordCriterion(noNumericSequenceCriterion, "Keine Zahlenfolge", result.noNumericSequence());
     }
 
     private void updatePasswordCriterion(Span criterion, String label, boolean fulfilled) {
@@ -663,31 +692,6 @@ public class RegistrateView extends VerticalLayout {
                 .set("background", fulfilled ? "#e8f5e5" : "#fff3ef")
                 .set("border-color", fulfilled ? "#b8d8b8" : "#f1b6a8")
                 .set("color", fulfilled ? SUCCESS : DANGER);
-    }
-
-    private boolean isValidPassword(String password) {
-        String value = password == null ? "" : password;
-        return value.length() >= MIN_PASSWORD_LENGTH
-                && containsUppercase(value)
-                && containsLowercase(value)
-                && containsSpecialCharacter(value)
-                && containsDigit(value);
-    }
-
-    private boolean containsUppercase(String value) {
-        return value.chars().anyMatch(Character::isUpperCase);
-    }
-
-    private boolean containsLowercase(String value) {
-        return value.chars().anyMatch(Character::isLowerCase);
-    }
-
-    private boolean containsDigit(String value) {
-        return value.chars().anyMatch(Character::isDigit);
-    }
-
-    private boolean containsSpecialCharacter(String value) {
-        return value.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
     }
 
     private void handleAuthResult(UserAuthResult result) {

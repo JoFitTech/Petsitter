@@ -37,6 +37,7 @@ public class RegistrateView extends VerticalLayout {
     private static final String LINK_CLR  = "#7b5236";
     private static final String DANGER    = "#c73e1d";
     private static final String SUCCESS   = "#3f7d42";
+    private static final String MUTED     = "#8a7060";
     private static final int MIN_PASSWORD_LENGTH = 14;
     private static final String PASSWORD_RULE_MESSAGE =
             "Das Passwort muss mindestens 14 Zeichen lang sein und Groß- und Kleinbuchstaben, eine Zahl sowie ein Sonderzeichen enthalten.";
@@ -216,10 +217,10 @@ public class RegistrateView extends VerticalLayout {
         passwortField.addValueChangeListener(e -> passwortField.setInvalid(false));
         passwortConfirmField.addValueChangeListener(e -> passwortConfirmField.setInvalid(false));
 
-        HorizontalLayout rowPass = twoColRow(passwordInputGroup(passwortField), passwortConfirmField);
+        HorizontalLayout rowPass = twoColRow(passwortField, passwortConfirmField);
         rowPass.setAlignItems(FlexComponent.Alignment.START);
 
-        kontoLayout.add(emailField, rowPass);
+        kontoLayout.add(emailField, rowPass, passwordCriteriaBox(passwortField));
 
         // ── Daten Fields ──────────────────────────────────────────────────
         H2 personalHeading = sectionHeading("Persönliche Angaben");
@@ -567,7 +568,15 @@ public class RegistrateView extends VerticalLayout {
                 .set("text-align", "center");
     }
 
-    private VerticalLayout passwordInputGroup(PasswordField passwordField) {
+    private VerticalLayout passwordCriteriaBox(PasswordField passwordField) {
+        Span criteriaLabel = new Span("Passwortanforderungen");
+        criteriaLabel.getStyle()
+                .set("color", MUTED)
+                .set("font-size", "11px")
+                .set("font-weight", "800")
+                .set("letter-spacing", "0.2px")
+                .set("text-transform", "uppercase");
+
         Span lengthCriterion = passwordCriterion("Mindestens 14 Zeichen");
         Span uppercaseCriterion = passwordCriterion("Großbuchstabe");
         Span lowercaseCriterion = passwordCriterion("Kleinbuchstabe");
@@ -575,6 +584,7 @@ public class RegistrateView extends VerticalLayout {
         Span digitCriterion = passwordCriterion("Zahl");
 
         VerticalLayout criteria = new VerticalLayout(
+                criteriaLabel,
                 lengthCriterion,
                 uppercaseCriterion,
                 lowercaseCriterion,
@@ -585,8 +595,13 @@ public class RegistrateView extends VerticalLayout {
         criteria.setSpacing(false);
         criteria.setWidthFull();
         criteria.getStyle()
-                .set("gap", "3px")
-                .set("margin", "2px 0 0 12px");
+                .set("background", "#fbf5ec")
+                .set("border", "1px solid #eadac8")
+                .set("border-radius", "18px")
+                .set("box-sizing", "border-box")
+                .set("gap", "6px")
+                .set("margin", "4px 0 0 0")
+                .set("padding", "10px 12px");
 
         updatePasswordCriteria(
                 "",
@@ -605,20 +620,24 @@ public class RegistrateView extends VerticalLayout {
                 digitCriterion
         ));
 
-        VerticalLayout group = new VerticalLayout(passwordField, criteria);
-        group.setPadding(false);
-        group.setSpacing(false);
-        group.setWidthFull();
-        group.getStyle().set("gap", "4px");
-        return group;
+        return criteria;
     }
 
     private Span passwordCriterion(String label) {
         Span criterion = new Span(label);
         criterion.getStyle()
+                .set("align-items", "center")
+                .set("border", "1px solid #eadac8")
+                .set("border-radius", "999px")
+                .set("box-sizing", "border-box")
+                .set("display", "inline-flex")
                 .set("font-size", "12px")
+                .set("gap", "6px")
                 .set("line-height", "1.25")
-                .set("font-weight", "600");
+                .set("font-weight", "700")
+                .set("min-height", "26px")
+                .set("padding", "5px 10px")
+                .set("width", "fit-content");
         return criterion;
     }
 
@@ -639,10 +658,11 @@ public class RegistrateView extends VerticalLayout {
     }
 
     private void updatePasswordCriterion(Span criterion, String label, boolean fulfilled) {
-        criterion.setText((fulfilled ? "Erfüllt: " : "Offen: ") + label);
+        criterion.setText((fulfilled ? "✓ " : "✕ ") + label);
         criterion.getStyle()
-                .set("color", fulfilled ? SUCCESS : DANGER)
-                .set("font-weight", fulfilled ? "700" : "600");
+                .set("background", fulfilled ? "#e8f5e5" : "#fff3ef")
+                .set("border-color", fulfilled ? "#b8d8b8" : "#f1b6a8")
+                .set("color", fulfilled ? SUCCESS : DANGER);
     }
 
     private boolean isValidPassword(String password) {

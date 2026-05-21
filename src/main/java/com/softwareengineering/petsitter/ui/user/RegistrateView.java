@@ -565,6 +565,29 @@ public class RegistrateView extends VerticalLayout {
         pf.getElement().getStyle()
                 .set("--lumo-contrast-10pct", INPUT_BG)
                 .set("--lumo-border-radius-m", "28px");
+        skipRevealButtonInTabOrder(pf);
+    }
+
+    private void skipRevealButtonInTabOrder(PasswordField pf) {
+        pf.getElement().executeJs("""
+                const field = this;
+                const apply = () => {
+                  const revealButton = field.querySelector('[slot="reveal"]');
+                  if (revealButton && revealButton.getAttribute('tabindex') !== '-1') {
+                    revealButton.setAttribute('tabindex', '-1');
+                  }
+                };
+                customElements.whenDefined('vaadin-password-field').then(() => {
+                  requestAnimationFrame(apply);
+                  setTimeout(apply, 0);
+                });
+                new MutationObserver(apply).observe(field, {
+                  attributes: true,
+                  attributeFilter: ['tabindex'],
+                  childList: true,
+                  subtree: true
+                });
+                """);
     }
 
     private void styleDateField(com.vaadin.flow.dom.Element el) {

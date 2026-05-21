@@ -32,6 +32,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 class UserServiceTest {
 
+    private static final String STRONG_PASSWORD = "StrongPassword1!";
+    private static final String PASSWORD_RULE_MESSAGE =
+            "Das Passwort muss mindestens 14 Zeichen lang sein und Groß- und Kleinbuchstaben, eine Zahl sowie ein Sonderzeichen enthalten.";
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @Test
@@ -324,6 +328,31 @@ class UserServiceTest {
     }
 
     @Test
+    void startRegistrationRejectsPasswordShorterThan14Characters() {
+        assertWeakRegistrationPasswordRejected("Aa1!short");
+    }
+
+    @Test
+    void startRegistrationRejectsPasswordWithoutUppercaseLetter() {
+        assertWeakRegistrationPasswordRejected("strongpassword1!");
+    }
+
+    @Test
+    void startRegistrationRejectsPasswordWithoutLowercaseLetter() {
+        assertWeakRegistrationPasswordRejected("STRONGPASSWORD1!");
+    }
+
+    @Test
+    void startRegistrationRejectsPasswordWithoutDigit() {
+        assertWeakRegistrationPasswordRejected("StrongPassword!!");
+    }
+
+    @Test
+    void startRegistrationRejectsPasswordWithoutSpecialCharacter() {
+        assertWeakRegistrationPasswordRejected("StrongPassword12");
+    }
+
+    @Test
     void startRegistrationRejectsInvalidPostalCode() {
         UserRepositoryFake userRepository = new UserRepositoryFake();
         LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
@@ -441,10 +470,14 @@ class UserServiceTest {
     }
 
     private UserRegistrationRequest registrationRequest(String email) {
+        return registrationRequest(email, STRONG_PASSWORD);
+    }
+
+    private UserRegistrationRequest registrationRequest(String email, String password) {
         return new UserRegistrationRequest(
                 email,
-                "secret123",
-                "secret123",
+                password,
+                password,
                 "Anna",
                 "Mueller",
                 "+49 221 111222",
@@ -457,6 +490,19 @@ class UserServiceTest {
                 "Deutsch",
                 "Deutschland"
         );
+    }
+
+    private void assertWeakRegistrationPasswordRejected(String password) {
+        UserRepositoryFake userRepository = new UserRepositoryFake();
+        LoginCodeServiceFake loginCodeService = new LoginCodeServiceFake();
+
+        UserAuthResult result = service(userRepository.repository(), authenticatedUser(Optional.empty()), loginCodeService)
+                .startRegistration(registrationRequest("weak.password@petsitter.local", password), "127.0.0.1");
+
+        assertThat(result.success()).isFalse();
+        assertThat(result.message()).isEqualTo(PASSWORD_RULE_MESSAGE);
+        assertThat(userRepository.savedUser).isNull();
+        assertThat(loginCodeService.requestedEmail).isNull();
     }
 
     private UserProfileUpdateRequest profileUpdateRequest() {

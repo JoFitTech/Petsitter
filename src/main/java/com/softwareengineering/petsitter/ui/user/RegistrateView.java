@@ -18,6 +18,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinService;
@@ -35,6 +36,10 @@ public class RegistrateView extends VerticalLayout {
     private static final String BROWN_BTN = "#5c3d1e";
     private static final String LINK_CLR  = "#7b5236";
     private static final String DANGER    = "#c73e1d";
+    private static final String SUCCESS   = "#3f7d42";
+    private static final int MIN_PASSWORD_LENGTH = 14;
+    private static final String PASSWORD_RULE_MESSAGE =
+            "Das Passwort muss mindestens 14 Zeichen lang sein und Groß- und Kleinbuchstaben, eine Zahl sowie ein Sonderzeichen enthalten.";
 
     private final UserService userService;
     private final PostalCodeService postalCodeService;
@@ -199,6 +204,7 @@ public class RegistrateView extends VerticalLayout {
         PasswordField passwortField = new PasswordField();
         passwortField.setPlaceholder("Passwort");
         passwortField.setWidthFull();
+        passwortField.setValueChangeMode(ValueChangeMode.EAGER);
         stylePasswordField(passwortField);
 
         PasswordField passwortConfirmField = new PasswordField();
@@ -210,7 +216,8 @@ public class RegistrateView extends VerticalLayout {
         passwortField.addValueChangeListener(e -> passwortField.setInvalid(false));
         passwortConfirmField.addValueChangeListener(e -> passwortConfirmField.setInvalid(false));
 
-        HorizontalLayout rowPass = twoColRow(passwortField, passwortConfirmField);
+        HorizontalLayout rowPass = twoColRow(passwordInputGroup(passwortField), passwortConfirmField);
+        rowPass.setAlignItems(FlexComponent.Alignment.START);
 
         kontoLayout.add(emailField, rowPass);
 
@@ -384,9 +391,9 @@ public class RegistrateView extends VerticalLayout {
                     emailField.setErrorMessage("Gültige E-Mail eingeben");
                     valid = false;
                 }
-                if (passwortField.getValue().length() < 8) {
+                if (!isValidPassword(passwortField.getValue())) {
                     passwortField.setInvalid(true);
-                    passwortField.setErrorMessage("Mindestens 8 Zeichen");
+                    passwortField.setErrorMessage(PASSWORD_RULE_MESSAGE);
                     valid = false;
                 }
                 if (!passwortConfirmField.getValue().equals(passwortField.getValue())) {
@@ -558,6 +565,109 @@ public class RegistrateView extends VerticalLayout {
                 .set("--vaadin-input-field-background", INPUT_BG)
                 .set("--vaadin-input-field-border-radius", "28px")
                 .set("text-align", "center");
+    }
+
+    private VerticalLayout passwordInputGroup(PasswordField passwordField) {
+        Span lengthCriterion = passwordCriterion("Mindestens 14 Zeichen");
+        Span uppercaseCriterion = passwordCriterion("Großbuchstabe");
+        Span lowercaseCriterion = passwordCriterion("Kleinbuchstabe");
+        Span specialCriterion = passwordCriterion("Sonderzeichen");
+        Span digitCriterion = passwordCriterion("Zahl");
+
+        VerticalLayout criteria = new VerticalLayout(
+                lengthCriterion,
+                uppercaseCriterion,
+                lowercaseCriterion,
+                specialCriterion,
+                digitCriterion
+        );
+        criteria.setPadding(false);
+        criteria.setSpacing(false);
+        criteria.setWidthFull();
+        criteria.getStyle()
+                .set("gap", "3px")
+                .set("margin", "2px 0 0 12px");
+
+        updatePasswordCriteria(
+                "",
+                lengthCriterion,
+                uppercaseCriterion,
+                lowercaseCriterion,
+                specialCriterion,
+                digitCriterion
+        );
+        passwordField.addValueChangeListener(e -> updatePasswordCriteria(
+                e.getValue(),
+                lengthCriterion,
+                uppercaseCriterion,
+                lowercaseCriterion,
+                specialCriterion,
+                digitCriterion
+        ));
+
+        VerticalLayout group = new VerticalLayout(passwordField, criteria);
+        group.setPadding(false);
+        group.setSpacing(false);
+        group.setWidthFull();
+        group.getStyle().set("gap", "4px");
+        return group;
+    }
+
+    private Span passwordCriterion(String label) {
+        Span criterion = new Span(label);
+        criterion.getStyle()
+                .set("font-size", "12px")
+                .set("line-height", "1.25")
+                .set("font-weight", "600");
+        return criterion;
+    }
+
+    private void updatePasswordCriteria(
+            String password,
+            Span lengthCriterion,
+            Span uppercaseCriterion,
+            Span lowercaseCriterion,
+            Span specialCriterion,
+            Span digitCriterion
+    ) {
+        String value = password == null ? "" : password;
+        updatePasswordCriterion(lengthCriterion, "Mindestens 14 Zeichen", value.length() >= MIN_PASSWORD_LENGTH);
+        updatePasswordCriterion(uppercaseCriterion, "Großbuchstabe", containsUppercase(value));
+        updatePasswordCriterion(lowercaseCriterion, "Kleinbuchstabe", containsLowercase(value));
+        updatePasswordCriterion(specialCriterion, "Sonderzeichen", containsSpecialCharacter(value));
+        updatePasswordCriterion(digitCriterion, "Zahl", containsDigit(value));
+    }
+
+    private void updatePasswordCriterion(Span criterion, String label, boolean fulfilled) {
+        criterion.setText((fulfilled ? "Erfüllt: " : "Offen: ") + label);
+        criterion.getStyle()
+                .set("color", fulfilled ? SUCCESS : DANGER)
+                .set("font-weight", fulfilled ? "700" : "600");
+    }
+
+    private boolean isValidPassword(String password) {
+        String value = password == null ? "" : password;
+        return value.length() >= MIN_PASSWORD_LENGTH
+                && containsUppercase(value)
+                && containsLowercase(value)
+                && containsSpecialCharacter(value)
+                && containsDigit(value);
+    }
+
+    private boolean containsUppercase(String value) {
+        return value.chars().anyMatch(Character::isUpperCase);
+    }
+
+    private boolean containsLowercase(String value) {
+        return value.chars().anyMatch(Character::isLowerCase);
+    }
+
+    private boolean containsDigit(String value) {
+        return value.chars().anyMatch(Character::isDigit);
+    }
+
+    private boolean containsSpecialCharacter(String value) {
+        return value.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
     }
 
     private void handleAuthResult(UserAuthResult result) {

@@ -31,7 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserService {
 
-    private static final int MIN_PASSWORD_LENGTH = 8;
+    private static final int MIN_PASSWORD_LENGTH = 14;
+    private static final String PASSWORD_RULE_MESSAGE =
+            "Das Passwort muss mindestens 14 Zeichen lang sein und Groß- und Kleinbuchstaben, eine Zahl sowie ein Sonderzeichen enthalten.";
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final UserRepository userRepository;
@@ -327,8 +329,8 @@ public class UserService {
         if (!isValidEmail(normalizeEmail(request.email()))) {
             return Optional.of("Bitte eine gültige E-Mail eingeben.");
         }
-        if (isBlank(request.password()) || request.password().length() < MIN_PASSWORD_LENGTH) {
-            return Optional.of("Das Passwort muss mindestens 8 Zeichen lang sein.");
+        if (!isValidRegistrationPassword(request.password())) {
+            return Optional.of(PASSWORD_RULE_MESSAGE);
         }
         if (!request.password().equals(request.confirmPassword())) {
             return Optional.of("Die Passwörter stimmen nicht überein.");
@@ -389,6 +391,15 @@ public class UserService {
 
     private boolean isValidEmail(String email) {
         return !email.isBlank() && EMAIL_PATTERN.matcher(email).matches();
+    }
+
+    private boolean isValidRegistrationPassword(String password) {
+        String value = password == null ? "" : password;
+        return value.length() >= MIN_PASSWORD_LENGTH
+                && value.chars().anyMatch(Character::isUpperCase)
+                && value.chars().anyMatch(Character::isLowerCase)
+                && value.chars().anyMatch(Character::isDigit)
+                && value.chars().anyMatch(ch -> !Character.isLetterOrDigit(ch));
     }
 
     private String normalizeEmail(String email) {

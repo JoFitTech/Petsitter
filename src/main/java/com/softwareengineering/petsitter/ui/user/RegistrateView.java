@@ -592,18 +592,30 @@ public class RegistrateView extends VerticalLayout {
         Span noFourDigitNumberCriterion = passwordCriterion("Keine 4-stellige Zahl");
         Span noNumericSequenceCriterion = passwordCriterion("Keine Zahlenfolge");
 
-        VerticalLayout criteria = new VerticalLayout(
-                criteriaLabel,
+        VerticalLayout leftCriteria = passwordCriteriaColumn(
                 lengthCriterion,
                 uppercaseCriterion,
                 lowercaseCriterion,
                 specialCriterion,
-                digitCriterion,
+                digitCriterion
+        );
+        VerticalLayout rightCriteria = passwordCriteriaColumn(
                 noForbiddenTermCriterion,
                 noRepeatedCharacterCriterion,
                 noFourDigitNumberCriterion,
                 noNumericSequenceCriterion
         );
+
+        HorizontalLayout criteriaColumns = new HorizontalLayout(leftCriteria, rightCriteria);
+        criteriaColumns.setWidthFull();
+        criteriaColumns.setSpacing(false);
+        criteriaColumns.getStyle()
+                .set("align-items", "flex-start")
+                .set("display", "flex")
+                .set("gap", "12px")
+                .set("flex-wrap", "wrap");
+
+        VerticalLayout criteria = new VerticalLayout(criteriaLabel, criteriaColumns);
         criteria.setPadding(false);
         criteria.setSpacing(false);
         criteria.setWidthFull();
@@ -642,6 +654,17 @@ public class RegistrateView extends VerticalLayout {
         ));
 
         return criteria;
+    }
+
+    private VerticalLayout passwordCriteriaColumn(Span... criteria) {
+        VerticalLayout column = new VerticalLayout(criteria);
+        column.setPadding(false);
+        column.setSpacing(false);
+        column.setWidth("calc(50% - 6px)");
+        column.getStyle()
+                .set("gap", "6px")
+                .set("min-width", "220px");
+        return column;
     }
 
     private Span passwordCriterion(String label) {

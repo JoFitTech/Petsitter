@@ -6,6 +6,7 @@ import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -21,6 +22,7 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 @Route("login")
 @PageTitle("Login | Pawsitter")
 @AnonymousAllowed
+@CssImport(value = "./styles/password-field-reveal-button.css", themeFor = "vaadin-password-field-button")
 public class LoginView extends VerticalLayout {
 
     private static final String DARK       = "#4a3428";

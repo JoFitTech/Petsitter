@@ -12,6 +12,7 @@ import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -28,6 +29,7 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 @Route("register")
 @PageTitle("Registrierung | Pawsitter")
 @AnonymousAllowed
+@CssImport(value = "./styles/password-field-reveal-button.css", themeFor = "vaadin-password-field-button")
 public class RegistrateView extends VerticalLayout {
 
     private static final String DARK      = "#4a3428";

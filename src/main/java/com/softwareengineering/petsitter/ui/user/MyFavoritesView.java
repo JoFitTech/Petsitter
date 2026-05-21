@@ -9,6 +9,7 @@ import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -32,16 +33,18 @@ public class MyFavoritesView extends Div {
     private final RequestService requestService;
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
+    private final UserService userService;
     private final Div favoritesContainer = new Div();
 
     public MyFavoritesView(FavoriteService favoriteService, OfferService offerService,
                            RequestService requestService, ChatService chatService,
-                           AuthenticatedUser authenticatedUser) {
+                           AuthenticatedUser authenticatedUser, UserService userService) {
         this.favoriteService = favoriteService;
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
+        this.userService = userService;
 
         setWidthFull();
         getStyle()
@@ -162,7 +165,8 @@ public class MyFavoritesView extends Div {
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService, requestService, chatService, authenticatedUser).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
+                offerService, requestService, chatService, authenticatedUser, userService).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

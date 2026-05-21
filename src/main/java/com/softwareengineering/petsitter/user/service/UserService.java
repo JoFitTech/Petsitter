@@ -7,6 +7,7 @@ import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.dto.PublicUserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
@@ -174,6 +175,16 @@ public class UserService {
         return authenticatedUser.get().map(this::toProfileDto);
     }
 
+    @Transactional(readOnly = true)
+    public Optional<PublicUserProfileDto> getPublicUserProfile(UUID userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+        return userRepository.findById(userId)
+                .filter(user -> user.getAccountStatus() == AccountStatus.VERIFIED)
+                .map(this::toPublicProfileDto);
+    }
+
     @Transactional
     public UserAuthResult updateCurrentUserProfile(UserProfileUpdateRequest request) {
         Optional<User> userOpt = authenticatedUser.get();
@@ -277,6 +288,20 @@ public class UserService {
                 user.getPendingEmailRequestedAt(),
                 petService.getPetSummaryForOwner(user.getId()),
                 user.getAccountRole(),
+                user.getAccountStatus()
+        );
+    }
+
+    private PublicUserProfileDto toPublicProfileDto(User user) {
+        return new PublicUserProfileDto(
+                user.getId(),
+                defaultIfBlank(user.getDisplayName(), user.getFirstName()),
+                user.getBirthDate(),
+                defaultIfBlank(user.getLanguage(), "deutsch"),
+                user.getBio(),
+                user.getPostalCode(),
+                user.getCity(),
+                petService.getPetSummaryForOwner(user.getId()),
                 user.getAccountStatus()
         );
     }

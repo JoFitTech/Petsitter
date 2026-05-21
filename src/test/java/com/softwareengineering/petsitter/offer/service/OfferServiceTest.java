@@ -728,6 +728,7 @@ class OfferServiceTest {
     void getOpenOffersByTypeExcludesCurrentUsersOffersAndExpiredOpenOffers() {
         User currentUser = user(UUID.randomUUID());
         User otherUser = user(UUID.randomUUID());
+        otherUser.setDisplayName("Ben Betreuung");
         UUID visibleOfferId = UUID.randomUUID();
         Offer ownOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
                 LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
@@ -751,6 +752,8 @@ class OfferServiceTest {
         List<OfferCardDto> result = offerService.getOpenOffersByType(OfferType.SITTER_OFFER);
 
         assertThat(result).extracting(OfferCardDto::id).containsExactly(visibleOfferId);
+        assertThat(result.get(0).creatorUserId()).isEqualTo(otherUser.getId());
+        assertThat(result.get(0).creatorDisplayName()).isEqualTo("Ben Betreuung");
         assertThat(requestedType).hasValue(OfferType.SITTER_OFFER);
         assertThat(requestedStatus).hasValue(OfferStatus.OPEN);
     }

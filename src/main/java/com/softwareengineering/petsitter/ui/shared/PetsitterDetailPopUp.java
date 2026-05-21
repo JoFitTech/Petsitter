@@ -7,6 +7,9 @@ import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
+import com.softwareengineering.petsitter.ui.chat.ProfilePopUp;
+import com.softwareengineering.petsitter.user.service.UserService;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -32,14 +35,16 @@ public class PetsitterDetailPopUp extends Dialog {
     private final RequestService requestService;
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
+    private final UserService userService;
 
     public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars, OfferService offerService,
                                 RequestService requestService, ChatService chatService,
-                                AuthenticatedUser authenticatedUser) {
+                                AuthenticatedUser authenticatedUser, UserService userService) {
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
+        this.userService = userService;
 
         setWidth("520px");
         setCloseOnOutsideClick(true);
@@ -165,6 +170,10 @@ public class PetsitterDetailPopUp extends Dialog {
 
         // ── Tier-Feld: dynamisch je nach OWNER_OFFER vs SITTER_OFFER ──────
         content.add(header, imageArea, offerTitle, factsRow, infoRow);
+        Component creatorRow = createCreatorRow(dto);
+        if (creatorRow != null) {
+            content.add(creatorRow);
+        }
 
         if (dto.petName() != null) {
             // OWNER_OFFER: zeige konkretes Haustier
@@ -266,6 +275,48 @@ public class PetsitterDetailPopUp extends Dialog {
         Button btn = styledButton("Auftrag anfragen");
         btn.addClickListener(e -> onAuftragAnfragenClicked(dto.id()));
         return btn;
+    }
+
+    private Component createCreatorRow(OfferCardDto dto) {
+        if (dto.creatorUserId() == null || isBlank(dto.creatorDisplayName())) {
+            return null;
+        }
+
+        HorizontalLayout row = new HorizontalLayout();
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.setSpacing(false);
+        row.getStyle()
+                .set("gap", "6px")
+                .set("background", "white")
+                .set("border-radius", "12px")
+                .set("padding", "10px 14px");
+
+        Span label = new Span("Anbieter:");
+        label.getStyle()
+                .set("font-size", "14px")
+                .set("font-weight", "700")
+                .set("color", "#7a6050");
+
+        Button nameButton = new Button(dto.creatorDisplayName());
+        nameButton.getStyle()
+                .set("background", "transparent")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("height", "auto")
+                .set("min-width", "0")
+                .set("color", DARK)
+                .set("font-size", "14px")
+                .set("font-weight", "800")
+                .set("text-decoration", "underline")
+                .set("cursor", "pointer");
+        nameButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
+                .ifPresentOrElse(
+                        profile -> new ProfilePopUp(profile).open(),
+                        () -> Notification.show("Profil konnte nicht geladen werden.")
+                ));
+
+        row.add(label, nameButton);
+        return row;
     }
 
     private Button styledButton(String label) {
@@ -383,5 +434,9 @@ public class PetsitterDetailPopUp extends Dialog {
             sb.append(i < filled ? "★" : "☆");
         }
         return sb.toString();
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

@@ -10,6 +10,7 @@ import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -53,6 +54,7 @@ public class MyOffers extends Div {
     private final ChatService chatService;
     private final BookingService bookingService;
     private final AuthenticatedUser authenticatedUser;
+    private final UserService userService;
     private final Div offersContainer = new Div();
 
     private String activeStatusFilter = "ALLE";  // ALLE | OFFEN | GEBUCHT | VERGANGEN
@@ -60,12 +62,13 @@ public class MyOffers extends Div {
 
     public MyOffers(OfferService offerService, RequestService requestService,
                     ChatService chatService, BookingService bookingService,
-                    AuthenticatedUser authenticatedUser) {
+                    AuthenticatedUser authenticatedUser, UserService userService) {
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.bookingService = bookingService;
         this.authenticatedUser = authenticatedUser;
+        this.userService = userService;
 
         setWidthFull();
         getStyle()
@@ -533,7 +536,8 @@ public class MyOffers extends Div {
     }
 
     private void openOfferDialog(MyOfferCardDto offer) {
-        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4, offerService, requestService, chatService, authenticatedUser).open();
+        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4,
+                offerService, requestService, chatService, authenticatedUser, userService).open();
     }
 
     private boolean isExpiredOpenOffer(MyOfferCardDto offer) {

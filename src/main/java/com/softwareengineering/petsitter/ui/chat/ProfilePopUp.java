@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.ui.chat;
 
+import com.softwareengineering.petsitter.user.domain.AccountStatus;
+import com.softwareengineering.petsitter.user.dto.PublicUserProfileDto;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -13,6 +15,8 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import java.time.LocalDate;
+import java.time.Period;
 
 public class ProfilePopUp extends Dialog {
 
@@ -22,6 +26,23 @@ public class ProfilePopUp extends Dialog {
     private static final String REVIEW_BG = "#f5eee4"; // Background of review items
 
     public ProfilePopUp() {
+        this(new PublicUserProfileDto(
+                null,
+                "Max Mustermann",
+                LocalDate.now().minusYears(21),
+                "deutsch",
+                "Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.",
+                "76689",
+                "Neuthard",
+                "2 Hunde",
+                AccountStatus.VERIFIED
+        ));
+    }
+
+    public ProfilePopUp(PublicUserProfileDto profile) {
+        PublicUserProfileDto safeProfile = profile != null ? profile : emptyProfile();
+        String displayName = valueOrDefault(safeProfile.displayName(), "Unbekannter Nutzer");
+
         // Style the dialog itself
         this.setWidth("800px");
         this.setMaxWidth("90vw");
@@ -44,7 +65,7 @@ public class ProfilePopUp extends Dialog {
         header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         header.setAlignItems(FlexComponent.Alignment.CENTER);
 
-        H2 title = new H2("Profil von max3010");
+        H2 title = new H2("Profil von " + displayName);
         title.getStyle()
                 .set("margin", "0")
                 .set("color", DARK)
@@ -96,7 +117,7 @@ public class ProfilePopUp extends Dialog {
         }
 
         // Name
-        H3 name = new H3("Max Mustermann");
+        H3 name = new H3(displayName);
         name.getStyle()
                 .set("margin", "0 0 15px 0")
                 .set("color", DARK)
@@ -116,7 +137,7 @@ public class ProfilePopUp extends Dialog {
         Icon pawIcon = new Icon(VaadinIcon.HEART);
         pawIcon.setSize("16px");
         pawIcon.getStyle().set("color", DARK);
-        Span dogs = new Span("2 Hunde");
+        Span dogs = new Span(valueOrDefault(safeProfile.petSummary(), "Keine Haustiere"));
         dogs.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
         dogsLayout.add(pawIcon, dogs);
         
@@ -127,7 +148,7 @@ public class ProfilePopUp extends Dialog {
         Icon userIcon = new Icon(VaadinIcon.USER);
         userIcon.setSize("16px");
         userIcon.getStyle().set("color", DARK);
-        Span age = new Span("21 Jahre alt");
+        Span age = new Span(formatAge(safeProfile.birthDate()));
         age.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
         ageLayout.add(userIcon, age);
 
@@ -138,7 +159,7 @@ public class ProfilePopUp extends Dialog {
         Icon pinIcon = new Icon(VaadinIcon.MAP_MARKER);
         pinIcon.setSize("16px");
         pinIcon.getStyle().set("color", DARK);
-        Span location = new Span("76689 Neuthard");
+        Span location = new Span(formatLocation(safeProfile.postalCode(), safeProfile.city()));
         location.getStyle().set("font-style", "italic").set("font-weight", "600").set("color", DARK);
         locationLayout.add(pinIcon, location);
 
@@ -149,20 +170,17 @@ public class ProfilePopUp extends Dialog {
         Icon globeIcon = new Icon(VaadinIcon.GLOBE);
         globeIcon.setSize("16px");
         globeIcon.getStyle().set("color", DARK);
-        Span lang = new Span("deutsch");
+        Span lang = new Span(valueOrDefault(safeProfile.language(), "deutsch"));
         lang.getStyle().set("font-style", "italic").set("font-weight", "600").set("color", DARK);
         langLayout.add(globeIcon, lang);
 
         detailsLayout.add(dogsLayout, ageLayout, locationLayout, langLayout);
 
         // Description
-        Paragraph desc1 = new Paragraph("Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.");
+        Paragraph desc1 = new Paragraph(valueOrDefault(safeProfile.bio(), "Noch keine Beschreibung hinterlegt."));
         desc1.getStyle().set("margin", "0 0 10px 0").set("color", "#6b5446").set("font-size", "15px");
-        
-        Paragraph desc2 = new Paragraph("Mir sind Vertrauen, klare Absprachen und ein liebevoller Umgang besonders wichtig.");
-        desc2.getStyle().set("margin", "0").set("color", "#6b5446").set("font-size", "15px");
 
-        infoSection.add(starsLayout, name, detailsLayout, desc1, desc2);
+        infoSection.add(starsLayout, name, detailsLayout, desc1);
 
         // Verified Badge (absolute positioned top right inside profileCard)
         Div verifiedBadge = new Div();
@@ -186,7 +204,10 @@ public class ProfilePopUp extends Dialog {
         verifiedBadge.add(checkIcon, new Span("Verifiziert"));
 
         profileContent.add(avatar, infoSection);
-        profileCard.add(profileContent, verifiedBadge);
+        profileCard.add(profileContent);
+        if (safeProfile.accountStatus() == AccountStatus.VERIFIED) {
+            profileCard.add(verifiedBadge);
+        }
 
         // Card 2: Reviews
         Div reviewsCard = new Div();
@@ -198,7 +219,7 @@ public class ProfilePopUp extends Dialog {
                 .set("box-sizing", "border-box")
                 .set("margin-top", "20px");
 
-        H2 reviewsTitle = new H2("Max's Bewertungen");
+        H2 reviewsTitle = new H2("Bewertungen von " + displayName);
         reviewsTitle.getStyle()
                 .set("margin", "0 0 20px 0")
                 .set("color", DARK)
@@ -227,6 +248,34 @@ public class ProfilePopUp extends Dialog {
 
         mainContainer.add(header, profileCard, reviewsCard);
         add(mainContainer);
+    }
+
+    private PublicUserProfileDto emptyProfile() {
+        return new PublicUserProfileDto(null, null, null, null, null, null, null, null, null);
+    }
+
+    private String formatAge(LocalDate birthDate) {
+        if (birthDate == null) {
+            return "Alter nicht angegeben";
+        }
+        int age = Period.between(birthDate, LocalDate.now()).getYears();
+        if (age < 0) {
+            return "Alter nicht angegeben";
+        }
+        return age + " Jahre alt";
+    }
+
+    private String formatLocation(String postalCode, String city) {
+        String location = (valueOrEmpty(postalCode) + " " + valueOrEmpty(city)).trim();
+        return valueOrDefault(location, "Ort nicht angegeben");
+    }
+
+    private String valueOrDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private String valueOrEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private Div createAvatar(int size) {

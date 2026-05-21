@@ -21,6 +21,7 @@ import com.softwareengineering.petsitter.ui.shared.FilterSearchBar;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -77,6 +78,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private final RequestService requestService;
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
+    private final UserService userService;
 
     private H1 pageTitle;
     private Div leftBlob;
@@ -91,12 +93,13 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     @Autowired
     public PetsitterFilterView(OfferService offerService, FavoriteService favoriteService,
                                RequestService requestService, ChatService chatService,
-                               AuthenticatedUser authenticatedUser) {
+                               AuthenticatedUser authenticatedUser, UserService userService) {
         this.offerService = offerService;
         this.favoriteService = favoriteService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
+        this.userService = userService;
         this.currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
 
         setSizeFull();
@@ -638,7 +641,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService, requestService, chatService, authenticatedUser).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
+                offerService, requestService, chatService, authenticatedUser, userService).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

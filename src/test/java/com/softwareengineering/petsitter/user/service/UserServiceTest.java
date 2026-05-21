@@ -9,6 +9,7 @@ import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.dto.PublicUserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserLoginRequest;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
@@ -99,6 +100,50 @@ class UserServiceTest {
             assertThat(profile.accountRole()).isEqualTo(AccountRole.SIGNED_IN_USER);
             assertThat(profile.accountStatus()).isEqualTo(AccountStatus.VERIFIED);
         });
+    }
+
+    @Test
+    void getPublicUserProfileMapsOnlyPublicFieldsForVerifiedUser() {
+        UUID userId = UUID.randomUUID();
+        User domainUser = user(userId);
+        UserRepositoryFake userRepository = new UserRepositoryFake(domainUser);
+        UserService userService = service(
+                userRepository.repository(),
+                authenticatedUser(Optional.empty()),
+                new LoginCodeServiceFake(),
+                petService("1 Hund, 1 Katze")
+        );
+
+        Optional<PublicUserProfileDto> result = userService.getPublicUserProfile(userId);
+
+        assertThat(result).hasValueSatisfying(profile -> {
+            assertThat(profile.id()).isEqualTo(userId);
+            assertThat(profile.displayName()).isEqualTo("Anna");
+            assertThat(profile.birthDate()).isEqualTo(LocalDate.of(1995, 5, 2));
+            assertThat(profile.language()).isEqualTo("deutsch");
+            assertThat(profile.bio()).isEqualTo("Ich betreue gerne Hunde und Katzen.");
+            assertThat(profile.postalCode()).isEqualTo("50667");
+            assertThat(profile.city()).isEqualTo("Koeln");
+            assertThat(profile.petSummary()).isEqualTo("1 Hund, 1 Katze");
+            assertThat(profile.accountStatus()).isEqualTo(AccountStatus.VERIFIED);
+        });
+        assertThat(userRepository.requestedId).hasValue(userId);
+    }
+
+    @Test
+    void getPublicUserProfileReturnsEmptyForMissingOrUnverifiedUser() {
+        UUID pendingUserId = UUID.randomUUID();
+        User pending = user(pendingUserId);
+        pending.setAccountStatus(AccountStatus.PENDING);
+        UserService userService = service(
+                new UserRepositoryFake(pending).repository(),
+                authenticatedUser(Optional.empty()),
+                new LoginCodeServiceFake()
+        );
+
+        assertThat(userService.getPublicUserProfile(pendingUserId)).isEmpty();
+        assertThat(userService.getPublicUserProfile(UUID.randomUUID())).isEmpty();
+        assertThat(userService.getPublicUserProfile(null)).isEmpty();
     }
 
     @Test

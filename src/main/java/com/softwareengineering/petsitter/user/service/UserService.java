@@ -31,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class UserService {
 
-    private static final int MIN_PASSWORD_LENGTH = 8;
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final UserRepository userRepository;
@@ -40,6 +39,7 @@ public class UserService {
     private final LoginCodeService loginCodeService;
     private final PetService petService;
     private final PostalCodeService postalCodeService;
+    private final PasswordPolicyService passwordPolicyService;
 
     public UserService(
             UserRepository userRepository,
@@ -47,7 +47,8 @@ public class UserService {
             PasswordEncoder passwordEncoder,
             LoginCodeService loginCodeService,
             PetService petService,
-            PostalCodeService postalCodeService
+            PostalCodeService postalCodeService,
+            PasswordPolicyService passwordPolicyService
     ) {
         this.userRepository = userRepository;
         this.authenticatedUser = authenticatedUser;
@@ -55,6 +56,7 @@ public class UserService {
         this.loginCodeService = loginCodeService;
         this.petService = petService;
         this.postalCodeService = postalCodeService;
+        this.passwordPolicyService = passwordPolicyService;
     }
 
     public Optional<User> findUserById(UUID userId) {
@@ -327,8 +329,9 @@ public class UserService {
         if (!isValidEmail(normalizeEmail(request.email()))) {
             return Optional.of("Bitte eine gültige E-Mail eingeben.");
         }
-        if (isBlank(request.password()) || request.password().length() < MIN_PASSWORD_LENGTH) {
-            return Optional.of("Das Passwort muss mindestens 8 Zeichen lang sein.");
+        PasswordPolicyService.PasswordPolicyResult passwordPolicy = passwordPolicyService.evaluate(request.password());
+        if (!passwordPolicy.valid()) {
+            return Optional.of(passwordPolicy.errorMessage());
         }
         if (!request.password().equals(request.confirmPassword())) {
             return Optional.of("Die Passwörter stimmen nicht überein.");

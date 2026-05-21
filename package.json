@@ -69,7 +69,7 @@
       "vite": "7.3.2",
       "vite-plugin-checker": "0.12.0"
     },
-    "hash": "d44f48fffa1e849b7a81307522db427913ccad3e0bb45d1e471af4455f570e43",
+    "hash": "5668ae66e5e531bfd11c6b080a02dcca05e6849291d9db1f741b6d09c9cc4a75",
     "overrides": {
       "@vaadin/a11y-base": "25.1.1",
       "@vaadin/accordion": "25.1.1",

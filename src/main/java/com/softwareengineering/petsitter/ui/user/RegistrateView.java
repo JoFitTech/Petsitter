@@ -6,11 +6,14 @@ import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
+import com.softwareengineering.petsitter.user.service.PasswordPolicyService;
 import com.softwareengineering.petsitter.user.service.UserService;
+import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -18,6 +21,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.EmailField;
 import com.vaadin.flow.component.textfield.PasswordField;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.VaadinService;
@@ -26,18 +30,23 @@ import com.vaadin.flow.server.auth.AnonymousAllowed;
 @Route("register")
 @PageTitle("Registrierung | Pawsitter")
 @AnonymousAllowed
+@CssImport(value = "./styles/password-field-reveal-button.css", themeFor = "vaadin-password-field-button")
 public class RegistrateView extends VerticalLayout {
 
-    private static final String DARK      = "#4a3428";
-    private static final String CREAM     = "#e8d9c8";
-    private static final String CARD_BG   = "#ffffff";
-    private static final String INPUT_BG  = "#f5e9d6";
+    private static final String DARK = "#4a3428";
+    private static final String CREAM = "#e8d9c8";
+    private static final String CARD_BG = "#ffffff";
+    private static final String INPUT_BG = "#f5e9d6";
     private static final String BROWN_BTN = "#5c3d1e";
-    private static final String LINK_CLR  = "#7b5236";
-    private static final String DANGER    = "#c73e1d";
+    private static final String LINK_CLR = "#7b5236";
+    private static final String DANGER = "#c73e1d";
+    private static final String SUCCESS = "#3f7d42";
+    private static final String MUTED = "#8a7060";
+    private static final String PASSWORD_CRITERIA_ERROR_MESSAGE = "Es sind noch nicht alle Passwortkriterien erfüllt.";
 
     private final UserService userService;
     private final PostalCodeService postalCodeService;
+    private final PasswordPolicyService passwordPolicyService;
     private final Paragraph errorMessage = new Paragraph();
     private final Paragraph statusMessage = new Paragraph();
 
@@ -46,9 +55,13 @@ public class RegistrateView extends VerticalLayout {
     private ComboBox<String> landField;
     private String currentRegistrationEmail = "";
 
-    public RegistrateView(UserService userService, PostalCodeService postalCodeService) {
+    public RegistrateView(
+            UserService userService,
+            PostalCodeService postalCodeService,
+            PasswordPolicyService passwordPolicyService) {
         this.userService = userService;
         this.postalCodeService = postalCodeService;
+        this.passwordPolicyService = passwordPolicyService;
 
         setSizeFull();
         setPadding(false);
@@ -66,10 +79,10 @@ public class RegistrateView extends VerticalLayout {
                 .set("padding", "32px 0");
 
         // ── Decorative background circles ─────────────────────────────────────
-        add(decoCircle("220px", "220px", "#d4c4b0", "-60px", null,  null,  "-40px")); // top-left
-        add(decoCircle("300px", "300px", "#b8d4cc", "-40px", "-40px", null, null));   // top-right (mint)
-        add(decoCircle("260px", "260px", "#c8b89a", null,   null,  "-60px", "-50px")); // bottom-left
-        add(decoCircle("200px", "200px", "#d4c4b0", null,   "-30px", "-50px", null)); // bottom-right
+        add(decoCircle("220px", "220px", "#d4c4b0", "-60px", null, null, "-40px")); // top-left
+        add(decoCircle("300px", "300px", "#b8d4cc", "-40px", "-40px", null, null)); // top-right (mint)
+        add(decoCircle("260px", "260px", "#c8b89a", null, null, "-60px", "-50px")); // bottom-left
+        add(decoCircle("200px", "200px", "#d4c4b0", null, "-30px", "-50px", null)); // bottom-right
 
         // ── Card ──────────────────────────────────────────────────────────────
         add(buildCard());
@@ -77,7 +90,7 @@ public class RegistrateView extends VerticalLayout {
 
     // ── Decorative circle ──────────────────────────────────────────────────────
     private Div decoCircle(String w, String h, String color,
-                           String top, String right, String bottom, String left) {
+            String top, String right, String bottom, String left) {
         Div circle = new Div();
         circle.getStyle()
                 .set("position", "fixed")
@@ -88,10 +101,14 @@ public class RegistrateView extends VerticalLayout {
                 .set("opacity", "0.55")
                 .set("pointer-events", "none")
                 .set("z-index", "0");
-        if (top    != null) circle.getStyle().set("top",    top);
-        if (right  != null) circle.getStyle().set("right",  right);
-        if (bottom != null) circle.getStyle().set("bottom", bottom);
-        if (left   != null) circle.getStyle().set("left",   left);
+        if (top != null)
+            circle.getStyle().set("top", top);
+        if (right != null)
+            circle.getStyle().set("right", right);
+        if (bottom != null)
+            circle.getStyle().set("bottom", bottom);
+        if (left != null)
+            circle.getStyle().set("left", left);
         return circle;
     }
 
@@ -199,6 +216,7 @@ public class RegistrateView extends VerticalLayout {
         PasswordField passwortField = new PasswordField();
         passwortField.setPlaceholder("Passwort");
         passwortField.setWidthFull();
+        passwortField.setValueChangeMode(ValueChangeMode.EAGER);
         stylePasswordField(passwortField);
 
         PasswordField passwortConfirmField = new PasswordField();
@@ -211,8 +229,9 @@ public class RegistrateView extends VerticalLayout {
         passwortConfirmField.addValueChangeListener(e -> passwortConfirmField.setInvalid(false));
 
         HorizontalLayout rowPass = twoColRow(passwortField, passwortConfirmField);
+        rowPass.setAlignItems(FlexComponent.Alignment.START);
 
-        kontoLayout.add(emailField, rowPass);
+        kontoLayout.add(emailField, rowPass, passwordCriteriaBox(passwortField));
 
         // ── Daten Fields ──────────────────────────────────────────────────
         H2 personalHeading = sectionHeading("Persönliche Angaben");
@@ -257,8 +276,8 @@ public class RegistrateView extends VerticalLayout {
 
         postalCodeField = pillTextField("Postleitzahl");
         cityField = pillTextField("Ort");
-        boolean[] cityAutoFilled = {false};
-        boolean[] landAutoFilled = {false};
+        boolean[] cityAutoFilled = { false };
+        boolean[] landAutoFilled = { false };
         postalCodeField.addValueChangeListener(e -> {
             postalCodeField.setInvalid(false);
             String plz = e.getValue();
@@ -275,13 +294,20 @@ public class RegistrateView extends VerticalLayout {
                     }
                 });
             } else {
-                if (cityAutoFilled[0]) { cityField.setValue(""); cityAutoFilled[0] = false; }
-                if (landAutoFilled[0]) { landField.setValue(null); landAutoFilled[0] = false; }
+                if (cityAutoFilled[0]) {
+                    cityField.setValue("");
+                    cityAutoFilled[0] = false;
+                }
+                if (landAutoFilled[0]) {
+                    landField.setValue(null);
+                    landAutoFilled[0] = false;
+                }
             }
         });
         cityField.addValueChangeListener(e -> {
             cityField.setInvalid(false);
-            if (e.isFromClient()) cityAutoFilled[0] = false;
+            if (e.isFromClient())
+                cityAutoFilled[0] = false;
         });
         HorizontalLayout rowPlzOrt = twoColRow(postalCodeField, cityField);
 
@@ -296,7 +322,10 @@ public class RegistrateView extends VerticalLayout {
                 "Indien", "Brasilien", "Argentinien", "Mexiko", "Südafrika",
                 "Nigeria", "Ägypten", "Marokko", "Iran", "Saudi-Arabien",
                 "Südkorea", "Indonesien", "Vietnam", "Pakistan");
-        landField.addValueChangeListener(e -> { if (e.isFromClient()) landAutoFilled[0] = false; });
+        landField.addValueChangeListener(e -> {
+            if (e.isFromClient())
+                landAutoFilled[0] = false;
+        });
         landField.getStyle().set("width", "50%").set("min-width", "200px");
         HorizontalLayout rowLand = new HorizontalLayout(landField);
         rowLand.setWidthFull();
@@ -306,8 +335,7 @@ public class RegistrateView extends VerticalLayout {
                 personalHeading,
                 rowVorNach, rowTelGeb, rowNat,
                 standortHeading,
-                rowStrasseHaus, rowPlzOrt, rowLand
-        );
+                rowStrasseHaus, rowPlzOrt, rowLand);
 
         // ── Step 3: Code confirmation layout ──────────────────────────────
         VerticalLayout codeLayout = new VerticalLayout();
@@ -327,6 +355,7 @@ public class RegistrateView extends VerticalLayout {
         TextField codeField = pillTextField("Bestätigungscode");
 
         Button confirmBtn = new Button("Code bestätigen");
+        confirmBtn.addClickShortcut(Key.ENTER);
         confirmBtn.setWidthFull();
         confirmBtn.getStyle()
                 .set("background", BROWN_BTN)
@@ -364,6 +393,7 @@ public class RegistrateView extends VerticalLayout {
 
         // ── Register button ────────────────────────────────────────────────
         Button registerBtn = new Button("Weiter");
+        registerBtn.addClickShortcut(Key.ENTER);
         registerBtn.setWidthFull();
         registerBtn.getStyle()
                 .set("background", BROWN_BTN)
@@ -379,14 +409,17 @@ public class RegistrateView extends VerticalLayout {
         registerBtn.addClickListener(e -> {
             if ("Weiter".equals(registerBtn.getText())) {
                 boolean valid = true;
-                if (emailField.getValue().isBlank() || !emailField.getValue().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+                if (emailField.getValue().isBlank()
+                        || !emailField.getValue().matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
                     emailField.setInvalid(true);
                     emailField.setErrorMessage("Gültige E-Mail eingeben");
                     valid = false;
                 }
-                if (passwortField.getValue().length() < 8) {
+                PasswordPolicyService.PasswordPolicyResult passwordPolicy = passwordPolicyService
+                        .evaluate(passwortField.getValue());
+                if (!passwordPolicy.valid()) {
                     passwortField.setInvalid(true);
-                    passwortField.setErrorMessage("Mindestens 8 Zeichen");
+                    passwortField.setErrorMessage(PASSWORD_CRITERIA_ERROR_MESSAGE);
                     valid = false;
                 }
                 if (!passwortConfirmField.getValue().equals(passwortField.getValue())) {
@@ -394,15 +427,40 @@ public class RegistrateView extends VerticalLayout {
                     passwortConfirmField.setErrorMessage("Passwörter stimmen nicht überein");
                     valid = false;
                 }
-                if (valid) datenTab.click();
+                if (valid)
+                    datenTab.click();
             } else {
                 boolean valid = true;
-                if (vornameField.getValue().isBlank()) { vornameField.setInvalid(true); vornameField.setErrorMessage("Pflichtfeld"); valid = false; }
-                if (nachnameField.getValue().isBlank()) { nachnameField.setInvalid(true); nachnameField.setErrorMessage("Pflichtfeld"); valid = false; }
-                if (strasseField.getValue().isBlank()) { strasseField.setInvalid(true); strasseField.setErrorMessage("Pflichtfeld"); valid = false; }
-                if (hausnummerField.getValue().isBlank()) { hausnummerField.setInvalid(true); hausnummerField.setErrorMessage("Pflichtfeld"); valid = false; }
-                if (postalCodeField.getValue().isBlank()) { postalCodeField.setInvalid(true); postalCodeField.setErrorMessage("Pflichtfeld"); valid = false; }
-                if (cityField.getValue().isBlank()) { cityField.setInvalid(true); cityField.setErrorMessage("Pflichtfeld"); valid = false; }
+                if (vornameField.getValue().isBlank()) {
+                    vornameField.setInvalid(true);
+                    vornameField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                }
+                if (nachnameField.getValue().isBlank()) {
+                    nachnameField.setInvalid(true);
+                    nachnameField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                }
+                if (strasseField.getValue().isBlank()) {
+                    strasseField.setInvalid(true);
+                    strasseField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                }
+                if (hausnummerField.getValue().isBlank()) {
+                    hausnummerField.setInvalid(true);
+                    hausnummerField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                }
+                if (postalCodeField.getValue().isBlank()) {
+                    postalCodeField.setInvalid(true);
+                    postalCodeField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                }
+                if (cityField.getValue().isBlank()) {
+                    cityField.setInvalid(true);
+                    cityField.setErrorMessage("Pflichtfeld");
+                    valid = false;
+                }
                 if (geburtstagsField.getValue() == null) {
                     geburtstagsField.setInvalid(true);
                     geburtstagsField.setErrorMessage("Pflichtfeld");
@@ -412,7 +470,8 @@ public class RegistrateView extends VerticalLayout {
                     geburtstagsField.setErrorMessage("Mindestalter 18 Jahre");
                     valid = false;
                 }
-                if (!valid) return;
+                if (!valid)
+                    return;
                 clearMessages();
                 currentRegistrationEmail = emailField.getValue();
                 UserAuthResult result = userService.startRegistration(new UserRegistrationRequest(
@@ -464,12 +523,9 @@ public class RegistrateView extends VerticalLayout {
                 kontoLayout,
                 datenLayout,
                 codeLayout,
-                registerBtn, loginBtn
-        );
+                registerBtn, loginBtn);
         return form;
     }
-
-
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -485,14 +541,16 @@ public class RegistrateView extends VerticalLayout {
     }
 
     private HorizontalLayout twoColRow(com.vaadin.flow.component.Component left,
-                                        com.vaadin.flow.component.Component right) {
+            com.vaadin.flow.component.Component right) {
         HorizontalLayout row = new HorizontalLayout(left, right);
         row.setWidthFull();
         row.setSpacing(true);
         row.getStyle().set("gap", "12px");
         // Make both children fill equal space
-        if (left instanceof com.vaadin.flow.component.HasSize hs1) hs1.setWidth("50%");
-        if (right instanceof com.vaadin.flow.component.HasSize hs2) hs2.setWidth("50%");
+        if (left instanceof com.vaadin.flow.component.HasSize hs1)
+            hs1.setWidth("50%");
+        if (right instanceof com.vaadin.flow.component.HasSize hs2)
+            hs2.setWidth("50%");
         return row;
     }
 
@@ -548,6 +606,29 @@ public class RegistrateView extends VerticalLayout {
         pf.getElement().getStyle()
                 .set("--lumo-contrast-10pct", INPUT_BG)
                 .set("--lumo-border-radius-m", "28px");
+        skipRevealButtonInTabOrder(pf);
+    }
+
+    private void skipRevealButtonInTabOrder(PasswordField pf) {
+        pf.getElement().executeJs("""
+                const field = this;
+                const apply = () => {
+                  const revealButton = field.querySelector('[slot="reveal"]');
+                  if (revealButton && revealButton.getAttribute('tabindex') !== '-1') {
+                    revealButton.setAttribute('tabindex', '-1');
+                  }
+                };
+                customElements.whenDefined('vaadin-password-field').then(() => {
+                  requestAnimationFrame(apply);
+                  setTimeout(apply, 0);
+                });
+                new MutationObserver(apply).observe(field, {
+                  attributes: true,
+                  attributeFilter: ['tabindex'],
+                  childList: true,
+                  subtree: true
+                });
+                """);
     }
 
     private void styleDateField(com.vaadin.flow.dom.Element el) {
@@ -558,6 +639,145 @@ public class RegistrateView extends VerticalLayout {
                 .set("--vaadin-input-field-background", INPUT_BG)
                 .set("--vaadin-input-field-border-radius", "28px")
                 .set("text-align", "center");
+    }
+
+    private VerticalLayout passwordCriteriaBox(PasswordField passwordField) {
+        Span criteriaLabel = new Span("Passwortanforderungen");
+        criteriaLabel.getStyle()
+                .set("color", MUTED)
+                .set("font-size", "11px")
+                .set("font-weight", "800")
+                .set("letter-spacing", "0.2px")
+                .set("text-transform", "uppercase");
+
+        Span lengthCriterion = passwordCriterion("Mindestens 14 Zeichen");
+        Span uppercaseCriterion = passwordCriterion("Großbuchstabe");
+        Span lowercaseCriterion = passwordCriterion("Kleinbuchstabe");
+        Span specialCriterion = passwordCriterion("Sonderzeichen");
+        Span digitCriterion = passwordCriterion("Zahl");
+        Span noForbiddenTermCriterion = passwordCriterion("Keine schwachen Wörter");
+        Span noRepeatedCharacterCriterion = passwordCriterion("Keine 3 gleichen Zeichen");
+        Span noFourDigitNumberCriterion = passwordCriterion("Keine 4-stellige Zahl");
+        Span noNumericSequenceCriterion = passwordCriterion("Keine Zahlenfolge");
+
+        VerticalLayout leftCriteria = passwordCriteriaColumn(
+                lengthCriterion,
+                uppercaseCriterion,
+                lowercaseCriterion,
+                specialCriterion,
+                digitCriterion);
+        VerticalLayout rightCriteria = passwordCriteriaColumn(
+                noForbiddenTermCriterion,
+                noRepeatedCharacterCriterion,
+                noFourDigitNumberCriterion,
+                noNumericSequenceCriterion);
+
+        HorizontalLayout criteriaColumns = new HorizontalLayout(leftCriteria, rightCriteria);
+        criteriaColumns.setWidthFull();
+        criteriaColumns.setSpacing(false);
+        criteriaColumns.getStyle()
+                .set("align-items", "flex-start")
+                .set("display", "flex")
+                .set("gap", "12px")
+                .set("flex-wrap", "wrap");
+
+        VerticalLayout criteria = new VerticalLayout(criteriaLabel, criteriaColumns);
+        criteria.setPadding(false);
+        criteria.setSpacing(false);
+        criteria.setWidthFull();
+        criteria.getStyle()
+                .set("background", "#fbf5ec")
+                .set("border", "1px solid #eadac8")
+                .set("border-radius", "18px")
+                .set("box-sizing", "border-box")
+                .set("gap", "6px")
+                .set("margin", "4px 0 0 0")
+                .set("padding", "10px 12px");
+
+        updatePasswordCriteria(
+                "",
+                lengthCriterion,
+                uppercaseCriterion,
+                lowercaseCriterion,
+                specialCriterion,
+                digitCriterion,
+                noForbiddenTermCriterion,
+                noRepeatedCharacterCriterion,
+                noFourDigitNumberCriterion,
+                noNumericSequenceCriterion);
+        passwordField.addValueChangeListener(e -> updatePasswordCriteria(
+                e.getValue(),
+                lengthCriterion,
+                uppercaseCriterion,
+                lowercaseCriterion,
+                specialCriterion,
+                digitCriterion,
+                noForbiddenTermCriterion,
+                noRepeatedCharacterCriterion,
+                noFourDigitNumberCriterion,
+                noNumericSequenceCriterion));
+
+        return criteria;
+    }
+
+    private VerticalLayout passwordCriteriaColumn(Span... criteria) {
+        VerticalLayout column = new VerticalLayout(criteria);
+        column.setPadding(false);
+        column.setSpacing(false);
+        column.setWidth("calc(50% - 6px)");
+        column.getStyle()
+                .set("gap", "6px")
+                .set("min-width", "220px");
+        return column;
+    }
+
+    private Span passwordCriterion(String label) {
+        Span criterion = new Span(label);
+        criterion.getStyle()
+                .set("align-items", "center")
+                .set("border", "1px solid #eadac8")
+                .set("border-radius", "999px")
+                .set("box-sizing", "border-box")
+                .set("display", "inline-flex")
+                .set("font-size", "12px")
+                .set("gap", "6px")
+                .set("line-height", "1.25")
+                .set("font-weight", "700")
+                .set("min-height", "26px")
+                .set("padding", "5px 10px")
+                .set("width", "fit-content");
+        return criterion;
+    }
+
+    private void updatePasswordCriteria(
+            String password,
+            Span lengthCriterion,
+            Span uppercaseCriterion,
+            Span lowercaseCriterion,
+            Span specialCriterion,
+            Span digitCriterion,
+            Span noForbiddenTermCriterion,
+            Span noRepeatedCharacterCriterion,
+            Span noFourDigitNumberCriterion,
+            Span noNumericSequenceCriterion) {
+        PasswordPolicyService.PasswordPolicyResult result = passwordPolicyService.evaluate(password);
+        updatePasswordCriterion(lengthCriterion, "Mindestens 14 Zeichen", result.minimumLength());
+        updatePasswordCriterion(uppercaseCriterion, "Großbuchstabe", result.uppercase());
+        updatePasswordCriterion(lowercaseCriterion, "Kleinbuchstabe", result.lowercase());
+        updatePasswordCriterion(specialCriterion, "Sonderzeichen", result.specialCharacter());
+        updatePasswordCriterion(digitCriterion, "Zahl", result.digit());
+        updatePasswordCriterion(noForbiddenTermCriterion, "Keine schwachen Wörter", result.noForbiddenTerm());
+        updatePasswordCriterion(noRepeatedCharacterCriterion, "Keine 3 gleichen Zeichen", result.noRepeatedCharacter());
+        updatePasswordCriterion(noFourDigitNumberCriterion, "Keine 4-stellige Zahl", result.noFourDigitNumber());
+        updatePasswordCriterion(noNumericSequenceCriterion, "Keine Zahlenfolge", result.noNumericSequence());
+    }
+
+    private void updatePasswordCriterion(Span criterion, String label, boolean fulfilled) {
+        criterion.setText((fulfilled ? "✓ " : "✕ ") + label);
+        criterion.getStyle()
+                .set("background", fulfilled ? "#e8f5e5" : "#fff3ef")
+                .set("border-color", fulfilled ? "#b8d8b8" : "#f1b6a8")
+                .set("color", fulfilled ? SUCCESS : DANGER);
     }
 
     private void handleAuthResult(UserAuthResult result) {

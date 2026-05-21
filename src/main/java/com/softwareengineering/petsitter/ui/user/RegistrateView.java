@@ -39,6 +39,8 @@ public class RegistrateView extends VerticalLayout {
     private static final String DANGER    = "#c73e1d";
     private static final String SUCCESS   = "#3f7d42";
     private static final String MUTED     = "#8a7060";
+    private static final String PASSWORD_CRITERIA_ERROR_MESSAGE =
+            "Es sind noch nicht alle Passwortkriterien erfüllt.";
 
     private final UserService userService;
     private final PostalCodeService postalCodeService;
@@ -399,7 +401,7 @@ public class RegistrateView extends VerticalLayout {
                 PasswordPolicyService.PasswordPolicyResult passwordPolicy = passwordPolicyService.evaluate(passwortField.getValue());
                 if (!passwordPolicy.valid()) {
                     passwortField.setInvalid(true);
-                    passwortField.setErrorMessage(passwordPolicy.errorMessage());
+                    passwortField.setErrorMessage(PASSWORD_CRITERIA_ERROR_MESSAGE);
                     valid = false;
                 }
                 if (!passwortConfirmField.getValue().equals(passwortField.getValue())) {

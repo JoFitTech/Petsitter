@@ -4,7 +4,6 @@ import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Span;
@@ -22,7 +21,9 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +43,8 @@ public class FilterSearchBar extends Div {
     private static final Locale GERMAN = Locale.GERMANY;
     private static final DateTimeFormatter DAY_MONTH_FORMATTER =
             DateTimeFormatter.ofPattern("d. MMMM", GERMAN);
+    private static final DateTimeFormatter MONTH_YEAR_FORMATTER =
+            DateTimeFormatter.ofPattern("MMMM yyyy", GERMAN);
     private static final List<Integer> DISTANCE_VALUES = List.of(
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
             15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
@@ -60,9 +63,12 @@ public class FilterSearchBar extends Div {
     private final Function<String, Optional<String>> originPostalCodeValidator;
 
     private TextField originPostalCodeField;
-    private DatePicker fromDatePicker;
-    private DatePicker toDatePicker;
+    private RadioButtonGroup<OfferDateFilterMode> dateModeGroup;
+    private HorizontalLayout dateFlexDaysRow;
+    private Div dateCalendar;
+    private Span dateRangeStatus;
     private Span distancePostalCodeValue;
+    private YearMonth displayedMonth;
     private LocalDate selectedFrom;
     private LocalDate selectedTo;
     private OfferDateFilterMode selectedDateFilterMode;
@@ -70,6 +76,7 @@ public class FilterSearchBar extends Div {
     private BigDecimal selectedEarnings;
     private int selectedDistance;
     private String selectedOriginPostalCode;
+    private boolean selectingRangeEnd;
 
     public FilterSearchBar(EarningsMode earningsMode, SearchCriteria initialCriteria,
             Function<String, Optional<String>> originPostalCodeValidator,
@@ -122,7 +129,8 @@ public class FilterSearchBar extends Div {
                 .set("margin-left", "16px")
                 .set("flex-shrink", "0");
 
-        whenPopover = popoverFor(whenField.component(), buildDatePopover(), "460px");
+        whenPopover = popoverFor(whenField.component(), buildDatePopover(), "500px",
+                PopoverPosition.TOP_START);
         earningsPopover = popoverFor(earningsField.component(), buildEarningsPopover(), "340px");
         distancePopover = popoverFor(distanceField.component(), buildDistancePopover(), "340px");
 
@@ -290,9 +298,13 @@ public class FilterSearchBar extends Div {
     }
 
     private Popover popoverFor(Component target, Component content, String width) {
+        return popoverFor(target, content, width, PopoverPosition.BOTTOM);
+    }
+
+    private Popover popoverFor(Component target, Component content, String width, PopoverPosition position) {
         Popover popover = new Popover();
         popover.setTarget(target);
-        popover.setPosition(PopoverPosition.BOTTOM);
+        popover.setPosition(position);
         popover.setCloseOnEsc(true);
         popover.setCloseOnOutsideClick(true);
         popover.setOpenOnClick(false);
@@ -328,44 +340,40 @@ public class FilterSearchBar extends Div {
 
     private Component buildDatePopover() {
         VerticalLayout content = popoverContent();
-        fromDatePicker = styledDatePicker("Von", selectedFrom);
-        toDatePicker = styledDatePicker("Bis", selectedTo);
-        toDatePicker.setMin(minimumToDate());
-        RadioButtonGroup<OfferDateFilterMode> dateModeGroup = dateModeGroup();
-        RadioButtonGroup<Integer> flexDaysGroup = flexDaysGroup();
-        flexDaysGroup.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
+        content.getStyle()
+                .set("gap", "5px")
+                .set("min-height", "370px")
+                .set("padding", "12px 16px");
+        displayedMonth = initialDisplayedMonth();
+        dateRangeStatus = new Span();
+        dateRangeStatus.getStyle()
+                .set("background", "#fdf6ec")
+                .set("border", "1px solid " + BORDER)
+                .set("border-radius", "18px")
+                .set("box-sizing", "border-box")
+                .set("color", DARK)
+                .set("font-size", "12px")
+                .set("font-weight", "800")
+                .set("padding", "4px 11px")
+                .set("width", "100%");
+        dateCalendar = new Div();
+        dateCalendar.setWidthFull();
+        dateModeGroup = dateModeGroup();
+        dateFlexDaysRow = flexDaysControl();
+        dateFlexDaysRow.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
 
-        fromDatePicker.addValueChangeListener(event -> {
-            selectedFrom = event.getValue();
-            toDatePicker.setMin(minimumToDate());
-            updateDateFilter();
-        });
-        toDatePicker.addValueChangeListener(event -> {
-            selectedTo = event.getValue();
-            updateDateFilter();
-        });
         dateModeGroup.addValueChangeListener(event -> {
             if (event.getValue() == null) {
                 return;
             }
             selectedDateFilterMode = event.getValue();
-            flexDaysGroup.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
-            updateDateFilter();
-        });
-        flexDaysGroup.addValueChangeListener(event -> {
-            if (event.getValue() == null) {
-                return;
-            }
-            selectedDateFlexDays = event.getValue();
+            dateFlexDaysRow.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
             updateDateFilter();
         });
 
-        HorizontalLayout row = new HorizontalLayout(fromDatePicker, toDatePicker);
-        row.setWidthFull();
-        row.setAlignItems(FlexComponent.Alignment.START);
-        row.getStyle().set("gap", "12px");
+        updateDateFilter();
 
-        content.add(popoverTitle("Zeitraum"), dateModeGroup, row, flexDaysGroup);
+        content.add(popoverTitle("Zeitraum"), dateModeGroup, dateFlexDaysRow, dateRangeStatus, dateCalendar);
         return content;
     }
 
@@ -382,17 +390,64 @@ public class FilterSearchBar extends Div {
         return group;
     }
 
-    private RadioButtonGroup<Integer> flexDaysGroup() {
-        RadioButtonGroup<Integer> group = new RadioButtonGroup<>();
-        group.setLabel("Toleranz");
-        group.setItems(DATE_FLEX_VALUES);
-        group.setValue(selectedDateFlexDays);
-        group.setItemLabelGenerator(days -> "+/- " + days + (days == 1 ? " Tag" : " Tage"));
-        group.getStyle()
-                .set("font-size", "13px")
-                .set("font-weight", "700")
-                .set("color", DARK);
-        return group;
+    private HorizontalLayout flexDaysControl() {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setPadding(false);
+        row.setSpacing(false);
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.getStyle()
+                .set("gap", "5px")
+                .set("flex-wrap", "wrap")
+                .set("width", "100%");
+
+        Span label = new Span("Toleranz");
+        label.getStyle()
+                .set("color", LABEL)
+                .set("font-size", "11px")
+                .set("font-weight", "900")
+                .set("margin-right", "2px");
+        row.add(label);
+
+        DATE_FLEX_VALUES.forEach(days -> row.add(flexDaysButton(days)));
+        return row;
+    }
+
+    private Button flexDaysButton(int days) {
+        Button button = new Button(days == 0 ? "0" : "+/- " + days);
+        button.setAriaLabel(days + (days == 1 ? " Tag Toleranz" : " Tage Toleranz"));
+        button.getStyle()
+                .set("background", days == selectedDateFlexDays ? BROWN : "#fdf6ec")
+                .set("border", "1px solid " + (days == selectedDateFlexDays ? BROWN : BORDER))
+                .set("border-radius", "999px")
+                .set("box-shadow", "none")
+                .set("color", days == selectedDateFlexDays ? "white" : BROWN)
+                .set("cursor", "pointer")
+                .set("font-size", "12px")
+                .set("font-weight", "900")
+                .set("height", "28px")
+                .set("min-width", "0")
+                .set("padding", "0 10px");
+        button.addClickListener(event -> {
+            selectedDateFlexDays = days;
+            refreshFlexDaysControl();
+            updateDateFilter();
+        });
+        return button;
+    }
+
+    private void refreshFlexDaysControl() {
+        if (dateFlexDaysRow == null) {
+            return;
+        }
+        dateFlexDaysRow.removeAll();
+        Span label = new Span("Toleranz");
+        label.getStyle()
+                .set("color", LABEL)
+                .set("font-size", "11px")
+                .set("font-weight", "900")
+                .set("margin-right", "2px");
+        dateFlexDaysRow.add(label);
+        DATE_FLEX_VALUES.forEach(days -> dateFlexDaysRow.add(flexDaysButton(days)));
     }
 
     private String dateModeLabel(OfferDateFilterMode mode) {
@@ -403,37 +458,278 @@ public class FilterSearchBar extends Div {
         };
     }
 
-    private DatePicker styledDatePicker(String label, LocalDate value) {
-        DatePicker picker = new DatePicker(label, value);
-        picker.setLocale(GERMAN);
-        picker.setI18n(germanDatePickerI18n());
-        picker.setMin(LocalDate.now());
-        picker.setClearButtonVisible(true);
-        picker.setWidthFull();
-        picker.getStyle()
-                .set("font-family", "Inter, Arial, sans-serif")
-                .set("font-weight", "700");
-        return picker;
-    }
-
     private void updateDateFilter() {
+        boolean showDateControls = selectedDateFilterMode != OfferDateFilterMode.ANY;
+        dateRangeStatus.setVisible(showDateControls);
+        dateCalendar.setVisible(showDateControls);
+        if (dateFlexDaysRow != null) {
+            dateFlexDaysRow.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
+        }
+        if (!showDateControls) {
+            whenValue.setText(formatDateRange());
+            dateCalendar.removeAll();
+            return;
+        }
+
         boolean invalidFrom = selectedDateFilterMode != OfferDateFilterMode.ANY && isPastDate(selectedFrom);
         boolean invalidTo = selectedDateFilterMode != OfferDateFilterMode.ANY && isPastDate(selectedTo);
         boolean invalidOrder = selectedDateFilterMode != OfferDateFilterMode.ANY && hasInvalidDateOrder();
 
-        fromDatePicker.setErrorMessage("Von darf nicht in der Vergangenheit liegen.");
-        fromDatePicker.setInvalid(invalidFrom);
-        toDatePicker.setErrorMessage(invalidTo
-                ? "Bis darf nicht in der Vergangenheit liegen."
-                : "Bis darf nicht vor Von liegen.");
-        toDatePicker.setInvalid(invalidTo || invalidOrder);
-
         if (invalidFrom || invalidTo || invalidOrder) {
+            dateRangeStatus.setText(invalidFrom || invalidTo
+                    ? "Der Zeitraum darf nicht in der Vergangenheit liegen."
+                    : "Bis darf nicht vor Von liegen.");
+            dateRangeStatus.getStyle()
+                    .set("background", "#fff3f0")
+                    .set("border", "1px solid #efb5a8")
+                    .set("color", "#8a2f1f");
+            refreshDateCalendar();
             return;
         }
-        fromDatePicker.setInvalid(false);
-        toDatePicker.setInvalid(false);
+        dateRangeStatus.setText(selectedDateFilterMode == OfferDateFilterMode.ANY
+                ? "Zeitlich flexibel"
+                : formatPlainDateRange());
+        dateRangeStatus.getStyle()
+                .set("background", "#fdf6ec")
+                .set("border", "1px solid " + BORDER)
+                .set("color", DARK);
         whenValue.setText(formatDateRange());
+        refreshDateCalendar();
+    }
+
+    private YearMonth initialDisplayedMonth() {
+        LocalDate today = LocalDate.now();
+        if (selectedFrom != null && !selectedFrom.isBefore(today)) {
+            return YearMonth.from(selectedFrom);
+        }
+        if (selectedTo != null && !selectedTo.isBefore(today)) {
+            return YearMonth.from(selectedTo);
+        }
+        return YearMonth.from(today);
+    }
+
+    private void refreshDateCalendar() {
+        if (dateCalendar == null) {
+            return;
+        }
+        dateCalendar.removeAll();
+        dateCalendar.add(calendarHeader(), weekdayHeader(), dayGrid());
+    }
+
+    private Component calendarHeader() {
+        Button previousMonth = calendarNavButton(VaadinIcon.CHEVRON_LEFT, "Vorheriger Monat");
+        previousMonth.setEnabled(displayedMonth.isAfter(YearMonth.from(LocalDate.now())));
+        previousMonth.addClickListener(event -> {
+            displayedMonth = displayedMonth.minusMonths(1);
+            refreshDateCalendar();
+        });
+
+        Button nextMonth = calendarNavButton(VaadinIcon.CHEVRON_RIGHT, "Nächster Monat");
+        nextMonth.addClickListener(event -> {
+            displayedMonth = displayedMonth.plusMonths(1);
+            refreshDateCalendar();
+        });
+
+        Span monthLabel = new Span(displayedMonth.atDay(1).format(MONTH_YEAR_FORMATTER));
+        monthLabel.getStyle()
+                .set("color", DARK)
+                .set("font-size", "15px")
+                .set("font-weight", "900")
+                .set("text-transform", "capitalize");
+
+        HorizontalLayout header = new HorizontalLayout(previousMonth, monthLabel, nextMonth);
+        header.setWidthFull();
+        header.setPadding(false);
+        header.setSpacing(false);
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        return header;
+    }
+
+    private Button calendarNavButton(VaadinIcon icon, String ariaLabel) {
+        Button button = new Button(new Icon(icon));
+        button.setAriaLabel(ariaLabel);
+        button.getStyle()
+                .set("background", "#fdf6ec")
+                .set("border", "1px solid " + BORDER)
+                .set("border-radius", "50%")
+                .set("box-shadow", "none")
+                .set("color", BROWN)
+                .set("cursor", "pointer")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("padding", "0")
+                .set("width", "28px");
+        return button;
+    }
+
+    private Component weekdayHeader() {
+        Div weekdays = calendarGrid();
+        List<String> labels = List.of("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So");
+        for (String label : labels) {
+            Span day = new Span(label);
+            day.getStyle()
+                    .set("color", LABEL)
+                    .set("font-size", "11px")
+                    .set("font-weight", "900")
+                    .set("line-height", "20px")
+                    .set("text-align", "center");
+            weekdays.add(day);
+        }
+        return weekdays;
+    }
+
+    private Component dayGrid() {
+        Div grid = calendarGrid();
+        LocalDate firstDay = displayedMonth.atDay(1);
+        int leadingBlankDays = firstDay.getDayOfWeek().getValue() - DayOfWeek.MONDAY.getValue();
+        for (int i = 0; i < leadingBlankDays; i++) {
+            grid.add(blankCalendarCell());
+        }
+        for (int day = 1; day <= displayedMonth.lengthOfMonth(); day++) {
+            grid.add(calendarDayButton(displayedMonth.atDay(day)));
+        }
+        return grid;
+    }
+
+    private Div calendarGrid() {
+        Div grid = new Div();
+        grid.getStyle()
+                .set("display", "grid")
+                .set("grid-template-columns", "repeat(7, minmax(0, 1fr))")
+                .set("gap", "0")
+                .set("width", "100%");
+        return grid;
+    }
+
+    private Component blankCalendarCell() {
+        Div blank = new Div();
+        blank.getStyle().set("height", "30px");
+        return blank;
+    }
+
+    private Component calendarDayButton(LocalDate date) {
+        Div cell = new Div();
+        Button button = new Button(String.valueOf(date.getDayOfMonth()));
+        boolean disabled = date.isBefore(LocalDate.now());
+        boolean selectedStart = date.equals(selectedFrom);
+        boolean selectedEnd = date.equals(selectedTo);
+        boolean insideRange = isInsideSelectedRange(date);
+        boolean hasCompleteRange = hasCompleteSelectedRange();
+
+        cell.getStyle()
+                .set("align-items", "center")
+                .set("box-sizing", "border-box")
+                .set("display", "flex")
+                .set("height", "30px")
+                .set("justify-content", "center")
+                .set("width", "100%");
+        applyRangeCellBackground(cell, selectedStart, selectedEnd, insideRange, hasCompleteRange);
+
+        button.setEnabled(!disabled);
+        button.setAriaLabel(date.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        button.getStyle()
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("font-size", "13px")
+                .set("font-weight", "800")
+                .set("height", "30px")
+                .set("margin", "0")
+                .set("min-width", "0")
+                .set("padding", "0")
+                .set("width", "100%");
+
+        if (disabled) {
+            button.getStyle()
+                    .set("background", "transparent")
+                    .set("color", "#c8b9aa")
+                    .set("cursor", "not-allowed");
+            cell.add(button);
+            return cell;
+        }
+
+        button.getStyle()
+                .set("background", "transparent")
+                .set("color", DARK)
+                .set("cursor", "pointer");
+        if (date.equals(LocalDate.now())) {
+            button.getStyle().set("box-shadow", "inset 0 0 0 1px " + BROWN);
+        }
+        if (insideRange) {
+            button.getStyle()
+                    .set("background", "transparent")
+                    .set("border-radius", "0")
+                    .set("color", DARK);
+        }
+        if (selectedStart || selectedEnd) {
+            button.getStyle()
+                    .set("background", BROWN)
+                    .set("border-radius", "999px")
+                    .set("box-shadow", "none")
+                    .set("color", "white");
+        }
+
+        button.addClickListener(event -> selectCalendarDate(date));
+        cell.add(button);
+        return cell;
+    }
+
+    private void applyRangeCellBackground(Div cell, boolean selectedStart, boolean selectedEnd,
+            boolean insideRange, boolean hasCompleteRange) {
+        if (!hasCompleteRange) {
+            cell.getStyle().set("background", "transparent");
+            return;
+        }
+        String rangeColor = "#f1dfcf";
+        if (insideRange) {
+            cell.getStyle().set("background", rangeColor);
+        } else if (selectedStart && !selectedEnd) {
+            cell.getStyle().set("background",
+                    "linear-gradient(to right, transparent 0 50%, " + rangeColor + " 50% 100%)");
+        } else if (selectedEnd && !selectedStart) {
+            cell.getStyle().set("background",
+                    "linear-gradient(to right, " + rangeColor + " 0 50%, transparent 50% 100%)");
+        } else {
+            cell.getStyle().set("background", "transparent");
+        }
+    }
+
+    private void selectCalendarDate(LocalDate date) {
+        if (date.isBefore(LocalDate.now())) {
+            return;
+        }
+        boolean switchFromFlexibleMode = selectedDateFilterMode == OfferDateFilterMode.ANY;
+        if (selectedFrom == null || selectedTo != null || !selectingRangeEnd) {
+            selectedFrom = date;
+            selectedTo = null;
+            selectingRangeEnd = true;
+        } else if (date.isBefore(selectedFrom)) {
+            selectedFrom = date;
+            selectedTo = null;
+            selectingRangeEnd = true;
+        } else {
+            selectedTo = date;
+            selectingRangeEnd = false;
+        }
+        displayedMonth = YearMonth.from(date);
+        if (switchFromFlexibleMode && dateModeGroup != null) {
+            dateModeGroup.setValue(OfferDateFilterMode.OVERLAP);
+            return;
+        }
+        updateDateFilter();
+    }
+
+    private boolean isInsideSelectedRange(LocalDate date) {
+        return selectedFrom != null
+                && selectedTo != null
+                && date.isAfter(selectedFrom)
+                && date.isBefore(selectedTo);
+    }
+
+    private boolean hasCompleteSelectedRange() {
+        return selectedFrom != null
+                && selectedTo != null
+                && !selectedFrom.equals(selectedTo);
     }
 
     private Component buildEarningsPopover() {
@@ -665,14 +961,6 @@ public class FilterSearchBar extends Div {
         return date != null && date.isBefore(LocalDate.now());
     }
 
-    private LocalDate minimumToDate() {
-        LocalDate today = LocalDate.now();
-        if (selectedFrom != null && selectedFrom.isAfter(today)) {
-            return selectedFrom;
-        }
-        return today;
-    }
-
     private BigDecimal parseEuroAmount(String value) {
         String normalized = value == null ? "" : value
                 .trim()
@@ -702,20 +990,6 @@ public class FilterSearchBar extends Div {
             return "beliebig";
         }
         return earningsMode.valuePrefix() + " " + formatEuroAmount(selectedEarnings);
-    }
-
-    private DatePicker.DatePickerI18n germanDatePickerI18n() {
-        return new DatePicker.DatePickerI18n()
-                .setMonthNames(List.of(
-                        "Januar", "Februar", "März", "April", "Mai", "Juni",
-                        "Juli", "August", "September", "Oktober", "November", "Dezember"))
-                .setWeekdays(List.of(
-                        "Sonntag", "Montag", "Dienstag", "Mittwoch",
-                        "Donnerstag", "Freitag", "Samstag"))
-                .setWeekdaysShort(List.of("So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"))
-                .setFirstDayOfWeek(1)
-                .setToday("Heute")
-                .setCancel("Abbrechen");
     }
 
     private record FilterPill(Div component, Span value) {

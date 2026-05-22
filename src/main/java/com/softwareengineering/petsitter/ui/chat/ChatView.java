@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.chat;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
+import com.softwareengineering.petsitter.chat.dto.ChatRefreshEventDto;
 import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
@@ -90,6 +91,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private final Map<String, Boolean> typingByConversationId = new HashMap<>();
     private Registration eventBusRegistration;
     private Registration typingRegistration;
+    private Registration refreshRegistration;
     private final ScheduledExecutorService typingScheduler = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> stopTypingFuture;
 
@@ -652,6 +654,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                     bookingService.acceptRequest(reqId, currentUserId);
                     Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
                     n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    eventBus.publishRefresh(new ChatRefreshEventDto(activeConversationId, currentUserId, activeRecipientId));
                     selectConversation(activeConversationId);
                 } catch (Exception ex) {
                     Notification.show("Fehler: " + ex.getMessage());
@@ -662,6 +665,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             Button denyBtn = new Button("Ablehnen", e -> {
                 try {
                     requestService.denyRequest(reqId, currentUserId);
+                    eventBus.publishRefresh(new ChatRefreshEventDto(activeConversationId, currentUserId, activeRecipientId));
                     selectConversation(activeConversationId);
                 } catch (Exception ex) {
                     Notification.show("Fehler: " + ex.getMessage());
@@ -828,6 +832,19 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                 });
             }
         });
+
+        this.refreshRegistration = eventBus.registerRefresh(currentUserId, event -> {
+            UI ui = getUI().orElse(null);
+            if (ui != null) {
+                ui.access(() -> {
+                    if (event.conversationId().equals(activeConversationId)) {
+                        selectConversation(activeConversationId);
+                    } else {
+                        refreshConversationList();
+                    }
+                });
+            }
+        });
     }
 
     private void handleTyping() {
@@ -875,6 +892,9 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         }
         if (typingRegistration != null) {
             typingRegistration.remove();
+        }
+        if (refreshRegistration != null) {
+            refreshRegistration.remove();
         }
         if (stopTypingFuture != null) {
             stopTypingFuture.cancel(true);

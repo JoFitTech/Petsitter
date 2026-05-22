@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.chat.service;
 
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
+import com.softwareengineering.petsitter.chat.dto.ChatRefreshEventDto;
 import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -20,5 +21,9 @@ public interface ChatUiEventBus {
     Registration registerTyping(UUID userId, Consumer<ChatTypingEventDto> listener);
 
     void publishTyping(ChatTypingEventDto event);
+
+    Registration registerRefresh(UUID userId, Consumer<ChatRefreshEventDto> listener);
+
+    void publishRefresh(ChatRefreshEventDto event);
 }
 

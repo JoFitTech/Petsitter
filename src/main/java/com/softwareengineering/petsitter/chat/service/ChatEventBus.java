@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.chat.service;
 
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
+import com.softwareengineering.petsitter.chat.dto.ChatRefreshEventDto;
 import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,7 @@ public class ChatEventBus implements ChatUiEventBus {
      */
     private final Map<UUID, List<Consumer<ChatMessageDto>>> listenersByUserId = new ConcurrentHashMap<>();
     private final Map<UUID, List<Consumer<ChatTypingEventDto>>> typingListenersByUserId = new ConcurrentHashMap<>();
+    private final Map<UUID, List<Consumer<ChatRefreshEventDto>>> refreshListenersByUserId = new ConcurrentHashMap<>();
 
     /**
      * Registriert einen Listener für einen User.
@@ -105,6 +107,30 @@ public class ChatEventBus implements ChatUiEventBus {
                 listener.accept(event);
             } catch (Exception e) {
                 log.error("Error notifying typing listener", e);
+            }
+        });
+    }
+
+    public Registration registerRefresh(UUID userId, Consumer<ChatRefreshEventDto> listener) {
+        List<Consumer<ChatRefreshEventDto>> userListeners = refreshListenersByUserId
+                .computeIfAbsent(userId, ignored -> new CopyOnWriteArrayList<>());
+        userListeners.add(listener);
+        return () -> {
+            List<Consumer<ChatRefreshEventDto>> listeners = refreshListenersByUserId.get(userId);
+            if (listeners != null) {
+                listeners.remove(listener);
+            }
+        };
+    }
+
+    public void publishRefresh(ChatRefreshEventDto event) {
+        List<Consumer<ChatRefreshEventDto>> listeners = refreshListenersByUserId
+                .getOrDefault(event.recipientId(), List.of());
+        listeners.forEach(listener -> {
+            try {
+                listener.accept(event);
+            } catch (Exception e) {
+                log.error("Error notifying refresh listener", e);
             }
         });
     }

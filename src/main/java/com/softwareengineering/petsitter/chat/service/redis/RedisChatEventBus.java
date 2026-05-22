@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.chat.service.redis;
 
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
+import com.softwareengineering.petsitter.chat.dto.ChatRefreshEventDto;
 import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import com.softwareengineering.petsitter.chat.service.ChatUiEventBus;
 import com.softwareengineering.petsitter.chat.service.Registration;
@@ -32,6 +33,16 @@ public class RedisChatEventBus implements ChatUiEventBus {
 
     @Override
     public void publishTyping(ChatTypingEventDto event) {
+        throw new UnsupportedOperationException("RedisChatEventBus ist als Skeleton angelegt und noch nicht aktiv.");
+    }
+
+    @Override
+    public Registration registerRefresh(UUID userId, Consumer<ChatRefreshEventDto> listener) {
+        throw new UnsupportedOperationException("RedisChatEventBus ist als Skeleton angelegt und noch nicht aktiv.");
+    }
+
+    @Override
+    public void publishRefresh(ChatRefreshEventDto event) {
         throw new UnsupportedOperationException("RedisChatEventBus ist als Skeleton angelegt und noch nicht aktiv.");
     }
 }

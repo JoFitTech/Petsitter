@@ -212,18 +212,15 @@ public class AddPetPopUp extends Dialog {
 
     private String displayType(PetDto pet) {
         if (pet.species() == PetSpecies.OTHER) {
-            return switch (pet.customSpecies() == null ? "" : pet.customSpecies()) {
-                case TYPE_FISH -> TYPE_FISH;
-                case TYPE_REPTILE -> TYPE_REPTILE;
-                case TYPE_RODENT -> TYPE_RODENT;
-                default -> TYPE_OTHER;
-            };
+            return TYPE_RODENT.equals(pet.customSpecies()) ? TYPE_RODENT : TYPE_OTHER;
         }
         return switch (pet.species()) {
             case DOG -> TYPE_DOG;
             case CAT -> TYPE_CAT;
             case BIRD -> TYPE_BIRD;
             case RABBIT -> TYPE_RABBIT;
+            case FISH -> TYPE_FISH;
+            case REPTILE -> TYPE_REPTILE;
             case OTHER -> TYPE_OTHER;
         };
     }
@@ -234,13 +231,15 @@ public class AddPetPopUp extends Dialog {
             case TYPE_CAT -> PetSpecies.CAT;
             case TYPE_BIRD -> PetSpecies.BIRD;
             case TYPE_RABBIT -> PetSpecies.RABBIT;
+            case TYPE_FISH -> PetSpecies.FISH;
+            case TYPE_REPTILE -> PetSpecies.REPTILE;
             default -> PetSpecies.OTHER;
         };
     }
 
     private String mapCustomSpecies(String selectedType, TextField customTypeField) {
         return switch (selectedType) {
-            case TYPE_FISH, TYPE_REPTILE, TYPE_RODENT -> selectedType;
+            case TYPE_RODENT -> selectedType;
             case TYPE_OTHER -> customTypeField.getValue().trim();
             default -> null;
         };

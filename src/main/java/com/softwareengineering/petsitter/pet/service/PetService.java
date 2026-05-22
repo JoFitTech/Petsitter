@@ -155,11 +155,13 @@ public class PetService {
 
     public static String speciesLabel(PetSpecies species) {
         return switch (species) {
-            case DOG    -> "Hund";
-            case CAT    -> "Katze";
-            case BIRD   -> "Vogel";
-            case RABBIT -> "Kaninchen";
-            case OTHER  -> "Sonstiges";
+            case DOG     -> "Hund";
+            case CAT     -> "Katze";
+            case BIRD    -> "Vogel";
+            case RABBIT  -> "Kaninchen";
+            case FISH    -> "Fisch";
+            case REPTILE -> "Reptil";
+            case OTHER   -> "Sonstiges";
         };
     }
 
@@ -276,21 +278,25 @@ public class PetService {
 
     private String singular(PetSpecies species) {
         return switch (species) {
-            case DOG -> "Hund";
-            case CAT -> "Katze";
-            case BIRD -> "Vogel";
-            case RABBIT -> "Kaninchen";
-            case OTHER -> "Haustier";
+            case DOG     -> "Hund";
+            case CAT     -> "Katze";
+            case BIRD    -> "Vogel";
+            case RABBIT  -> "Kaninchen";
+            case FISH    -> "Fisch";
+            case REPTILE -> "Reptil";
+            case OTHER   -> "Haustier";
         };
     }
 
     private String plural(PetSpecies species) {
         return switch (species) {
-            case DOG -> "Hunde";
-            case CAT -> "Katzen";
-            case BIRD -> "Vögel";
-            case RABBIT -> "Kaninchen";
-            case OTHER -> "Haustiere";
+            case DOG     -> "Hunde";
+            case CAT     -> "Katzen";
+            case BIRD    -> "Vögel";
+            case RABBIT  -> "Kaninchen";
+            case FISH    -> "Fische";
+            case REPTILE -> "Reptilien";
+            case OTHER   -> "Haustiere";
         };
     }
 }

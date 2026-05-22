@@ -5,6 +5,8 @@ public enum PetSpecies {
     CAT,
     BIRD,
     RABBIT,
+    FISH,
+    REPTILE,
     OTHER
 }
 

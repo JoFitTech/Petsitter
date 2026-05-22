@@ -425,6 +425,8 @@ public class OfferService {
             case CAT -> OfferAnimalType.CAT;
             case BIRD -> OfferAnimalType.BIRD;
             case RABBIT -> OfferAnimalType.SMALL_ANIMAL;
+            case FISH -> OfferAnimalType.FISH;
+            case REPTILE -> OfferAnimalType.REPTILE;
             case OTHER -> OfferAnimalType.OTHER;
         };
     }
@@ -614,15 +616,14 @@ public class OfferService {
     }
 
     private String petSpeciesLabel(Pet pet) {
-        if (pet.getSpecies() == PetSpecies.OTHER) {
-            return pet.getCustomSpecies() != null ? pet.getCustomSpecies() : "Sonstiges";
-        }
         return switch (pet.getSpecies()) {
-            case DOG    -> "Hund";
-            case CAT    -> "Katze";
-            case BIRD   -> "Vogel";
-            case RABBIT -> "Kaninchen";
-            default     -> pet.getSpecies().name();
+            case DOG     -> "Hund";
+            case CAT     -> "Katze";
+            case BIRD    -> "Vogel";
+            case RABBIT  -> "Kaninchen";
+            case FISH    -> "Fisch";
+            case REPTILE -> "Reptil";
+            case OTHER   -> pet.getCustomSpecies() != null ? pet.getCustomSpecies() : "Sonstiges";
         };
     }
 

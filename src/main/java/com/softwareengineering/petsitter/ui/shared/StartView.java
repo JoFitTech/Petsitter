@@ -8,6 +8,7 @@ import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -37,16 +38,18 @@ public class StartView extends VerticalLayout {
     private final RequestService requestService;
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
+    private final UserService userService;
 
     @Autowired
     public StartView(OfferService offerService, FavoriteService favoriteService,
                      RequestService requestService, ChatService chatService,
-                     AuthenticatedUser authenticatedUser) {
+                     AuthenticatedUser authenticatedUser, UserService userService) {
         this.offerService = offerService;
         this.favoriteService = favoriteService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
+        this.userService = userService;
         setWidthFull();
         setPadding(false);
         setSpacing(false);
@@ -293,7 +296,8 @@ public class StartView extends VerticalLayout {
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4, offerService, requestService, chatService, authenticatedUser).open();
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
+                offerService, requestService, chatService, authenticatedUser, userService).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

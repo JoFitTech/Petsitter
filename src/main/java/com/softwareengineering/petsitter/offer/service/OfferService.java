@@ -533,6 +533,16 @@ public class OfferService {
         return offer.getCreateUser() != null ? offer.getCreateUser().getCity() : null;
     }
 
+    private String creatorDisplayName(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getDisplayName() != null && !user.getDisplayName().isBlank()) {
+            return user.getDisplayName();
+        }
+        return user.getFirstName();
+    }
+
     private OfferCardDto toCardDto(Offer offer) {
         return toCardDto(offer, null);
     }
@@ -560,7 +570,9 @@ public class OfferService {
                 createUser != null ? createUser.getCity() : null,
                 distanceKm,
                 false,
-                offer.getOfferType()
+                offer.getOfferType(),
+                createUser != null ? createUser.getId() : null,
+                creatorDisplayName(createUser)
         );
     }
 

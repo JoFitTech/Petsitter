@@ -621,7 +621,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineAuftraege() {
         contentPanel.removeAll();
-        contentPanel.add(new MyOffers(offerService, requestService, chatService, bookingService, authenticatedUser));
+        contentPanel.add(new MyOffers(offerService, requestService, chatService, bookingService,
+                authenticatedUser, userService));
     }
 
     private void showMeineBuchungen() {
@@ -631,7 +632,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineFavoriten() {
         contentPanel.removeAll();
-        contentPanel.add(new MyFavoritesView(favoriteService, offerService, requestService, chatService, authenticatedUser));
+        contentPanel.add(new MyFavoritesView(favoriteService, offerService, requestService, chatService,
+                authenticatedUser, userService));
     }
 
     private void showPersAngaben() {

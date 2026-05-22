@@ -165,8 +165,20 @@ public class FavoriteService {
                 createUser != null ? createUser.getCity() : null,
                 null,
                 true,
-                offer.getOfferType()
+                offer.getOfferType(),
+                createUser != null ? createUser.getId() : null,
+                creatorDisplayName(createUser)
         );
+    }
+
+    private String creatorDisplayName(User user) {
+        if (user == null) {
+            return null;
+        }
+        if (user.getDisplayName() != null && !user.getDisplayName().isBlank()) {
+            return user.getDisplayName();
+        }
+        return user.getFirstName();
     }
 
     private String titleOrFallback(Offer offer) {

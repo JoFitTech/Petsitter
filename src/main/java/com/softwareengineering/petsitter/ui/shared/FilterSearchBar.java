@@ -60,6 +60,8 @@ public class FilterSearchBar extends Div {
     private final Function<String, Optional<String>> originPostalCodeValidator;
 
     private TextField originPostalCodeField;
+    private DatePicker fromDatePicker;
+    private DatePicker toDatePicker;
     private Span distancePostalCodeValue;
     private LocalDate selectedFrom;
     private LocalDate selectedTo;
@@ -119,15 +121,24 @@ public class FilterSearchBar extends Div {
                 .set("cursor", "pointer")
                 .set("margin-left", "16px")
                 .set("flex-shrink", "0");
-        searchBtn.addClickListener(e -> {
-            if (!hasInvalidDateRange() && !hasInvalidOriginPostalCode()) {
-                this.onSearch.accept(getCriteria());
-            }
-        });
 
         whenPopover = popoverFor(whenField.component(), buildDatePopover(), "460px");
         earningsPopover = popoverFor(earningsField.component(), buildEarningsPopover(), "340px");
         distancePopover = popoverFor(distanceField.component(), buildDistancePopover(), "340px");
+
+        searchBtn.addClickListener(e -> {
+            if (hasInvalidDateRange()) {
+                updateDateFilter();
+                if (!whenPopover.isOpened()) {
+                    openOnly(whenPopover);
+                }
+                return;
+            }
+            if (hasInvalidOriginPostalCode()) {
+                return;
+            }
+            this.onSearch.accept(getCriteria());
+        });
 
         whenField.component().addClickListener(e -> openOnly(whenPopover));
         earningsField.component().addClickListener(e -> openOnly(earningsPopover));
@@ -162,10 +173,14 @@ public class FilterSearchBar extends Div {
     }
 
     public static SearchCriteria defaultCriteria(String originPostalCode) {
-        int currentYear = LocalDate.now().getYear();
+        LocalDate today = LocalDate.now();
+        LocalDate defaultFrom = LocalDate.of(today.getYear(), 6, 15);
+        if (defaultFrom.isBefore(today)) {
+            defaultFrom = today;
+        }
         return new SearchCriteria(
-                LocalDate.of(currentYear, 6, 15),
-                LocalDate.of(currentYear, 6, 18),
+                defaultFrom,
+                defaultFrom.plusDays(3),
                 OfferDateFilterMode.OVERLAP,
                 0,
                 new BigDecimal("80"),
@@ -313,21 +328,21 @@ public class FilterSearchBar extends Div {
 
     private Component buildDatePopover() {
         VerticalLayout content = popoverContent();
-        DatePicker fromPicker = styledDatePicker("Von", selectedFrom);
-        DatePicker toPicker = styledDatePicker("Bis", selectedTo);
-        toPicker.setMin(selectedFrom);
+        fromDatePicker = styledDatePicker("Von", selectedFrom);
+        toDatePicker = styledDatePicker("Bis", selectedTo);
+        toDatePicker.setMin(minimumToDate());
         RadioButtonGroup<OfferDateFilterMode> dateModeGroup = dateModeGroup();
         RadioButtonGroup<Integer> flexDaysGroup = flexDaysGroup();
         flexDaysGroup.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
 
-        fromPicker.addValueChangeListener(event -> {
+        fromDatePicker.addValueChangeListener(event -> {
             selectedFrom = event.getValue();
-            toPicker.setMin(selectedFrom);
-            updateDateFilter(fromPicker, toPicker);
+            toDatePicker.setMin(minimumToDate());
+            updateDateFilter();
         });
-        toPicker.addValueChangeListener(event -> {
+        toDatePicker.addValueChangeListener(event -> {
             selectedTo = event.getValue();
-            updateDateFilter(fromPicker, toPicker);
+            updateDateFilter();
         });
         dateModeGroup.addValueChangeListener(event -> {
             if (event.getValue() == null) {
@@ -335,17 +350,17 @@ public class FilterSearchBar extends Div {
             }
             selectedDateFilterMode = event.getValue();
             flexDaysGroup.setVisible(selectedDateFilterMode == OfferDateFilterMode.OVERLAP);
-            updateDateFilter(fromPicker, toPicker);
+            updateDateFilter();
         });
         flexDaysGroup.addValueChangeListener(event -> {
             if (event.getValue() == null) {
                 return;
             }
             selectedDateFlexDays = event.getValue();
-            updateDateFilter(fromPicker, toPicker);
+            updateDateFilter();
         });
 
-        HorizontalLayout row = new HorizontalLayout(fromPicker, toPicker);
+        HorizontalLayout row = new HorizontalLayout(fromDatePicker, toDatePicker);
         row.setWidthFull();
         row.setAlignItems(FlexComponent.Alignment.START);
         row.getStyle().set("gap", "12px");
@@ -392,6 +407,7 @@ public class FilterSearchBar extends Div {
         DatePicker picker = new DatePicker(label, value);
         picker.setLocale(GERMAN);
         picker.setI18n(germanDatePickerI18n());
+        picker.setMin(LocalDate.now());
         picker.setClearButtonVisible(true);
         picker.setWidthFull();
         picker.getStyle()
@@ -400,15 +416,23 @@ public class FilterSearchBar extends Div {
         return picker;
     }
 
-    private void updateDateFilter(DatePicker fromPicker, DatePicker toPicker) {
-        boolean invalidRange = hasInvalidDateRange();
-        toPicker.setInvalid(invalidRange);
-        toPicker.setErrorMessage("Bis darf nicht vor Von liegen.");
-        if (invalidRange) {
+    private void updateDateFilter() {
+        boolean invalidFrom = selectedDateFilterMode != OfferDateFilterMode.ANY && isPastDate(selectedFrom);
+        boolean invalidTo = selectedDateFilterMode != OfferDateFilterMode.ANY && isPastDate(selectedTo);
+        boolean invalidOrder = selectedDateFilterMode != OfferDateFilterMode.ANY && hasInvalidDateOrder();
+
+        fromDatePicker.setErrorMessage("Von darf nicht in der Vergangenheit liegen.");
+        fromDatePicker.setInvalid(invalidFrom);
+        toDatePicker.setErrorMessage(invalidTo
+                ? "Bis darf nicht in der Vergangenheit liegen."
+                : "Bis darf nicht vor Von liegen.");
+        toDatePicker.setInvalid(invalidTo || invalidOrder);
+
+        if (invalidFrom || invalidTo || invalidOrder) {
             return;
         }
-        fromPicker.setInvalid(false);
-        toPicker.setInvalid(false);
+        fromDatePicker.setInvalid(false);
+        toDatePicker.setInvalid(false);
         whenValue.setText(formatDateRange());
     }
 
@@ -628,9 +652,25 @@ public class FilterSearchBar extends Div {
 
     private boolean hasInvalidDateRange() {
         return selectedDateFilterMode != OfferDateFilterMode.ANY
-                && selectedFrom != null
+                && (isPastDate(selectedFrom) || isPastDate(selectedTo) || hasInvalidDateOrder());
+    }
+
+    private boolean hasInvalidDateOrder() {
+        return selectedFrom != null
                 && selectedTo != null
                 && selectedTo.isBefore(selectedFrom);
+    }
+
+    private boolean isPastDate(LocalDate date) {
+        return date != null && date.isBefore(LocalDate.now());
+    }
+
+    private LocalDate minimumToDate() {
+        LocalDate today = LocalDate.now();
+        if (selectedFrom != null && selectedFrom.isAfter(today)) {
+            return selectedFrom;
+        }
+        return today;
     }
 
     private BigDecimal parseEuroAmount(String value) {

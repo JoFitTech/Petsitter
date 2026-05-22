@@ -787,6 +787,26 @@ class OfferServiceTest {
     }
 
     @Test
+    void searchOpenOffersRejectsPastDateCriteria() {
+        UUID visibleOfferId = UUID.randomUUID();
+        Offer visibleOffer = offer(visibleOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(visibleOffer), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                fixedCreateOfferFormRules()
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                searchCriteria(OfferSearchMode.TIERSITTER,
+                        LocalDate.of(2026, 5, 9), LocalDate.of(2026, 5, 13),
+                        OfferDateFilterMode.OVERLAP, 0, null));
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     void getOpenOffersByTypeKeepsCurrentOffersForAnonymousUsers() {
         UUID visibleOfferId = UUID.randomUUID();
         Offer visibleOffer = offer(visibleOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,

@@ -318,7 +318,17 @@ public class OfferService {
 
     private boolean hasInvalidSearchRange(OfferSearchCriteria criteria) {
         return criteria.dateFilterMode() != OfferDateFilterMode.ANY
-                && criteria.from() != null
+                && (isPastSearchDate(criteria.from())
+                || isPastSearchDate(criteria.to())
+                || hasInvalidSearchDateOrder(criteria));
+    }
+
+    private boolean isPastSearchDate(LocalDate date) {
+        return date != null && date.isBefore(createOfferFormRules.minimumStartDate());
+    }
+
+    private boolean hasInvalidSearchDateOrder(OfferSearchCriteria criteria) {
+        return criteria.from() != null
                 && criteria.to() != null
                 && criteria.to().isBefore(criteria.from());
     }

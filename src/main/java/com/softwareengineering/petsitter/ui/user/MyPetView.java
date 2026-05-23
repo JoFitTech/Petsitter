@@ -5,6 +5,8 @@ import com.softwareengineering.petsitter.pet.dto.PetDeletionDecision;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionImpact;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionOfferImpact;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.vaadin.flow.component.Component;
@@ -153,6 +155,7 @@ public class MyPetView extends Div {
                 info.add(s);
             }
         }
+        info.add(buildPetTagChips(pet));
 
         leftSection.add(avatar, info);
 
@@ -430,6 +433,43 @@ public class MyPetView extends Div {
             return pet.customSpecies();
         }
         return PetService.speciesLabel(pet.species());
+    }
+
+    private HorizontalLayout buildPetTagChips(PetDto pet) {
+        HorizontalLayout chips = new HorizontalLayout();
+        chips.setPadding(false);
+        chips.setSpacing(false);
+        chips.getStyle()
+                .set("gap", "8px")
+                .set("flex-wrap", "wrap")
+                .set("margin-top", "12px");
+
+        PetVaccinationStatus vaccinationStatus = pet.vaccinationStatus() == null
+                ? PetVaccinationStatus.UNBEKANNT
+                : pet.vaccinationStatus();
+        chips.add(tagChip(vaccinationStatus.label()));
+        if (pet.tags() != null) {
+            pet.tags().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(PetTag::label)
+                    .map(this::tagChip)
+                    .forEach(chips::add);
+        }
+        return chips;
+    }
+
+    private Span tagChip(String label) {
+        Span chip = new Span(label);
+        chip.getStyle()
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "999px")
+                .set("background", "#fbf8f1")
+                .set("color", "#7a6050")
+                .set("font-size", "12px")
+                .set("font-weight", "800")
+                .set("padding", "5px 10px")
+                .set("line-height", "1.2");
+        return chip;
     }
 
     private String formatAge(LocalDate birthDate) {

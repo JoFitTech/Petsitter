@@ -23,5 +23,6 @@ public record MyOfferCardDto(
         String petName,
         String petSpecies,
         String petBreed,
+        String petTags,
         OfferAnimalType animalType
 ) {}

@@ -186,6 +186,9 @@ public class PetsitterDetailPopUp extends Dialog {
                 petValue.append(")");
             }
             content.add(readOnlyTextField(dto.petName().contains(",") ? "Haustiere" : "Haustier", petValue.toString()));
+            if (dto.petTags() != null && !dto.petTags().isBlank()) {
+                content.add(readOnlyTextField("Eigenschaften", dto.petTags()));
+            }
         } else if (dto.animalType() != null) {
             // SITTER_OFFER: zeige bevorzugte Tierart
             content.add(readOnlyTextField("Bevorzugte Tierart", dto.animalType().label()));

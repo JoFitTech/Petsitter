@@ -23,6 +23,7 @@ public record OfferCardDto(
         String petName,
         String petSpecies,
         String petBreed,
+        String petTags,
         String postalCode,
         String city,
         Integer distanceKm,
@@ -45,6 +46,7 @@ public record OfferCardDto(
             String petName,
             String petSpecies,
             String petBreed,
+            String petTags,
             String postalCode,
             String city,
             Integer distanceKm,
@@ -52,7 +54,7 @@ public record OfferCardDto(
             OfferType offerType
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
                 favorited, offerType, null, null);
     }
 
@@ -70,13 +72,14 @@ public record OfferCardDto(
             String petName,
             String petSpecies,
             String petBreed,
+            String petTags,
             String postalCode,
             String city,
             Integer distanceKm,
             boolean favorited
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
                 favorited, null, null, null);
     }
 
@@ -94,12 +97,13 @@ public record OfferCardDto(
             String petName,
             String petSpecies,
             String petBreed,
+            String petTags,
             String postalCode,
             String city,
             Integer distanceKm
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
                 false, null, null, null);
     }
 
@@ -116,16 +120,17 @@ public record OfferCardDto(
             OfferCareType careType,
             String petName,
             String petSpecies,
-            String petBreed
+            String petBreed,
+            String petTags
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, null, null, null, false,
+                frequency, careType, petName, petSpecies, petBreed, petTags, null, null, null, false,
                 null, null, null);
     }
 
     public OfferCardDto withFavorited(boolean favorited) {
         return new OfferCardDto(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
                 favorited, offerType, creatorUserId, creatorDisplayName);
     }
 }

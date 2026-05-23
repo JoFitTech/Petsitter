@@ -9,9 +9,12 @@ import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionAction;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionDecision;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionImpact;
+import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
@@ -24,6 +27,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -62,6 +66,54 @@ class PetServiceTest {
                 .getPetSummaryForOwner(UUID.randomUUID());
 
         assertThat(summary).isEqualTo("Keine Haustiere");
+    }
+
+    @Test
+    void createPetForCurrentUserDefaultsUnknownVaccinationStatusAndEmptyTags() {
+        User owner = user(UUID.randomUUID());
+        PetRepositoryFake petRepository = new PetRepositoryFake(List.of());
+        PetService petService = service(owner, petRepository.repository(), null);
+
+        petService.createPetForCurrentUser(new PetDto(
+                null,
+                "Balu",
+                PetSpecies.DOG,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null));
+
+        assertThat(petRepository.savedPets).hasSize(1);
+        Pet savedPet = petRepository.savedPets.getFirst();
+        assertThat(savedPet.getOwner()).isSameAs(owner);
+        assertThat(savedPet.getName()).isEqualTo("Balu");
+        assertThat(savedPet.getVaccinationStatus()).isEqualTo(PetVaccinationStatus.UNBEKANNT);
+        assertThat(savedPet.getTags()).isEmpty();
+    }
+
+    @Test
+    void updatePetStoresVaccinationStatusAndTags() {
+        User owner = user(UUID.randomUUID());
+        Pet pet = pet(UUID.randomUUID(), owner, PetSpecies.DOG);
+        PetRepositoryFake petRepository = new PetRepositoryFake(List.of(pet));
+        PetService petService = service(owner, petRepository.repository(), null);
+
+        petService.updatePet(pet.getId(), new PetDto(
+                pet.getId(),
+                "Balu",
+                PetSpecies.DOG,
+                null,
+                "Golden Retriever",
+                null,
+                "Braucht viel Auslauf",
+                PetVaccinationStatus.GEIMPFT,
+                Set.of(PetTag.STUBENREIN, PetTag.VERSPIELT)));
+
+        assertThat(petRepository.savedPets).containsExactly(pet);
+        assertThat(pet.getVaccinationStatus()).isEqualTo(PetVaccinationStatus.GEIMPFT);
+        assertThat(pet.getTags()).containsExactlyInAnyOrder(PetTag.STUBENREIN, PetTag.VERSPIELT);
     }
 
     @Test
@@ -293,6 +345,7 @@ class PetServiceTest {
         private final List<Pet> pets;
         private final AtomicReference<UUID> requestedOwnerId = new AtomicReference<>();
         private final List<Pet> deletedPets = new ArrayList<>();
+        private final List<Pet> savedPets = new ArrayList<>();
 
         PetRepositoryFake(List<Pet> pets) {
             this.pets = pets;
@@ -315,6 +368,11 @@ class PetServiceTest {
                         if ("delete".equals(method.getName())) {
                             deletedPets.add((Pet) args[0]);
                             return null;
+                        }
+                        if ("save".equals(method.getName())) {
+                            Pet pet = (Pet) args[0];
+                            savedPets.add(pet);
+                            return pet;
                         }
                         if ("toString".equals(method.getName())) {
                             return "PetRepositoryFake";

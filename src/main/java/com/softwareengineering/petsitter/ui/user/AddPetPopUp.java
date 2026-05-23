@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.vaadin.flow.component.button.Button;
@@ -7,6 +9,7 @@ import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -15,7 +18,12 @@ import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.dom.Element;
 import java.time.LocalDate;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class AddPetPopUp extends Dialog {
@@ -99,6 +107,13 @@ public class AddPetPopUp extends Dialog {
         infoField.setMinHeight("100px");
         styleInputField(infoField.getElement());
 
+        AtomicReference<PetVaccinationStatus> selectedVaccinationStatus =
+                new AtomicReference<>(initialVaccinationStatus(existing));
+        Set<PetTag> selectedTags = initialTags(existing);
+
+        VerticalLayout vaccinationStatusTags = buildVaccinationStatusTags(selectedVaccinationStatus);
+        VerticalLayout petTagSelector = buildPetTagSelector(selectedTags);
+
         populateFields(existing, nameField, typeField, customTypeField, breedField, birthDateField, infoField);
 
         HorizontalLayout footerButtons = new HorizontalLayout();
@@ -132,7 +147,7 @@ public class AddPetPopUp extends Dialog {
                 .set("border", "none");
         btnSave.addClickListener(e -> {
             PetDto dto = createDto(existing, nameField, typeField, customTypeField, breedField, birthDateField,
-                    infoField);
+                    infoField, selectedVaccinationStatus.get(), selectedTags);
             if (dto == null) {
                 return;
             }
@@ -146,8 +161,8 @@ public class AddPetPopUp extends Dialog {
 
         footerButtons.add(btnCancel, btnSave);
 
-        mainContainer.add(title, nameField, typeField, customTypeField, breedField, birthDateField, infoField,
-                footerButtons);
+        mainContainer.add(title, nameField, typeField, customTypeField, breedField, birthDateField,
+                vaccinationStatusTags, petTagSelector, infoField, footerButtons);
         add(mainContainer);
     }
 
@@ -183,7 +198,9 @@ public class AddPetPopUp extends Dialog {
             TextField customTypeField,
             TextField breedField,
             DatePicker birthDateField,
-            TextArea infoField) {
+            TextArea infoField,
+            PetVaccinationStatus selectedVaccinationStatus,
+            Set<PetTag> selectedTags) {
         String name = nameField.getValue();
         String selectedType = typeField.getValue();
         if (name == null || name.isBlank()) {
@@ -207,7 +224,108 @@ public class AddPetPopUp extends Dialog {
                 mapCustomSpecies(selectedType, customTypeField),
                 blankToNull(breedField.getValue()),
                 birthDateField.getValue(),
-                blankToNull(infoField.getValue()));
+                blankToNull(infoField.getValue()),
+                selectedVaccinationStatus == null
+                        ? PetVaccinationStatus.UNBEKANNT
+                        : selectedVaccinationStatus,
+                selectedTags == null ? Set.of() : new LinkedHashSet<>(selectedTags));
+    }
+
+    private PetVaccinationStatus initialVaccinationStatus(PetDto existing) {
+        if (existing == null || existing.vaccinationStatus() == null) {
+            return PetVaccinationStatus.UNBEKANNT;
+        }
+        return existing.vaccinationStatus();
+    }
+
+    private Set<PetTag> initialTags(PetDto existing) {
+        if (existing == null || existing.tags() == null || existing.tags().isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        return new LinkedHashSet<>(existing.tags());
+    }
+
+    private VerticalLayout buildVaccinationStatusTags(AtomicReference<PetVaccinationStatus> selectedStatus) {
+        HorizontalLayout tags = tagRow();
+        Map<PetVaccinationStatus, Button> buttons = new LinkedHashMap<>();
+        for (PetVaccinationStatus status : PetVaccinationStatus.values()) {
+            Button tag = tagButton(status.label());
+            buttons.put(status, tag);
+            tag.addClickListener(event -> {
+                selectedStatus.set(status);
+                buttons.forEach((candidate, button) -> styleTagButton(button, candidate == selectedStatus.get()));
+            });
+            tags.add(tag);
+        }
+        buttons.forEach((status, button) -> styleTagButton(button, status == selectedStatus.get()));
+        return tagSection("Impfstatus", tags);
+    }
+
+    private VerticalLayout buildPetTagSelector(Set<PetTag> selectedTags) {
+        HorizontalLayout tags = tagRow();
+        Map<PetTag, Button> buttons = new LinkedHashMap<>();
+        for (PetTag petTag : PetTag.values()) {
+            Button tag = tagButton(petTag.label());
+            buttons.put(petTag, tag);
+            tag.addClickListener(event -> {
+                if (selectedTags.contains(petTag)) {
+                    selectedTags.remove(petTag);
+                } else {
+                    selectedTags.add(petTag);
+                }
+                styleTagButton(tag, selectedTags.contains(petTag));
+            });
+            tags.add(tag);
+        }
+        buttons.forEach((petTag, button) -> styleTagButton(button, selectedTags.contains(petTag)));
+        return tagSection("Eigenschaften", tags);
+    }
+
+    private VerticalLayout tagSection(String labelText, HorizontalLayout tags) {
+        VerticalLayout section = new VerticalLayout();
+        section.setPadding(false);
+        section.setSpacing(false);
+        section.getStyle().set("gap", "8px");
+
+        Span label = new Span(labelText);
+        label.getStyle()
+                .set("color", DARK)
+                .set("font-size", "14px")
+                .set("font-weight", "700");
+
+        section.add(label, tags);
+        return section;
+    }
+
+    private HorizontalLayout tagRow() {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setPadding(false);
+        row.setSpacing(false);
+        row.getStyle()
+                .set("gap", "8px")
+                .set("flex-wrap", "wrap");
+        return row;
+    }
+
+    private Button tagButton(String label) {
+        Button button = new Button(label);
+        button.getStyle()
+                .set("border-radius", "999px")
+                .set("height", "34px")
+                .set("padding", "0 14px")
+                .set("font-size", "13px")
+                .set("font-weight", "800")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        return button;
+    }
+
+    private void styleTagButton(Button button, boolean selected) {
+        button.getElement().setAttribute("aria-pressed", String.valueOf(selected));
+        button.getStyle()
+                .set("background", selected ? BROWN_BTN : "#FCF9F2")
+                .set("color", selected ? "white" : DARK)
+                .set("border", selected ? "1px solid " + BROWN_BTN : "1px solid #ead5ae");
     }
 
     private String displayType(PetDto pet) {

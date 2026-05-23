@@ -2,6 +2,8 @@ package com.softwareengineering.petsitter.pet.domain;
 
 import com.softwareengineering.petsitter.user.domain.User;
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -13,6 +15,8 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDate;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -89,6 +93,16 @@ public class Pet {
     @Column(length = 1000)
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "vaccination_status", nullable = false, length = 32)
+    private PetVaccinationStatus vaccinationStatus = PetVaccinationStatus.UNBEKANNT;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(name = "pet_tag", joinColumns = @JoinColumn(name = "pet_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tag", nullable = false, length = 64)
+    private Set<PetTag> tags = new LinkedHashSet<>();
+
     public Pet() {
     }
 
@@ -154,5 +168,29 @@ public class Pet {
 
     public void setNotes(String notes) {
         this.notes = notes;
+    }
+
+    public PetVaccinationStatus getVaccinationStatus() {
+        return vaccinationStatus;
+    }
+
+    public void setVaccinationStatus(PetVaccinationStatus vaccinationStatus) {
+        this.vaccinationStatus = vaccinationStatus;
+    }
+
+    public Set<PetTag> getTags() {
+        if (tags == null) {
+            tags = new LinkedHashSet<>();
+        }
+        return tags;
+    }
+
+    public void setTags(Set<PetTag> tags) {
+        getTags().clear();
+        if (tags != null) {
+            tags.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(this.tags::add);
+        }
     }
 }

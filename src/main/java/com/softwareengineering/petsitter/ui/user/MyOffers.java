@@ -561,6 +561,7 @@ public class MyOffers extends Div {
                 offer.petName(),
                 offer.petSpecies(),
                 offer.petBreed(),
+                offer.petTags(),
                 null,
                 null,
                 null,

@@ -26,6 +26,8 @@ import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
@@ -445,9 +447,12 @@ class OfferServiceTest {
         ownerOpen.setDescription("Füttern und spielen");
         ownerOpen.setFrequency(OfferFrequency.ONE_TIME);
         ownerOpen.setCareType(OfferCareType.PET_SITTING);
-        ownerOpen.setPets(List.of(
-                pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT),
-                pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG)));
+        Pet cat = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
+        cat.setVaccinationStatus(PetVaccinationStatus.GEIMPFT);
+        cat.setTags(Set.of(PetTag.STUBENREIN, PetTag.VERSPIELT));
+        Pet dog = pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG);
+        dog.setTags(Set.of(PetTag.VERSPIELT));
+        ownerOpen.setPets(List.of(cat, dog));
         Offer sitterBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
                 LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 5), BigDecimal.valueOf(250));
         sitterBooked.setAnimalType(OfferAnimalType.DOG);
@@ -475,6 +480,8 @@ class OfferServiceTest {
         assertThat(result.get(0).careType()).isEqualTo(OfferCareType.PET_SITTING);
         assertThat(result.get(0).petName()).isEqualTo("Mila, Balu");
         assertThat(result.get(0).petSpecies()).isEqualTo("Katze, Hund");
+        assertThat(result.get(0).petTags())
+                .isEqualTo("Geimpft, Impfstatus unbekannt, Stubenrein, Verspielt");
         assertThat(result.get(1).animalType()).isEqualTo(OfferAnimalType.DOG);
         assertThat(result.get(2).title()).isEqualTo("Auftrag");
     }
@@ -1498,6 +1505,7 @@ class OfferServiceTest {
                 "Beschreibung",
                 OfferFrequency.ONE_TIME,
                 OfferCareType.PET_SITTING,
+                null,
                 null,
                 null,
                 null,

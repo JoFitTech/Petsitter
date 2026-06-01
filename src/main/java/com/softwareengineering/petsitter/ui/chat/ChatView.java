@@ -667,7 +667,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                     Notification.show("Fehler: " + ex.getMessage());
                 }
             });
-            acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
+            acceptBtn.getStyle().set("background", "#774f35").set("color", "white").set("border-radius", "8px");
 
             Button denyBtn = new Button("Ablehnen", e -> {
                 try {

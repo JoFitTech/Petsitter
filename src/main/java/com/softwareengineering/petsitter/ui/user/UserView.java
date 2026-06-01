@@ -244,7 +244,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
-        active.getStyle().set("background", DARK).set("color", "white");
+        active.getStyle().set("background", "#774f35").set("color", "white");
     }
 
     private Div cardPanel() {
@@ -284,7 +284,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         Button btn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
         btn.getStyle()
             .set("border-radius", "24px")
-            .set("background", DARK)
+            .set("background", "#774f35")
             .set("color", "white")
             .set("box-shadow", "none")
             .set("font-weight", "600")
@@ -299,7 +299,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         Button btn = new Button(label);
         btn.getStyle()
             .set("border-radius", "24px")
-            .set("background", DARK)
+            .set("background", "#774f35")
             .set("color", "white")
             .set("box-shadow", "none")
             .set("font-weight", "600")
@@ -448,7 +448,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
                 .set("bottom", "2px").set("right", "2px")
                 .set("width", "28px").set("height", "28px")
                 .set("border-radius", "50%")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("display", "flex")
                 .set("align-items", "center")
                 .set("justify-content", "center")

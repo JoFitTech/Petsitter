@@ -217,7 +217,7 @@ public class MyFavoritesView extends Div {
 
         Button confirm = new Button("Entfernen");
         confirm.getStyle()
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("border-radius", "22px")
                 .set("box-shadow", "none")

@@ -327,7 +327,7 @@ public class PetsitterDetailPopUp extends Dialog {
         Button btn = new Button(label);
         btn.setWidthFull();
         btn.getStyle()
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("height", "52px")
                 .set("border-radius", "28px")

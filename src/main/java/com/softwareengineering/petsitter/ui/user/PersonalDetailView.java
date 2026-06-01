@@ -229,7 +229,7 @@ public class PersonalDetailView extends Div {
         Button btn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
         btn.getStyle()
             .set("border-radius", "24px")
-            .set("background", DARK)
+            .set("background", "#774f35")
             .set("color", "white")
             .set("box-shadow", "none")
             .set("font-weight", "600")
@@ -244,7 +244,7 @@ public class PersonalDetailView extends Div {
         Button btn = new Button(label);
         btn.getStyle()
             .set("border-radius", "24px")
-            .set("background", DARK)
+            .set("background", "#774f35")
             .set("color", "white")
             .set("box-shadow", "none")
             .set("font-weight", "600")

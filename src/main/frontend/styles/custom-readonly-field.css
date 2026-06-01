@@ -1,0 +1,17 @@
+:host([readonly]) [part="input-field"] {
+  border: 1px solid #7b7069 !important;
+  background-color: #ffffff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 0 3px rgba(234, 213, 174, 0.75) !important;
+}
+
+:host([readonly]) ::placeholder {
+  color: #7b7069 !important;
+  opacity: 1 !important;
+}
+
+:host([readonly]) [part="value"]::placeholder {
+  color: #7b7069 !important;
+  opacity: 1 !important;
+}
+

@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
@@ -37,6 +38,7 @@ class ChatViewIntegrationTest {
         AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
         RequestService requestService = Mockito.mock(RequestService.class);
         BookingService bookingService = Mockito.mock(BookingService.class);
+        UserService userService = Mockito.mock(UserService.class);
 
         UUID currentUserId = UUID.randomUUID();
         User currentUser = new User();
@@ -62,7 +64,7 @@ class ChatViewIntegrationTest {
                 )
         ));
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
 
         assertThat(containsText(view, "Ben Sitter")).isTrue();
     }
@@ -75,6 +77,7 @@ class ChatViewIntegrationTest {
         AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
         RequestService requestService = Mockito.mock(RequestService.class);
         BookingService bookingService = Mockito.mock(BookingService.class);
+        UserService userService = Mockito.mock(UserService.class);
 
         UUID currentUserId = UUID.randomUUID();
         UUID otherUserId = UUID.randomUUID();
@@ -123,7 +126,7 @@ class ChatViewIntegrationTest {
                 )
         ));
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
 
         Method selectConversation = ChatView.class.getDeclaredMethod("selectConversation", String.class);
         selectConversation.setAccessible(true);

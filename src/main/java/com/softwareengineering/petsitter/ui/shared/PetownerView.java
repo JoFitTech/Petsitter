@@ -53,7 +53,9 @@ public class PetownerView extends VerticalLayout {
         setPadding(false);
         setSpacing(false);
         setDefaultHorizontalComponentAlignment(Alignment.CENTER);
-        getStyle().set("overflow-x", "hidden");
+        getStyle()
+                .set("overflow-x", "hidden")
+                .set("background", "#ebf6f0");
 
         add(createPageWrapper());
     }
@@ -65,7 +67,7 @@ public class PetownerView extends VerticalLayout {
         wrapper.getStyle()
                 .set("position", "relative")
                 .set("overflow-x", "hidden")
-                .set("background", LIGHT_BG);
+                .set("background", "#ebf6f0");
 
         wrapper.add(
                 createBackgroundBlobs(),
@@ -86,7 +88,7 @@ public class PetownerView extends VerticalLayout {
                 .set("top", "80px")
                 .set("width", "460px")
                 .set("height", "460px")
-                .set("background", "#d8ecd8")
+                .set("background", "#e2f5ec")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -97,22 +99,11 @@ public class PetownerView extends VerticalLayout {
                 .set("top", "130px")
                 .set("width", "470px")
                 .set("height", "470px")
-                .set("background", "#e7f0f0")
+                .set("background", "#eef0fa")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
-        Div bottomBlob = new Div();
-        bottomBlob.getStyle()
-                .set("position", "absolute")
-                .set("right", "-170px")
-                .set("bottom", "120px")
-                .set("width", "430px")
-                .set("height", "430px")
-                .set("background", "#fff0dd")
-                .set("border-radius", "50%")
-                .set("z-index", "0");
-
-        container.add(leftBlob, rightBlob, bottomBlob);
+        container.add(leftBlob, rightBlob);
         return container;
     }
 
@@ -194,6 +185,7 @@ public class PetownerView extends VerticalLayout {
                 FilterSearchBar.defaultCriteria(offerService.getCurrentUserPostalCode().orElse(null)),
                 offerService::validateOriginPostalCode,
                 this::onSearchClicked);
+        searchBar.getStyle().set("max-width", "860px");
 
         Hr line = new Hr();
         line.getStyle()

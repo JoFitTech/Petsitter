@@ -13,6 +13,7 @@ import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.html.Image;
@@ -154,7 +155,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                     .set("height", "42px")
                     .set("padding", "0 22px")
                     .set("border-radius", "22px")
-                    .set("background", DARK)
+                    .set("background", "#774f35")
                     .set("color", "white")
                     .set("font-weight", "700")
                     .set("font-size", "14px")
@@ -471,6 +472,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
         // X close button – absolute, top-right corner
         Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("position", "absolute")
                 .set("top", "12px")
@@ -480,6 +482,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .set("min-width", "28px")
                 .set("border-radius", "50%")
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("color", "#9a8070")
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")

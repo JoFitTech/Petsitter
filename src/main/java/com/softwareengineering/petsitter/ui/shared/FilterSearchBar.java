@@ -104,7 +104,8 @@ public class FilterSearchBar extends Div {
                 .set("padding", "16px 24px")
                 .set("box-sizing", "border-box")
                 .set("margin", "36px auto 0 auto")
-                .set("max-width", "860px")
+                .set("width", "100%")
+                .set("max-width", "100%")
                 .set("gap", "0");
 
         FilterPill whenField = filterPill("📅", "Wann?", formatDateRange(), true);

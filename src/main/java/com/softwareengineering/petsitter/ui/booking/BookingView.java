@@ -43,7 +43,10 @@ public class BookingView extends VerticalLayout {
         setSizeFull();
         setPadding(false);
         setSpacing(false);
-        getStyle().set("position", "relative").set("overflow", "hidden");
+        getStyle()
+                .set("position", "relative")
+                .set("overflow", "hidden")
+                .set("background", "#e8d9c8");
 
         add(buildDecorativeCircles());
         add(buildMainContent());

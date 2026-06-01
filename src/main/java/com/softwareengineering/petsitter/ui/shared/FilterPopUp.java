@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.combobox.MultiSelectComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -14,6 +15,7 @@ import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.dependency.CssImport;
 
 import java.util.Set;
 import java.util.function.Consumer;
@@ -26,6 +28,7 @@ import java.util.function.Consumer;
  *   new FilterPopUp(criteria, onApply).open();
  * </pre>
  */
+@CssImport(value = "./styles/custom-dialog-overlay.css", themeFor = "vaadin-dialog-overlay")
 public class FilterPopUp extends Dialog {
 
     private static final String DARK      = "#4a3428";
@@ -50,6 +53,7 @@ public class FilterPopUp extends Dialog {
         setWidth("520px");
         setCloseOnOutsideClick(true);
         getElement().getStyle().set("border-radius", "24px");
+        getElement().getThemeList().add("no-padding");
 
         // ── Outer container ────────────────────────────────────────────────
         VerticalLayout content = new VerticalLayout();
@@ -59,7 +63,8 @@ public class FilterPopUp extends Dialog {
                 .set("background", CREAM_BG)
                 .set("border-radius", "20px")
                 .set("padding", "28px 28px 24px 28px")
-                .set("gap", "18px");
+                .set("gap", "18px")
+                .set("font-family", "'Inter', sans-serif");
 
         // ── Header: title + close button ──────────────────────────────────
         HorizontalLayout header = new HorizontalLayout();
@@ -75,8 +80,10 @@ public class FilterPopUp extends Dialog {
                 .set("color", DARK);
 
         Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("color", DARK)
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
@@ -160,9 +167,9 @@ public class FilterPopUp extends Dialog {
 
         Button resetBtn = new Button("Alle Filter zurücksetzen");
         resetBtn.getStyle()
-                .set("background", "transparent")
+                .set("background", "#fff6e6")
                 .set("color", DARK)
-                .set("border", "1.5px solid " + BORDER)
+                .set("border", "1.5px solid #e9d5ae")
                 .set("border-radius", "28px")
                 .set("height", "48px")
                 .set("padding", "0 24px")
@@ -180,7 +187,7 @@ public class FilterPopUp extends Dialog {
 
         Button applyBtn = new Button("Filter anwenden");
         applyBtn.getStyle()
-                .set("background", DARK)
+                .set("background", BROWN)
                 .set("color", "white")
                 .set("border-radius", "28px")
                 .set("height", "48px")
@@ -225,6 +232,7 @@ public class FilterPopUp extends Dialog {
             Button starBtn = new Button(i <= selectedStarRating ? "★" : "★");
             starBtn.getStyle()
                     .set("background", "transparent")
+                    .set("border", "none")
                     .set("box-shadow", "none")
                     .set("font-size", "32px")
                     .set("padding", "0")

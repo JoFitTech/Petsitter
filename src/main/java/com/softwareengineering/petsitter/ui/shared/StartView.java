@@ -194,6 +194,7 @@ public class StartView extends VerticalLayout {
                 FilterSearchBar.defaultCriteria(offerService.getCurrentUserPostalCode().orElse(null)),
                 offerService::validateOriginPostalCode,
                 this::onSearchClicked);
+        searchBar.getStyle().set("max-width", "860px");
 
         Hr line = new Hr();
         line.getStyle()

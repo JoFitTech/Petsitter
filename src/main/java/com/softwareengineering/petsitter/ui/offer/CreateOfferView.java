@@ -61,6 +61,7 @@ import java.util.UUID;
 @PageTitle("Auftrag erstellen | Pawsitter")
 @RolesAllowed(AccountRole.ROLE_SIGNED_IN_USER)
 @CssImport(value = "./styles/filter-search-popover.css", themeFor = "vaadin-popover-overlay")
+@CssImport(value = "./styles/custom-readonly-field.css", themeFor = "vaadin-text-field")
 public class CreateOfferView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK = "#4a3428";
@@ -149,7 +150,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         uploadedFileNames.clear();
 
         String mode = modeForCurrentOfferType();
-        String pageBg = isOwnerOffer() ? "#ebf6f0" : LIGHT_BG;
+        String pageBg = isOwnerOffer() ? LIGHT_BG : "#ebf6f0";
         getStyle().set("background", pageBg);
 
         add(createPageWrapper(mode, pageBg));
@@ -183,7 +184,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("top", "60px")
                 .set("width", "400px")
                 .set("height", "400px")
-                .set("background", "request".equals(mode) ? "#e2f5ec" : "#f6ead5")
+                .set("background", "request".equals(mode) ? "#f6ead5" : "#e2f5ec")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -194,7 +195,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("top", "100px")
                 .set("width", "440px")
                 .set("height", "440px")
-                .set("background", "request".equals(mode) ? "#eef0fa" : "#e7f0f0")
+                .set("background", "request".equals(mode) ? "#e7f0f0" : "#eef0fa")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -226,8 +227,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         titleLayout.setSpacing(false);
 
         String headlineText = isEditMode()
-                ? (isOwnerOffer() ? "Tiersitter Angebot bearbeiten" : "Tierhalter Angebot bearbeiten")
-                : ("request".equals(mode) ? "Neues Tiersitter Angebot erstellen" : "Neues Tierhalter Angebot erstellen");
+                ? (isOwnerOffer() ? "Tierhalter Angebot bearbeiten" : "Tiersitter Angebot bearbeiten")
+                : ("request".equals(mode) ? "Neues Tierhalter Angebot erstellen" : "Neues Tiersitter Angebot erstellen");
         H1 headline = new H1(headlineText);
         headline.getStyle()
                 .set("font-size", "28px")
@@ -236,8 +237,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         String subtitleText = isEditMode()
                 ? "Passe die gespeicherten Details an."
-                : ("request".equals(mode) ? "Details für dein Tiersitting Angebot angeben"
-                : "Details für dein Tierhalter Angebot angeben");
+                : ("request".equals(mode) ? "Details für dein Tierhalter Angebot angeben"
+                : "Details für dein Tiersitting Angebot angeben");
         Paragraph subtitle = new Paragraph(subtitleText);
         subtitle.getStyle()
                 .set("font-size", "15px")
@@ -320,8 +321,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         imageUpload.setMaxFileSize(10 * 1024 * 1024); // 10 MB
 
         String btnText = isOwnerOffer()
-                ? " Lade hier Bilder von dir hoch"
-                : " Lade hier Bilder deiner Haustiere hoch";
+                ? " Lade hier Bilder deiner Haustiere hoch"
+                : " Lade hier Bilder von dir hoch";
         Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
         cameraIcon.setSize("22px");
         cameraIcon.getStyle()
@@ -502,9 +503,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         dateRangeField.setWidthFull();
         dateRangeField.getStyle()
                 .set("border-radius", "12px")
-                .set("--vaadin-input-field-background", "#fffdf8")
-                .set("border", "1px solid #ead5ae")
-                .set("cursor", "pointer");
+                .set("border", "none")
+                .set("cursor", "pointer")
+                .set("margin-top", "10px");
 
         displayedMonth = initialDisplayedMonth();
 
@@ -1099,7 +1100,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private String imagePreviewPlaceholderText() {
-        return isOwnerOffer() ? "Vorschau deiner Bilder" : "Vorschau deiner Haustierbilder";
+        return isOwnerOffer() ? "Vorschau deiner Haustierbilder" : "Vorschau deiner Bilder";
     }
 
     private String currentOfferTitle() {

@@ -12,6 +12,7 @@ import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
@@ -80,8 +81,10 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("color", DARK);
 
         Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("color", DARK)
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")

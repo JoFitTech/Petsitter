@@ -45,7 +45,7 @@ import java.time.LocalDate;
 public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK     = "#4a3428";
-    private static final String CREAM    = "#fbf8f1";
+    private static final String CREAM    = "#e8d9c8";
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
@@ -194,12 +194,14 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         VerticalLayout sidebar = new VerticalLayout();
         sidebar.setPadding(false);
         sidebar.setSpacing(false);
-        sidebar.setWidth("210px");
-        sidebar.setMinWidth("210px");
+        sidebar.setWidth("240px");
+        sidebar.setMinWidth("240px");
         sidebar.getStyle()
-            .set("gap", "6px")
-            .set("padding", "8px 0")
-            .set("background", "transparent");
+            .set("gap", "8px")
+            .set("padding", "24px")
+            .set("background", "#fdf6ec")
+            .set("border-radius", "20px")
+            .set("box-sizing", "border-box");
 
         btnUeberMich      = sidebarBtn("Über mich");
         btnMeineTiere     = sidebarBtn("Meine Tiere");

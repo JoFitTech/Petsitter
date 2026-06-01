@@ -1,8 +1,11 @@
-# Test Documentation – Chat-Modul
+# Test Documentation
 
 ## Ziel
 
-Dieses Dokument dokumentiert die abgeschlossenen Unit-, Integrations- und UI-Tests für das Chat-Modul (MongoDB + Vaadin Push).
+Dieses Dokument dokumentiert alle Unit-, Integrations- und UI-Tests des Petsitter-Backends.
+- **Chat-Modul** (MongoDB + Vaadin Push)
+- **Bewertungssystem** (UserReviewService mit Race-Condition-Handling)
+- **Geschäftslogik** (Offer, Request, Booking Services)
 
 ---
 
@@ -28,6 +31,19 @@ Dieses Dokument dokumentiert die abgeschlossenen Unit-, Integrations- und UI-Tes
 | --- | --- | --- | --- | --- |
 | `ChatEventBusTest` | `chatEventBus_notifiesRecipient` | Unit | ✅ | In-Memory EventBus publiziert Messages an registrierte Listener |
 | `ChatEventBusTest` | `chatEventBus_doesNotNotifyOtherUsers` | Unit | ✅ | Andere User erhalten keine Benachrichtigungen für fremde Messages |
+| --- | --- | --- | --- | --- |
+| `UserReviewServiceTest` | `submitReview_ownerCanRateSitter_afterCompletedBooking` | Unit | ✅ | Owner kann Sitter nach COMPLETED Booking bewerten (Erfolgsfall) |
+| `UserReviewServiceTest` | `submitReview_failsWhenBookingNotCompleted` | Unit | ✅ | Bewertung vor Abschluss des Bookings → BusinessRuleViolationException |
+| `UserReviewServiceTest` | `submitReview_failsWhenReviewerNotBookingParticipant` | Unit | ✅ | Nur Booking-Teilnehmer dürfen bewerten → ForbiddenOperationException |
+| `UserReviewServiceTest` | `submitReview_failsWhenRatingOutOfRange` | Unit | ✅ | Rating muss 1-5 sein, sonst BusinessRuleViolationException |
+| `UserReviewServiceTest` | `submitReview_failsWhenReviewerAlreadyReviewedBooking` | Unit | ✅ | Duplikat-Schutz: Pro Booking+Reviewer nur eine Review |
+| `UserReviewServiceTest` | `submitReview_rejectsTooLongComment` | Unit | ✅ | Kommentar max 100 Zeichen, sonst BusinessRuleViolationException |
+| `UserReviewServiceTest` | `submitReview_failsWhenBookingNotFound` | Unit | ✅ | Fehlende Booking → NotFoundException |
+| `UserReviewServiceTest` | `submitReview_normalizesCommentToNullWhenBlank` | Unit | ✅ | Leere Kommentare werden zu null normalisiert |
+| `UserReviewServiceTest` | `hasUserReviewedBooking_returnsFalseWhenNotReviewed` | Unit | ✅ | Duplikat-Check: false wenn nicht bewertet |
+| `UserReviewServiceTest` | `hasUserReviewedBooking_returnsTrueWhenReviewed` | Unit | ✅ | Duplikat-Check: true wenn bereits bewertet |
+| `UserReviewServiceTest` | `submitReview_handlesRaceConditionGracefully` | Unit | ✅ | **HARDENING**: DataIntegrityViolationException → Business-Exception |
+| `UserReviewServiceTest` | `getUserRatingSummary_returnsRoundedAverage` | Unit | ✅ | Durchschnittsbewertung auf 1 Stelle gerundet |
 
 ### Integrations-Tests
 
@@ -45,6 +61,7 @@ Dieses Dokument dokumentiert die abgeschlossenen Unit-, Integrations- und UI-Tes
 | **ChatService** | 8 Unit-Tests | ✅ 100% |
 | **ChatAccessService** | 4 Unit-Tests | ✅ 100% |
 | **ChatEventBus** | 2 Unit-Tests | ✅ 100% |
+| **UserReviewService** | 12 Unit-Tests | ✅ 100% (mit Race-Condition-Handling) |
 | **ChatView (UI)** | 2 Integration-Tests | ✅ Basic Flows |
 | **ChatBookingListener** | Implizit via BookingService | ✅ Covered |
 | **Notification Integration** | Implizit via ChatService | ✅ Covered |
@@ -105,9 +122,10 @@ docker compose up -d
 
 ✅ Alle Unit-Tests: **BESTANDEN**  
 ✅ Alle Integration-Tests: **BESTANDEN**  
-✅ Build: **SUCCESS**  
+✅ Build: **SUCCESS (195 Tests, 0 Failures)**  
 ✅ Deploy-Ready: **JA**
 
-Zuletzt aktualisiert: 2026-05-16
+Zuletzt aktualisiert: 2026-06-01 (Hardening-Commit: UserReviewService Race-Condition + Duplikat-Schutz)
+
 
 

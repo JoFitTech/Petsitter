@@ -5,9 +5,6 @@ import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
-import com.softwareengineering.petsitter.review.dto.UserReviewDto;
-import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
-import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
@@ -15,6 +12,7 @@ import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
+import com.softwareengineering.petsitter.wallet.service.WalletService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -58,8 +56,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private final RequestService requestService;
     private final ChatService chatService;
     private final BookingService bookingService;
+    private final WalletService walletService;
     private final AuthenticatedUser authenticatedUser;
-    private final UserReviewService userReviewService;
     private UserProfileDto currentProfile;
 
     private Button btnUeberMich;
@@ -67,6 +65,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnMeineAuftraege;
     private Button btnMeineBuchungen;
     private Button btnMeineFavoriten;
+    private Button btnGuthaben;
     private Button btnPersAngaben;
     private Button btnLogout;
     private Div contentPanel;
@@ -79,8 +78,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             RequestService requestService,
             ChatService chatService,
             BookingService bookingService,
-            AuthenticatedUser authenticatedUser,
-            UserReviewService userReviewService) {
+            WalletService walletService,
+            AuthenticatedUser authenticatedUser) {
         this.userService = userService;
         this.petService = petService;
         this.offerService = offerService;
@@ -88,8 +87,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         this.requestService = requestService;
         this.chatService = chatService;
         this.bookingService = bookingService;
+        this.walletService = walletService;
         this.authenticatedUser = authenticatedUser;
-        this.userReviewService = userReviewService;
         reloadProfile();
 
         setSizeFull();
@@ -126,6 +125,11 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         if ("pets".equals(tab)) {
             setActiveStyle(btnMeineTiere);
             showMeineTiere();
+            return;
+        }
+        if ("wallet".equals(tab)) {
+            setActiveStyle(btnGuthaben);
+            showGuthaben();
             return;
         }
         setActiveStyle(btnUeberMich);
@@ -212,6 +216,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege = sidebarBtn("Meine Aufträge");
         btnMeineBuchungen = sidebarBtn("Meine Buchungen");
         btnMeineFavoriten = sidebarBtn("Meine Favoriten");
+        btnGuthaben        = sidebarBtn("Guthaben");
         btnPersAngaben    = sidebarBtn("Persönliche Angaben");
         btnLogout         = sidebarBtn("Log out");
 
@@ -220,10 +225,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
         btnMeineBuchungen.addClickListener(e -> { setActiveStyle(btnMeineBuchungen); showMeineBuchungen(); });
         btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
+        btnGuthaben.addClickListener(e        -> { setActiveStyle(btnGuthaben);        showGuthaben(); });
         btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(); });
         btnLogout.addClickListener(e         -> handleLogout());
 
-        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout);
+        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen,
+                btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout);
         return sidebar;
     }
 
@@ -245,7 +252,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private void setActiveStyle(Button active) {
-        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout}) {
+        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen,
+                btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
         active.getStyle().set("background", DARK).set("color", "white");
@@ -480,18 +488,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         info.setSpacing(false);
         info.getStyle().set("gap", "4px");
 
-        // Echte Bewertungssterne aus Service
-        String starsStr;
-        if (currentProfile != null) {
-            UserRatingSummary sum = userReviewService.getUserRatingSummary(currentProfile.id());
-            int fullStars = (int) Math.round(sum.averageRating());
-            starsStr = (sum.ratingCount() > 0)
-                    ? "★".repeat(fullStars) + "☆".repeat(5 - fullStars) + "  (" + sum.ratingCount() + ")"
-                    : "☆☆☆☆☆  (0)";
-        } else {
-            starsStr = "☆☆☆☆☆";
-        }
-        Span stars = new Span(starsStr);
+        Span stars = new Span("★★★★★");
         stars.getStyle().set("color", "#f5c842").set("font-size", "20px").set("letter-spacing", "2px");
 
         Span verified = new Span("✓ Verifiziert");
@@ -594,38 +591,11 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         reviewTitle.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
         section.add(reviewTitle);
 
-        if (currentProfile == null) {
-            section.add(new Span("Profil nicht geladen."));
-            return section;
-        }
-
-        UserRatingSummary summary = userReviewService.getUserRatingSummary(currentProfile.id());
-        if (summary.ratingCount() == 0) {
-            Span empty = new Span("Noch keine Bewertungen vorhanden.");
-            empty.getStyle().set("font-size", "14px").set("color", "#a08060");
-            section.add(empty);
-            return section;
-        }
-
-        // Zusammenfassung anzeigen
-        Span summarySpan = new Span(
-                "Ø " + summary.averageRating() + " ★  (" + summary.ratingCount() + " Bewertungen)");
-        summarySpan.getStyle()
-                .set("font-size", "15px").set("font-weight", "700").set("color", "#f5a623");
-        section.add(summarySpan);
-
-        // Letzte 3 Bewertungen
-        java.util.List<UserReviewDto> recent = userReviewService.getRecentReviews(currentProfile.id(), 3);
-        for (UserReviewDto r : recent) {
-            section.add(reviewCard(buildStarsText(r.rating()), r.reviewerName(),
-                    r.comment() != null ? r.comment() : ""));
-        }
+        section.add(reviewCard("★★★★★", "Sehr zuverlässig",
+            "Bruno war bestens betreut. Kommunikation und Übergabe waren super unkompliziert."));
+        section.add(reviewCard("★★★★★", "Freundlich und flexibel",
+            "Sehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgefühlt."));
         return section;
-    }
-
-    private String buildStarsText(int rating) {
-        return "★".repeat(Math.max(0, Math.min(rating, 5))) +
-               "☆".repeat(Math.max(0, 5 - Math.min(rating, 5)));
     }
 
     private Div reviewCard(String starsText, String headline, String text) {
@@ -671,13 +641,18 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineBuchungen() {
         contentPanel.removeAll();
-        contentPanel.add(new MyBookings(bookingService, chatService, authenticatedUser, userReviewService));
+        contentPanel.add(new MyBookings(bookingService, chatService, authenticatedUser));
     }
 
     private void showMeineFavoriten() {
         contentPanel.removeAll();
         contentPanel.add(new MyFavoritesView(favoriteService, offerService, requestService, chatService,
-                authenticatedUser, userService));
+                authenticatedUser, userService, bookingService));
+    }
+
+    private void showGuthaben() {
+        contentPanel.removeAll();
+        contentPanel.add(new MyWalletView(walletService, authenticatedUser));
     }
 
     private void showPersAngaben() {

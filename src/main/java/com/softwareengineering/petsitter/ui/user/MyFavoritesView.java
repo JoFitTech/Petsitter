@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
@@ -34,17 +35,20 @@ public class MyFavoritesView extends Div {
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
     private final UserService userService;
+    private final BookingService bookingService;
     private final Div favoritesContainer = new Div();
 
     public MyFavoritesView(FavoriteService favoriteService, OfferService offerService,
                            RequestService requestService, ChatService chatService,
-                           AuthenticatedUser authenticatedUser, UserService userService) {
+                           AuthenticatedUser authenticatedUser, UserService userService,
+                           BookingService bookingService) {
         this.favoriteService = favoriteService;
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
         this.userService = userService;
+        this.bookingService = bookingService;
 
         setWidthFull();
         getStyle()
@@ -166,7 +170,7 @@ public class MyFavoritesView extends Div {
 
     private void openOfferDialog(OfferCardDto dto) {
         new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
-                offerService, requestService, chatService, authenticatedUser, userService).open();
+                offerService, requestService, chatService, authenticatedUser, userService, bookingService).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

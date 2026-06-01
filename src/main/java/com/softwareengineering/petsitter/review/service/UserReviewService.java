@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
 import com.softwareengineering.petsitter.review.domain.UserReview;
 import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.dto.UserReviewDto;
 import com.softwareengineering.petsitter.review.repository.UserReviewRepository;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
@@ -12,10 +13,12 @@ import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -113,6 +116,42 @@ public class UserReviewService {
         return userReviewRepository.existsByBooking_IdAndReviewer_Id(bookingId, reviewerId);
     }
 
+    /**
+     * Gibt die letzten {@code limit} Bewertungen fuer einen Reviewee zurueck.
+     *
+     * @param revieweeId ID des bewerteten Users
+     * @param limit      maximale Anzahl Bewertungen (z.B. 3 fuer Profilvorschau)
+     * @return Liste der DTOs, neueste zuerst
+     */
+    @Transactional(readOnly = true)
+    public List<UserReviewDto> getRecentReviews(UUID revieweeId, int limit) {
+        requireId(revieweeId, "revieweeId darf nicht null sein");
+        int safeLimit = Math.max(1, Math.min(limit, 50));
+        return userReviewRepository
+                .findByReviewee_IdOrderByCreatedAtDesc(revieweeId, PageRequest.of(0, safeLimit))
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    private UserReviewDto toDto(com.softwareengineering.petsitter.review.domain.UserReview review) {
+        String reviewerName = buildDisplayName(review.getReviewer());
+        return new UserReviewDto(
+                review.getId(),
+                reviewerName,
+                review.getRating(),
+                review.getComment(),
+                review.getCreatedAt()
+        );
+    }
+
+    private String buildDisplayName(com.softwareengineering.petsitter.user.domain.User user) {
+        if (user == null) return "Unbekannt";
+        String name = ((user.getFirstName() != null ? user.getFirstName() : "") + " "
+                + (user.getLastName() != null ? user.getLastName() : "")).trim();
+        return name.isBlank() ? "Anonym" : name;
+    }
+
     private User resolveParticipant(Booking booking, UUID reviewerId) {
         User owner = booking.getOwner();
         User sitter = booking.getSitter();
@@ -175,6 +214,9 @@ public class UserReviewService {
         return normalized;
     }
 }
+
+
+
 
 
 

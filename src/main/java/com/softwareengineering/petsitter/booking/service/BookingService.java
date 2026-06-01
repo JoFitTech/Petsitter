@@ -15,9 +15,13 @@ import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationE
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +42,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class BookingService {
+
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
 
     private final BookingRepository bookingRepository;
     private final OfferRequestRepository offerRequestRepository;
@@ -168,6 +174,60 @@ public class BookingService {
         List<Booking> bookings = bookingRepository.findAllByAcceptedRequest_Id(requestId);
         if (bookings.isEmpty()) return false;
         return bookings.stream().allMatch(b -> b.getStatus() == BookingStatus.CANCELLED);
+    }
+
+    /**
+     * Schliesst ein Booking manuell ab (setzt Status auf COMPLETED).
+     * Nur Owner oder Sitter duerfen abschliessen, und nur wenn endDate bereits verstrichen ist.
+     *
+     * @param bookingId ID des Bookings
+     * @param userId    ID des anfragenden Users
+     */
+    @Transactional
+    public void completeBooking(UUID bookingId, UUID userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+
+        boolean isOwner  = booking.getOwner().getId().equals(userId);
+        boolean isSitter = booking.getSitter().getId().equals(userId);
+
+        if (!isOwner && !isSitter) {
+            throw new ForbiddenOperationException("Nur Owner oder Sitter duerfen ein Booking abschliessen.");
+        }
+
+        if (booking.getStatus() != BookingStatus.CREATED) {
+            throw new BusinessRuleViolationException(
+                    "Nur aktive Buchungen koennen abgeschlossen werden (aktuell: " + booking.getStatus() + ").");
+        }
+
+        if (booking.getEndDate() == null || booking.getEndDate().isAfter(LocalDate.now())) {
+            throw new BusinessRuleViolationException(
+                    "Buchung kann erst nach dem Enddatum abgeschlossen werden.");
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        bookingRepository.save(booking);
+    }
+
+    /**
+     * Automatischer Scheduler: Schliesst alle Bookings ab, deren endDate bereits vergangen ist.
+     * Laeuft taeglich einmal (configurable ueber petsitter.booking.complete-scheduler-cron).
+     *
+     * @return Anzahl der abgeschlossenen Bookings
+     */
+    @Scheduled(cron = "${petsitter.booking.complete-scheduler-cron:0 0 2 * * *}")
+    @Transactional
+    public int autoCompleteExpiredBookings() {
+        List<Booking> expired = bookingRepository.findAllByStatusAndEndDateLessThanEqual(
+                BookingStatus.CREATED, LocalDate.now());
+        for (Booking b : expired) {
+            b.setStatus(BookingStatus.COMPLETED);
+        }
+        bookingRepository.saveAll(expired);
+        if (!expired.isEmpty()) {
+            log.info("Auto-completed {} expired bookings.", expired.size());
+        }
+        return expired.size();
     }
 
     /**

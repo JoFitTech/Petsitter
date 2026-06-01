@@ -4,10 +4,12 @@ import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.dto.BookingDto;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
@@ -21,6 +23,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.server.VaadinSession;
 
@@ -47,15 +50,18 @@ public class MyBookings extends Div {
     private final BookingService bookingService;
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
+    private final UserReviewService userReviewService;
     private final Div bookingsContainer = new Div();
 
-    private String activeFilter = "ALLE";   // ALLE | AKTIV | STORNIERT | VERGANGEN
-    private String activeSort   = "STARTDATUM"; // STARTDATUM | BUCHUNGSDATUM
+    private String activeFilter = "ALLE";
+    private String activeSort   = "STARTDATUM";
 
-    public MyBookings(BookingService bookingService, ChatService chatService, AuthenticatedUser authenticatedUser) {
+    public MyBookings(BookingService bookingService, ChatService chatService,
+                      AuthenticatedUser authenticatedUser, UserReviewService userReviewService) {
         this.bookingService = bookingService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
+        this.userReviewService = userReviewService;
 
         setWidthFull();
         getStyle()
@@ -309,6 +315,9 @@ public class MyBookings extends Div {
 
         if (dto.status() == BookingStatus.CREATED) {
             card.add(chatBtn, buildCancelLink(dto));
+        } else if (dto.status() == BookingStatus.COMPLETED) {
+            card.add(chatBtn, buildReviewButton(dto, currentUserId));
+            card.add(buildHideLink(dto.id()));
         } else {
             card.add(chatBtn, buildHideLink(dto.id()));
         }
@@ -331,6 +340,116 @@ public class MyBookings extends Div {
             }
         });
         return link;
+    }
+
+    private Component buildReviewButton(BookingDto dto, UUID currentUserId) {
+        boolean alreadyReviewed = userReviewService.hasUserReviewedBooking(dto.id(), currentUserId);
+
+        if (alreadyReviewed) {
+            Span done = new Span("✓ Bewertet");
+            done.getStyle()
+                    .set("display", "block")
+                    .set("margin-top", "10px")
+                    .set("font-size", "13px")
+                    .set("font-weight", "600")
+                    .set("color", "#4f7f45")
+                    .set("text-align", "center");
+            return done;
+        }
+
+        Button reviewBtn = new Button("Jetzt bewerten", new Icon(VaadinIcon.STAR));
+        reviewBtn.setWidthFull();
+        reviewBtn.getStyle()
+                .set("border-radius", "24px")
+                .set("background", "#f5c842")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("font-weight", "600")
+                .set("font-size", "13px")
+                .set("height", "40px")
+                .set("cursor", "pointer")
+                .set("margin-top", "10px");
+        reviewBtn.addClickListener(e -> openReviewDialog(dto, currentUserId, reviewBtn));
+        return reviewBtn;
+    }
+
+    private void openReviewDialog(BookingDto dto, UUID currentUserId, Button reviewBtn) {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("420px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(true);
+        content.setSpacing(false);
+        content.getStyle().set("gap", "16px");
+
+        H3 title = new H3("Buchung bewerten");
+        title.getStyle().set("margin", "0").set("font-weight", "800").set("color", DARK);
+
+        Span subtitle = new Span("Wie war deine Erfahrung mit: " +
+                (dto.ownerId().equals(currentUserId) ? dto.sitterName() : dto.ownerName()) + "?");
+        subtitle.getStyle().set("font-size", "14px").set("color", MUTED);
+
+        // Stern-Auswahl
+        int[] selectedRating = {5};
+        HorizontalLayout starsRow = new HorizontalLayout();
+        starsRow.setSpacing(false);
+        starsRow.getStyle().set("gap", "6px");
+        Icon[] starIcons = new Icon[5];
+        for (int i = 0; i < 5; i++) {
+            int starNum = i + 1;
+            Icon star = new Icon(VaadinIcon.STAR);
+            star.setSize("28px");
+            star.getStyle().set("color", "#f5c842").set("cursor", "pointer");
+            starIcons[i] = star;
+            star.getElement().addEventListener("click", ev -> {
+                selectedRating[0] = starNum;
+                for (int j = 0; j < 5; j++) {
+                    starIcons[j].getStyle().set("color", j < starNum ? "#f5c842" : "#d1c4b4");
+                }
+            });
+            starsRow.add(star);
+        }
+
+        TextArea commentArea = new TextArea("Kommentar (optional)");
+        commentArea.setWidthFull();
+        commentArea.setMaxLength(100);
+        commentArea.setPlaceholder("Deine Erfahrung in max. 100 Zeichen...");
+        commentArea.getStyle().set("font-size", "14px");
+
+        HorizontalLayout buttons = new HorizontalLayout();
+        buttons.setWidthFull();
+        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.getStyle().set("gap", "10px");
+
+        Button cancel = new Button("Abbrechen");
+        cancel.getStyle().set("border-radius", "24px").set("background", "#e8ddd4")
+                .set("color", DARK).set("box-shadow", "none").set("font-weight", "600");
+        cancel.addClickListener(e -> dialog.close());
+
+        Button submit = new Button("Bewertung abgeben");
+        submit.getStyle().set("border-radius", "24px").set("background", DARK)
+                .set("color", "white").set("box-shadow", "none").set("font-weight", "600");
+        submit.addClickListener(e -> {
+            try {
+                userReviewService.submitReview(
+                        dto.id(), currentUserId, selectedRating[0],
+                        commentArea.getValue().isBlank() ? null : commentArea.getValue());
+                dialog.close();
+                Notification.show("Danke fuer deine Bewertung! ★".repeat(selectedRating[0]))
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                // ReviewBtn ersetzen durch "Bewertet"-Label
+                reviewBtn.setEnabled(false);
+                reviewBtn.setText("✓ Bewertet");
+                reviewBtn.getStyle().set("background", "#e8f5e9").set("color", "#4f7f45");
+            } catch (Exception ex) {
+                Notification.show("Fehler: " + ex.getMessage()).addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+
+        buttons.add(cancel, submit);
+        content.add(title, subtitle, starsRow, commentArea, buttons);
+        dialog.add(content);
+        dialog.open();
     }
 
     private Span buildHideLink(UUID bookingId) {

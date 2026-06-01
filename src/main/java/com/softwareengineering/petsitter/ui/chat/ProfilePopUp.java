@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.ui.chat;
 
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.dto.UserReviewDto;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.dto.PublicUserProfileDto;
 import com.vaadin.flow.component.button.Button;
@@ -17,39 +19,37 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import java.time.LocalDate;
 import java.time.Period;
+import java.util.List;
 
 public class ProfilePopUp extends Dialog {
 
     private static final String DARK = "#4a3428";
-    private static final String LIGHT_BG = "#f3eada"; // Background of the popup
-    private static final String CARD_BG = "#fbf7f0";  // Background of the cards
-    private static final String REVIEW_BG = "#f5eee4"; // Background of review items
+    private static final String LIGHT_BG = "#f3eada";
+    private static final String CARD_BG = "#fbf7f0";
+    private static final String REVIEW_BG = "#f5eee4";
 
     public ProfilePopUp() {
         this(new PublicUserProfileDto(
-                null,
-                "Max Mustermann",
-                LocalDate.now().minusYears(21),
-                "deutsch",
+                null, "Max Mustermann",
+                LocalDate.now().minusYears(21), "deutsch",
                 "Hallo, ich bin Max und betreue seit mehreren Jahren Hunde und Katzen.",
-                "76689",
-                "Neuthard",
-                "2 Hunde",
-                AccountStatus.VERIFIED
-        ));
+                "76689", "Neuthard", "2 Hunde", AccountStatus.VERIFIED),
+                null, List.of());
     }
 
     public ProfilePopUp(PublicUserProfileDto profile) {
+        this(profile, null, List.of());
+    }
+
+    public ProfilePopUp(PublicUserProfileDto profile, UserRatingSummary ratingSummary,
+                        List<UserReviewDto> recentReviews) {
         PublicUserProfileDto safeProfile = profile != null ? profile : emptyProfile();
         String displayName = valueOrDefault(safeProfile.displayName(), "Unbekannter Nutzer");
 
-        // Style the dialog itself
         this.setWidth("800px");
         this.setMaxWidth("90vw");
-        
-        // Customizing the dialog overlay background if needed, but we'll focus on the content
         this.getElement().getThemeList().add("no-padding");
-        
+
         VerticalLayout mainContainer = new VerticalLayout();
         mainContainer.setPadding(true);
         mainContainer.setSpacing(true);
@@ -66,138 +66,79 @@ public class ProfilePopUp extends Dialog {
         header.setAlignItems(FlexComponent.Alignment.CENTER);
 
         H2 title = new H2("Profil von " + displayName);
-        title.getStyle()
-                .set("margin", "0")
-                .set("color", DARK)
-                .set("font-size", "24px")
-                .set("font-weight", "800");
+        title.getStyle().set("margin", "0").set("color", DARK)
+                .set("font-size", "24px").set("font-weight", "800");
 
         Button closeButton = new Button(new Icon(VaadinIcon.CLOSE));
         closeButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeButton.getStyle().set("color", DARK);
-        closeButton.addClickListener(e -> {
-            System.out.println("Close button clicked in ProfilePopUp");
-            this.close();
-        });
-
+        closeButton.addClickListener(e -> this.close());
         header.add(title, closeButton);
 
-        // Card 1: Profile Details
+        // Profil-Card
         Div profileCard = new Div();
         profileCard.getStyle()
-                .set("background-color", CARD_BG)
-                .set("border-radius", "20px")
-                .set("padding", "30px")
-                .set("width", "100%")
-                .set("box-sizing", "border-box")
-                .set("position", "relative");
+                .set("background-color", CARD_BG).set("border-radius", "20px")
+                .set("padding", "30px").set("width", "100%")
+                .set("box-sizing", "border-box").set("position", "relative");
 
         HorizontalLayout profileContent = new HorizontalLayout();
         profileContent.setSpacing(true);
         profileContent.setAlignItems(FlexComponent.Alignment.START);
         profileContent.getStyle().set("gap", "40px");
 
-        // Avatar
         Div avatar = createAvatar(160);
-        
-        // Info Section
+
         VerticalLayout infoSection = new VerticalLayout();
         infoSection.setPadding(false);
         infoSection.setSpacing(false);
 
-        // Stars
+        // Sterne: echt oder leer
         HorizontalLayout starsLayout = new HorizontalLayout();
         starsLayout.setSpacing(false);
         starsLayout.getStyle().set("gap", "4px").set("margin-bottom", "10px");
+
+        int filledStars = (ratingSummary != null && ratingSummary.ratingCount() > 0)
+                ? (int) Math.round(ratingSummary.averageRating()) : 0;
         for (int i = 0; i < 5; i++) {
-            Icon star = new Icon(VaadinIcon.STAR);
+            Icon star = new Icon(i < filledStars ? VaadinIcon.STAR : VaadinIcon.STAR_O);
             star.setSize("20px");
-            star.getStyle().set("color", "#ffdf4a");
+            star.getStyle().set("color", i < filledStars ? "#ffdf4a" : "#c0b090");
             starsLayout.add(star);
         }
+        if (ratingSummary != null && ratingSummary.ratingCount() > 0) {
+            Span ratingText = new Span("  " + ratingSummary.averageRating() + " (" + ratingSummary.ratingCount() + ")");
+            ratingText.getStyle().set("font-size", "14px").set("color", "#6b5446").set("margin-left", "6px");
+            starsLayout.add(ratingText);
+        }
 
-        // Name
         H3 name = new H3(displayName);
-        name.getStyle()
-                .set("margin", "0 0 15px 0")
-                .set("color", DARK)
-                .set("font-size", "22px")
-                .set("font-weight", "700");
+        name.getStyle().set("margin", "0 0 15px 0").set("color", DARK)
+                .set("font-size", "22px").set("font-weight", "700");
 
-        // Details (Hunde, Alter, Ort, Sprache)
         VerticalLayout detailsLayout = new VerticalLayout();
         detailsLayout.setPadding(false);
         detailsLayout.setSpacing(false);
         detailsLayout.getStyle().set("margin-bottom", "20px").set("gap", "4px");
+        detailsLayout.add(
+                buildInfoLine(VaadinIcon.HEART, valueOrDefault(safeProfile.petSummary(), "Keine Haustiere")),
+                buildInfoLine(VaadinIcon.USER, formatAge(safeProfile.birthDate())),
+                buildInfoLine(VaadinIcon.MAP_MARKER, formatLocation(safeProfile.postalCode(), safeProfile.city())),
+                buildInfoLine(VaadinIcon.GLOBE, valueOrDefault(safeProfile.language(), "deutsch"))
+        );
 
-        HorizontalLayout dogsLayout = new HorizontalLayout();
-        dogsLayout.setAlignItems(FlexComponent.Alignment.CENTER);
-        dogsLayout.setSpacing(false);
-        dogsLayout.getStyle().set("gap", "6px");
-        Icon pawIcon = new Icon(VaadinIcon.HEART);
-        pawIcon.setSize("16px");
-        pawIcon.getStyle().set("color", DARK);
-        Span dogs = new Span(valueOrDefault(safeProfile.petSummary(), "Keine Haustiere"));
-        dogs.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
-        dogsLayout.add(pawIcon, dogs);
-        
-        HorizontalLayout ageLayout = new HorizontalLayout();
-        ageLayout.setAlignItems(FlexComponent.Alignment.CENTER);
-        ageLayout.setSpacing(false);
-        ageLayout.getStyle().set("gap", "6px");
-        Icon userIcon = new Icon(VaadinIcon.USER);
-        userIcon.setSize("16px");
-        userIcon.getStyle().set("color", DARK);
-        Span age = new Span(formatAge(safeProfile.birthDate()));
-        age.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
-        ageLayout.add(userIcon, age);
+        Paragraph desc = new Paragraph(valueOrDefault(safeProfile.bio(), "Noch keine Beschreibung hinterlegt."));
+        desc.getStyle().set("margin", "0 0 10px 0").set("color", "#6b5446").set("font-size", "15px");
 
-        HorizontalLayout locationLayout = new HorizontalLayout();
-        locationLayout.setAlignItems(FlexComponent.Alignment.CENTER);
-        locationLayout.setSpacing(false);
-        locationLayout.getStyle().set("gap", "6px");
-        Icon pinIcon = new Icon(VaadinIcon.MAP_MARKER);
-        pinIcon.setSize("16px");
-        pinIcon.getStyle().set("color", DARK);
-        Span location = new Span(formatLocation(safeProfile.postalCode(), safeProfile.city()));
-        location.getStyle().set("font-style", "italic").set("font-weight", "600").set("color", DARK);
-        locationLayout.add(pinIcon, location);
+        infoSection.add(starsLayout, name, detailsLayout, desc);
 
-        HorizontalLayout langLayout = new HorizontalLayout();
-        langLayout.setAlignItems(FlexComponent.Alignment.CENTER);
-        langLayout.setSpacing(false);
-        langLayout.getStyle().set("gap", "6px");
-        Icon globeIcon = new Icon(VaadinIcon.GLOBE);
-        globeIcon.setSize("16px");
-        globeIcon.getStyle().set("color", DARK);
-        Span lang = new Span(valueOrDefault(safeProfile.language(), "deutsch"));
-        lang.getStyle().set("font-style", "italic").set("font-weight", "600").set("color", DARK);
-        langLayout.add(globeIcon, lang);
-
-        detailsLayout.add(dogsLayout, ageLayout, locationLayout, langLayout);
-
-        // Description
-        Paragraph desc1 = new Paragraph(valueOrDefault(safeProfile.bio(), "Noch keine Beschreibung hinterlegt."));
-        desc1.getStyle().set("margin", "0 0 10px 0").set("color", "#6b5446").set("font-size", "15px");
-
-        infoSection.add(starsLayout, name, detailsLayout, desc1);
-
-        // Verified Badge (absolute positioned top right inside profileCard)
         Div verifiedBadge = new Div();
         verifiedBadge.getStyle()
-                .set("position", "absolute")
-                .set("top", "30px")
-                .set("right", "30px")
-                .set("background-color", "#f0faf5") // Very light green
-                .set("color", "#2e7d32") // Green text
-                .set("padding", "6px 12px")
-                .set("border-radius", "20px")
-                .set("font-size", "13px")
-                .set("font-weight", "600")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("gap", "4px");
-        
+                .set("position", "absolute").set("top", "30px").set("right", "30px")
+                .set("background-color", "#f0faf5").set("color", "#2e7d32")
+                .set("padding", "6px 12px").set("border-radius", "20px")
+                .set("font-size", "13px").set("font-weight", "600")
+                .set("display", "flex").set("align-items", "center").set("gap", "4px");
         Icon checkIcon = new Icon(VaadinIcon.CHECK);
         checkIcon.setSize("14px");
         checkIcon.getStyle().set("color", "#2e7d32");
@@ -209,45 +150,49 @@ public class ProfilePopUp extends Dialog {
             profileCard.add(verifiedBadge);
         }
 
-        // Card 2: Reviews
+        // Bewertungs-Card
         Div reviewsCard = new Div();
         reviewsCard.getStyle()
-                .set("background-color", CARD_BG)
-                .set("border-radius", "20px")
-                .set("padding", "30px")
-                .set("width", "100%")
-                .set("box-sizing", "border-box")
-                .set("margin-top", "20px");
+                .set("background-color", CARD_BG).set("border-radius", "20px")
+                .set("padding", "30px").set("width", "100%")
+                .set("box-sizing", "border-box").set("margin-top", "20px");
 
         H2 reviewsTitle = new H2("Bewertungen von " + displayName);
-        reviewsTitle.getStyle()
-                .set("margin", "0 0 20px 0")
-                .set("color", DARK)
-                .set("font-size", "22px")
-                .set("font-weight", "800");
+        reviewsTitle.getStyle().set("margin", "0 0 20px 0").set("color", DARK)
+                .set("font-size", "22px").set("font-weight", "800");
 
         VerticalLayout reviewsList = new VerticalLayout();
         reviewsList.setPadding(false);
         reviewsList.setSpacing(true);
 
-        // Review 1
-        reviewsList.add(createReviewItem(
-                5, 
-                "Sehr zuverlässig", 
-                "„Bruno war bestens betreut. Kommunikation und Übergabe waren super unkompliziert.“"
-        ));
-
-        // Review 2
-        reviewsList.add(createReviewItem(
-                4, 
-                "Freundlich und flexibel", 
-                "„Sehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgefühlt.“"
-        ));
+        if (recentReviews != null && !recentReviews.isEmpty()) {
+            for (UserReviewDto r : recentReviews) {
+                reviewsList.add(createReviewItem(r.rating(), r.reviewerName(),
+                        r.comment() != null ? "\u201E" + r.comment() + "\u201C" : ""));
+            }
+        } else {
+            Span noReviews = new Span("Noch keine Bewertungen vorhanden.");
+            noReviews.getStyle().set("font-size", "14px").set("color", "#a08060");
+            reviewsList.add(noReviews);
+        }
 
         reviewsCard.add(reviewsTitle, reviewsList);
-
         mainContainer.add(header, profileCard, reviewsCard);
         add(mainContainer);
+    }
+
+    private HorizontalLayout buildInfoLine(VaadinIcon iconType, String text) {
+        HorizontalLayout layout = new HorizontalLayout();
+        layout.setAlignItems(FlexComponent.Alignment.CENTER);
+        layout.setSpacing(false);
+        layout.getStyle().set("gap", "6px");
+        Icon icon = new Icon(iconType);
+        icon.setSize("16px");
+        icon.getStyle().set("color", DARK);
+        Span s = new Span(text);
+        s.getStyle().set("font-style", "italic").set("color", DARK).set("font-weight", "600");
+        layout.add(icon, s);
+        return layout;
     }
 
     private PublicUserProfileDto emptyProfile() {
@@ -255,14 +200,9 @@ public class ProfilePopUp extends Dialog {
     }
 
     private String formatAge(LocalDate birthDate) {
-        if (birthDate == null) {
-            return "Alter nicht angegeben";
-        }
+        if (birthDate == null) return "Alter nicht angegeben";
         int age = Period.between(birthDate, LocalDate.now()).getYears();
-        if (age < 0) {
-            return "Alter nicht angegeben";
-        }
-        return age + " Jahre alt";
+        return age < 0 ? "Alter nicht angegeben" : age + " Jahre alt";
     }
 
     private String formatLocation(String postalCode, String city) {
@@ -281,16 +221,11 @@ public class ProfilePopUp extends Dialog {
     private Div createAvatar(int size) {
         Div avatar = new Div();
         avatar.getStyle()
-                .set("width", size + "px")
-                .set("height", size + "px")
-                .set("min-width", size + "px")
-                .set("border-radius", "50%")
-                .set("background-color", "#e0c4a4") // Light brown matching the design
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("overflow", "hidden");
-
+                .set("width", size + "px").set("height", size + "px")
+                .set("min-width", size + "px").set("border-radius", "50%")
+                .set("background-color", "#e0c4a4")
+                .set("display", "flex").set("align-items", "center")
+                .set("justify-content", "center").set("overflow", "hidden");
         Div svgWrap = new Div();
         svgWrap.getElement().setProperty("innerHTML",
                 "<svg width='" + (size * 0.7) + "' height='" + (size * 0.7) + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
@@ -303,12 +238,9 @@ public class ProfilePopUp extends Dialog {
     private Div createReviewItem(int starsCount, String titleText, String reviewText) {
         Div reviewItem = new Div();
         reviewItem.getStyle()
-                .set("background-color", REVIEW_BG)
-                .set("border-radius", "12px")
-                .set("padding", "20px")
-                .set("width", "100%")
-                .set("box-sizing", "border-box")
-                .set("border", "1px solid #efe4d3");
+                .set("background-color", REVIEW_BG).set("border-radius", "12px")
+                .set("padding", "20px").set("width", "100%")
+                .set("box-sizing", "border-box").set("border", "1px solid #efe4d3");
 
         HorizontalLayout header = new HorizontalLayout();
         header.setAlignItems(FlexComponent.Alignment.CENTER);
@@ -318,7 +250,6 @@ public class ProfilePopUp extends Dialog {
         HorizontalLayout starsLayout = new HorizontalLayout();
         starsLayout.setSpacing(false);
         starsLayout.getStyle().set("gap", "2px");
-        
         for (int i = 0; i < 5; i++) {
             Icon star = new Icon(i < starsCount ? VaadinIcon.STAR : VaadinIcon.STAR_O);
             star.setSize("14px");
@@ -327,20 +258,15 @@ public class ProfilePopUp extends Dialog {
         }
 
         Span title = new Span(titleText);
-        title.getStyle()
-                .set("color", DARK)
-                .set("font-weight", "700")
-                .set("font-size", "15px");
-
+        title.getStyle().set("color", DARK).set("font-weight", "700").set("font-size", "15px");
         header.add(starsLayout, title);
 
-        Paragraph text = new Paragraph(reviewText);
-        text.getStyle()
-                .set("margin", "0")
-                .set("color", "#6b5446")
-                .set("font-size", "14px");
-
-        reviewItem.add(header, text);
+        reviewItem.add(header);
+        if (!reviewText.isBlank()) {
+            Paragraph text = new Paragraph(reviewText);
+            text.getStyle().set("margin", "0").set("color", "#6b5446").set("font-size", "14px");
+            reviewItem.add(text);
+        }
         return reviewItem;
     }
 }

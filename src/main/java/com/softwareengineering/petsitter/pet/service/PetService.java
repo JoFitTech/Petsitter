@@ -5,6 +5,8 @@ import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionAction;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionDecision;
 import com.softwareengineering.petsitter.pet.dto.PetDeletionImpact;
@@ -173,11 +175,26 @@ public class PetService {
         pet.setBreed(dto.breed() == null || dto.breed().isBlank() ? null : dto.breed().trim());
         pet.setBirthDate(dto.birthDate());
         pet.setNotes(dto.notes() == null || dto.notes().isBlank() ? null : dto.notes().trim());
+        pet.setVaccinationStatus(dto.vaccinationStatus() == null
+                ? PetVaccinationStatus.UNBEKANNT
+                : dto.vaccinationStatus());
+        pet.setTags(normalizeTags(dto.tags()));
     }
 
     private PetDto toDto(Pet pet) {
         return new PetDto(pet.getId(), pet.getName(), pet.getSpecies(),
-                pet.getCustomSpecies(), pet.getBreed(), pet.getBirthDate(), pet.getNotes());
+                pet.getCustomSpecies(), pet.getBreed(), pet.getBirthDate(), pet.getNotes(),
+                pet.getVaccinationStatus() == null ? PetVaccinationStatus.UNBEKANNT : pet.getVaccinationStatus(),
+                new LinkedHashSet<>(pet.getTags()));
+    }
+
+    private Set<PetTag> normalizeTags(Set<PetTag> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return Set.of();
+        }
+        return tags.stream()
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     private User currentUserOrThrow() {

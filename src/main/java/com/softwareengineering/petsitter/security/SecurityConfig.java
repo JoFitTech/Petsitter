@@ -104,6 +104,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/",
                                 "/login",
+                                "/forgot-password",
                                 "/error",
                                 "/VAADIN/**",
                                 "/frontend/**",

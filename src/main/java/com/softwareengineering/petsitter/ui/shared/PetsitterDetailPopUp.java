@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.booking.dto.BookingAcceptancePreview;
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
@@ -9,6 +11,7 @@ import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.chat.ProfilePopUp;
 import com.softwareengineering.petsitter.user.service.UserService;
+import java.math.BigDecimal;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -41,15 +44,18 @@ public class PetsitterDetailPopUp extends Dialog {
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
     private final UserService userService;
+    private final BookingService bookingService;
 
     public PetsitterDetailPopUp(OfferCardDto dto, String distance, int stars, OfferService offerService,
                                 RequestService requestService, ChatService chatService,
-                                AuthenticatedUser authenticatedUser, UserService userService) {
+                                AuthenticatedUser authenticatedUser, UserService userService,
+                                BookingService bookingService) {
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
         this.userService = userService;
+        this.bookingService = bookingService;
 
         setWidth("520px");
         setCloseOnOutsideClick(true);
@@ -202,6 +208,9 @@ public class PetsitterDetailPopUp extends Dialog {
                 petValue.append(")");
             }
             content.add(readOnlyTextField(dto.petName().contains(",") ? "Haustiere" : "Haustier", petValue.toString()));
+            if (dto.petTags() != null && !dto.petTags().isBlank()) {
+                content.add(readOnlyTextField("Eigenschaften", dto.petTags()));
+            }
         } else if (dto.animalType() != null) {
             // SITTER_OFFER: zeige bevorzugte Tierart
             content.add(readOnlyTextField("Bevorzugte Tierart", dto.animalType().label()));
@@ -340,6 +349,25 @@ public class PetsitterDetailPopUp extends Dialog {
     }
 
     private void onAuftragAnfragenClicked(UUID offerId) {
+        UUID currentUserId = authenticatedUser.get()
+                .map(com.softwareengineering.petsitter.user.domain.User::getId)
+                .orElse(null);
+        if (currentUserId == null) {
+            Notification.show("Bitte melde dich an.");
+            return;
+        }
+
+        try {
+            BookingAcceptancePreview preview = bookingService.previewForOffer(offerId, currentUserId);
+            if (!preview.sufficientBalance()) {
+                openInsufficientBalanceDialog(preview);
+                return;
+            }
+        } catch (Exception ex) {
+            Notification.show("Fehler: " + ex.getMessage());
+            return;
+        }
+
         Dialog dialog = new Dialog();
         dialog.setWidth("440px");
         dialog.getElement().getThemeList().add("no-padding");
@@ -400,13 +428,6 @@ public class PetsitterDetailPopUp extends Dialog {
         buttons.getStyle().set("margin-top", "8px");
 
         Button submitBtn = new Button("Anfragen", e -> {
-            UUID currentUserId = authenticatedUser.get()
-                    .map(com.softwareengineering.petsitter.user.domain.User::getId)
-                    .orElse(null);
-            if (currentUserId == null) {
-                Notification.show("Bitte melde dich an.");
-                return;
-            }
             try {
                 var request = requestService.createRequest(offerId, currentUserId, messageArea.getValue());
                 String conversationId = chatService.createConversationForRequest(
@@ -436,6 +457,53 @@ public class PetsitterDetailPopUp extends Dialog {
         dialogContent.add(header, messageArea, buttons);
         dialog.add(dialogContent);
         dialog.open();
+    }
+
+    private void openInsufficientBalanceDialog(BookingAcceptancePreview preview) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Buchung bestätigen");
+        dialog.setWidth("460px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(false);
+        content.getStyle().set("gap", "12px");
+
+        Paragraph explanation = new Paragraph(
+                "Der Gesamtpreis wird von deinem Guthaben abgezogen und bis zur Auszahlung sicher in Treuhand gehalten.");
+        explanation.getStyle().set("margin", "0").set("font-size", "14px").set("color", "#7a6050");
+
+        content.add(
+                explanation,
+                paymentLine("Preis pro Tag", preview.pricePerDay()),
+                paymentLine("Gesamtpreis", preview.totalPrice()),
+                paymentLine("Dein Guthaben", preview.availableBalance()));
+
+        Paragraph warning = new Paragraph("Dein Guthaben reicht für diese Buchung noch nicht aus.");
+        warning.getStyle().set("margin", "0").set("color", "#9a4f36").set("font-weight", "700");
+        Button walletButton = new Button("Guthaben aufladen", event -> {
+            dialog.close();
+            close();
+            UI.getCurrent().navigate("profile", QueryParameters.of("tab", "wallet"));
+        });
+        walletButton.getStyle().set("background", DARK).set("color", "white").set("border-radius", "22px");
+        content.add(warning, walletButton);
+        content.add(new ExternalPaymentMethods());
+
+        dialog.add(content);
+        dialog.open();
+    }
+
+    private Component paymentLine(String label, BigDecimal amount) {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        Span key = new Span(label);
+        key.getStyle().set("color", "#7a6050");
+        Span value = new Span(amount.setScale(2) + " EUR");
+        value.getStyle().set("font-weight", "800").set("color", DARK);
+        row.add(key, value);
+        return row;
     }
 
     // ── Private helpers ───────────────────────────────────────────────────

@@ -49,3 +49,4 @@ petsitter:
   # DEV: Zeigt vollständigen Code im Log (ausschalten in PROD!)
   dev:
     show-login-code: ${PETSITTER_DEV_SHOW_LOGIN_CODE:true}
+    show-password-reset-code: ${PETSITTER_DEV_SHOW_PASSWORD_RESET_CODE:true}

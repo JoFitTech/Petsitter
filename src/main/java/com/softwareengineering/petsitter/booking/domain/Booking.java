@@ -14,7 +14,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
@@ -30,7 +29,7 @@ import java.util.UUID;
  * - Wer (Owner, Sitter)
  * - Welches Pet wird betreut
  * - Wann (startDate, endDate)
- * - Wieviel (pricePerWeek)
+ * - Wieviel (pricePerDay und fester totalPrice-Snapshot)
  *
  * <p>Lifecycle:
  * 1. Owner erstellt OWNER_OFFER  → Status = OPEN
@@ -42,8 +41,8 @@ import java.util.UUID;
  * 7. User kann Booking später stornieren → Status = CANCELLED
  * 8. Nach Ablauf → Status = COMPLETED (manuell oder auto)
  *
- * <p>Wichtig: 1:1 Verhältnis zwischen Offer und Booking!
- * Unique Constraints auf offer_id und accepted_request_id garantieren das.
+ * <p>Ein Offer und ein Request koennen nach einer Stornierung erneut verwendet werden.
+ * Historische Bookings bleiben dabei erhalten.
  *
  * @see com.softwareengineering.petsitter.booking.service.BookingService#acceptRequest
  * @see com.softwareengineering.petsitter.offer.domain.Offer
@@ -61,21 +60,19 @@ public class Booking {
     private UUID id;
 
     /**
-     * Das übergeordnete Offer – 1:1 Verhältnis.
-     * unique = true: Nur ein Booking pro Offer!
+     * Das übergeordnete Offer.
      * Wird gesetzt, wenn Request von Offer-Creator akzeptiert wird.
      */
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "offer_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "offer_id", nullable = false)
     private Offer offer;
 
     /**
-     * Der akzeptierte Request – 1:1 Verhältnis.
-     * unique = true: Jeder Request kann maximal einmal akzeptiert werden.
+     * Der akzeptierte Request.
      * Dies ist der Request, der dieses Booking erzeugt hat.
      */
-    @OneToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "accepted_request_id", nullable = false, unique = true)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "accepted_request_id", nullable = false)
     private OfferRequest acceptedRequest;
 
     /**
@@ -120,11 +117,17 @@ public class Booking {
     private LocalDate endDate;
 
     /**
-     * Preis pro Woche für die Betreuung in EUR.
+     * Preis pro Tag für die Betreuung in EUR.
      * Wird vom Offer übernommen (z.B. 50.00).
      */
     @Column(precision = 12, scale = 2)
-    private BigDecimal pricePerWeek;
+    private BigDecimal pricePerDay;
+
+    /**
+     * Fester Gesamtpreis der Buchung in EUR.
+     */
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalPrice;
 
     /**
      * Status des Bookings.
@@ -209,12 +212,20 @@ public class Booking {
         this.endDate = endDate;
     }
 
-    public BigDecimal getPricePerWeek() {
-        return pricePerWeek;
+    public BigDecimal getPricePerDay() {
+        return pricePerDay;
     }
 
-    public void setPricePerWeek(BigDecimal pricePerWeek) {
-        this.pricePerWeek = pricePerWeek;
+    public void setPricePerDay(BigDecimal pricePerDay) {
+        this.pricePerDay = pricePerDay;
+    }
+
+    public BigDecimal getTotalPrice() {
+        return totalPrice;
+    }
+
+    public void setTotalPrice(BigDecimal totalPrice) {
+        this.totalPrice = totalPrice;
     }
 
     public BookingStatus getStatus() {

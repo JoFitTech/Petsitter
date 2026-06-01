@@ -1,27 +1,13 @@
 package com.softwareengineering.petsitter.ui.booking;
 
-import com.softwareengineering.petsitter.booking.domain.BookingStatus;
-import com.softwareengineering.petsitter.booking.dto.BookingDto;
-import com.softwareengineering.petsitter.booking.service.BookingService;
-import com.softwareengineering.petsitter.security.AuthenticatedUser;
-import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
-import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.html.*;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.VaadinIcon;
-import com.vaadin.flow.component.notification.Notification;
-import com.vaadin.flow.component.notification.NotificationVariant;
-import com.vaadin.flow.component.orderedlayout.FlexComponent;
-import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
+import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Optional;
 
 @Route(value = "bookings", layout = MainLayout.class)
 @PageTitle("Buchungen | Petsitter")

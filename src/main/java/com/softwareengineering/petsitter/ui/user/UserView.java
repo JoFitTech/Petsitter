@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.user;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
@@ -12,6 +13,7 @@ import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
+import com.softwareengineering.petsitter.wallet.service.WalletService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -49,12 +51,14 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
+    private final PostalCodeService postalCodeService;
     private final PetService petService;
     private final OfferService offerService;
     private final FavoriteService favoriteService;
     private final RequestService requestService;
     private final ChatService chatService;
     private final BookingService bookingService;
+    private final WalletService walletService;
     private final AuthenticatedUser authenticatedUser;
     private UserProfileDto currentProfile;
 
@@ -63,26 +67,31 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnMeineAuftraege;
     private Button btnMeineBuchungen;
     private Button btnMeineFavoriten;
+    private Button btnGuthaben;
     private Button btnPersAngaben;
     private Button btnLogout;
     private Div contentPanel;
 
     public UserView(
             UserService userService,
+            PostalCodeService postalCodeService,
             PetService petService,
             OfferService offerService,
             FavoriteService favoriteService,
             RequestService requestService,
             ChatService chatService,
             BookingService bookingService,
+            WalletService walletService,
             AuthenticatedUser authenticatedUser) {
         this.userService = userService;
+        this.postalCodeService = postalCodeService;
         this.petService = petService;
         this.offerService = offerService;
         this.favoriteService = favoriteService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.bookingService = bookingService;
+        this.walletService = walletService;
         this.authenticatedUser = authenticatedUser;
         reloadProfile();
 
@@ -120,6 +129,11 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         if ("pets".equals(tab)) {
             setActiveStyle(btnMeineTiere);
             showMeineTiere();
+            return;
+        }
+        if ("wallet".equals(tab)) {
+            setActiveStyle(btnGuthaben);
+            showGuthaben();
             return;
         }
         setActiveStyle(btnUeberMich);
@@ -208,6 +222,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege = sidebarBtn("Meine Aufträge");
         btnMeineBuchungen = sidebarBtn("Meine Buchungen");
         btnMeineFavoriten = sidebarBtn("Meine Favoriten");
+        btnGuthaben        = sidebarBtn("Guthaben");
         btnPersAngaben    = sidebarBtn("Persönliche Angaben");
         btnLogout         = sidebarBtn("Log out");
 
@@ -216,10 +231,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
         btnMeineBuchungen.addClickListener(e -> { setActiveStyle(btnMeineBuchungen); showMeineBuchungen(); });
         btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
+        btnGuthaben.addClickListener(e        -> { setActiveStyle(btnGuthaben);        showGuthaben(); });
         btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(); });
         btnLogout.addClickListener(e         -> handleLogout());
 
-        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout);
+        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen,
+                btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout);
         return sidebar;
     }
 
@@ -241,7 +258,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private void setActiveStyle(Button active) {
-        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout}) {
+        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen,
+                btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
         active.getStyle().set("background", "#774f35").set("color", "white");
@@ -635,7 +653,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private void showMeineFavoriten() {
         contentPanel.removeAll();
         contentPanel.add(new MyFavoritesView(favoriteService, offerService, requestService, chatService,
-                authenticatedUser, userService));
+                authenticatedUser, userService, bookingService));
+    }
+
+    private void showGuthaben() {
+        contentPanel.removeAll();
+        contentPanel.add(new MyWalletView(walletService, authenticatedUser));
     }
 
     private void showPersAngaben() {
@@ -643,7 +666,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             return;
         }
         contentPanel.removeAll();
-        contentPanel.add(new PersonalDetailView(userService, currentProfile, profile -> currentProfile = profile));
+        contentPanel.add(new PersonalDetailView(userService, postalCodeService, currentProfile, profile -> currentProfile = profile));
     }
 
     private void handleLogout() {

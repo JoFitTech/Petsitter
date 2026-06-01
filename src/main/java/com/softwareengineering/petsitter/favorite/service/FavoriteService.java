@@ -9,6 +9,8 @@ import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
@@ -161,6 +163,7 @@ public class FavoriteService {
                 petNames(pets),
                 petSpeciesLabels(pets),
                 petBreeds(pets),
+                petTags(pets),
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
                 null,
@@ -205,6 +208,32 @@ public class FavoriteService {
 
     private String petBreeds(List<Pet> pets) {
         return petSummary(pets, Pet::getBreed);
+    }
+
+    private String petTags(List<Pet> pets) {
+        if (pets == null || pets.isEmpty()) {
+            return null;
+        }
+        List<String> vaccinationLabels = List.of(PetVaccinationStatus.values()).stream()
+                .filter(status -> pets.stream().anyMatch(pet -> vaccinationStatus(pet) == status))
+                .map(PetVaccinationStatus::label)
+                .toList();
+        List<String> tagLabels = List.of(PetTag.values()).stream()
+                .filter(tag -> pets.stream()
+                        .filter(java.util.Objects::nonNull)
+                        .anyMatch(pet -> pet.getTags().contains(tag)))
+                .map(PetTag::label)
+                .toList();
+        String value = java.util.stream.Stream.concat(vaccinationLabels.stream(), tagLabels.stream())
+                .collect(Collectors.joining(", "));
+        return value.isBlank() ? null : value;
+    }
+
+    private PetVaccinationStatus vaccinationStatus(Pet pet) {
+        if (pet == null || pet.getVaccinationStatus() == null) {
+            return PetVaccinationStatus.UNBEKANNT;
+        }
+        return pet.getVaccinationStatus();
     }
 
     private String petSpeciesLabel(Pet pet) {

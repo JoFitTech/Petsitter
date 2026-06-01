@@ -7,10 +7,13 @@ import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.user.repository.UserRepository;
+import com.softwareengineering.petsitter.booking.domain.Booking;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.util.List;
 import java.util.UUID;
@@ -33,13 +36,16 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final AuthenticatedUser authenticatedUser;
+    private final UserRepository userRepository;
 
     public NotificationService(
             NotificationRepository notificationRepository,
-            AuthenticatedUser authenticatedUser
+            AuthenticatedUser authenticatedUser,
+            UserRepository userRepository
     ) {
         this.notificationRepository = notificationRepository;
         this.authenticatedUser = authenticatedUser;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -115,6 +121,54 @@ public class NotificationService {
         notificationRepository.save(notification);
         log.info("Request notification created for recipient {} from requester {} in conversation {}",
             recipient.getId(), requester.getId(), conversationId);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void createWalletTopUpRequiredNotification(UUID ownerId) {
+        if (ownerId == null) {
+            return;
+        }
+        userRepository.findById(ownerId).ifPresent(owner -> createNotification(
+                owner,
+                NotificationType.WALLET_TOP_UP_REQUIRED,
+                "Dein Guthaben reicht fuer eine angefragte Buchung nicht aus. Bitte lade Guthaben auf.",
+                "wallet"));
+    }
+
+    @Transactional
+    public void createPayoutRequestedNotification(User owner, Booking booking) {
+        createNotification(
+                owner,
+                NotificationType.PAYOUT_REQUESTED,
+                "Der Tiersitter hat die Auszahlung fuer eine Betreuung angefordert.",
+                booking.getId().toString());
+    }
+
+    @Transactional
+    public void createPayoutReleasedNotification(User sitter, Booking booking) {
+        createNotification(
+                sitter,
+                NotificationType.PAYOUT_RELEASED,
+                "Die Auszahlung fuer eine Betreuung wurde deinem Guthaben gutgeschrieben.",
+                booking.getId().toString());
+    }
+
+    private void createNotification(
+            User recipient,
+            NotificationType type,
+            String message,
+            String referenceId
+    ) {
+        if (recipient == null) {
+            return;
+        }
+        Notification notification = new Notification();
+        notification.setRecipient(recipient);
+        notification.setType(type);
+        notification.setMessage(message);
+        notification.setReferenceId(referenceId);
+        notification.setRead(false);
+        notificationRepository.save(notification);
     }
 
     /**

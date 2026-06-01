@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.booking.dto.BookingDto;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
+import com.softwareengineering.petsitter.wallet.domain.PaymentStatus;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -26,6 +27,7 @@ import com.vaadin.flow.server.VaadinSession;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -130,11 +132,15 @@ public class MyBookings extends Div {
         Comparator<BookingDto> comparator = "BUCHUNGSDATUM".equals(activeSort)
                 ? Comparator.comparing(b -> b.bookedAt() != null ? b.bookedAt() : java.time.LocalDateTime.MIN)
                 : Comparator.comparing(b -> b.startDate() != null ? b.startDate() : LocalDate.MIN);
-        return list.stream().sorted(comparator.reversed()).collect(Collectors.toList());
+        return list.stream().sorted(comparator).collect(Collectors.toList());
     }
 
     private boolean isPast(BookingDto b) {
         return b.startDate() != null && b.startDate().isBefore(LocalDate.now());
+    }
+
+    private boolean hasStarted(BookingDto b) {
+        return b.startDate() != null && !b.startDate().isAfter(LocalDate.now());
     }
 
     // ── Header with filter/sort controls ─────────────────────────────────
@@ -231,7 +237,7 @@ public class MyBookings extends Div {
         Span roleBadge = badge(roleLabel, "#ffffff", DARK);
         roleBadge.getStyle().set("position", "absolute").set("top", "12px").set("left", "12px");
 
-        Span statusBadge = badge(statusLabel(dto.status()), statusBackground(dto.status()), statusColor(dto.status()));
+        Span statusBadge = badge(statusLabel(dto), statusBackground(dto), statusColor(dto));
         statusBadge.getStyle().set("position", "absolute").set("top", "12px").set("right", "12px");
 
         colorBar.add(roleBadge, statusBadge);
@@ -278,8 +284,17 @@ public class MyBookings extends Div {
         detailsRow.getStyle().set("gap", "12px");
         detailsRow.add(
                 buildDetailColumn("Zeitraum",    formatDateRange(dto.startDate(), dto.endDate()), DARK),
-                buildDetailColumn("Preis/Woche", formatPrice(dto.pricePerWeek()), "#a5663b"),
-                buildDetailColumn("Status",      statusLabel(dto.status()), DARK)
+                buildDetailColumn("Preis/Tag",   formatPrice(dto.pricePerDay()), "#a5663b"),
+                buildDetailColumn("Status",      statusLabel(dto), DARK)
+        );
+
+        HorizontalLayout paymentRow = new HorizontalLayout();
+        paymentRow.setWidthFull();
+        paymentRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        paymentRow.getStyle().set("gap", "12px").set("margin-top", "14px");
+        paymentRow.add(
+                buildDetailColumn("Gesamtpreis", formatPrice(dto.totalPrice()), DARK),
+                buildDetailColumn("Zahlung", paymentStatusLabel(dto.paymentStatus()), paymentStatusColor(dto.paymentStatus()))
         );
 
         Button chatBtn = new Button("Zum Chat", new Icon(VaadinIcon.CHAT));
@@ -305,15 +320,90 @@ public class MyBookings extends Div {
 
         card.add(colorBar, titleRow, subtitle);
         if (petSpan != null) card.add(petSpan);
-        card.add(detailsRow);
+        card.add(detailsRow, paymentRow);
 
         if (dto.status() == BookingStatus.CREATED) {
-            card.add(chatBtn, buildCancelLink(dto));
+            card.add(chatBtn);
+            addPaymentActions(card, dto, currentUserId, isOwner);
+            if (!hasStarted(dto)) {
+                card.add(buildCancelLink(dto));
+            }
         } else {
             card.add(chatBtn, buildHideLink(dto.id()));
         }
 
         return card;
+    }
+
+    private void addPaymentActions(Div card, BookingDto dto, UUID currentUserId, boolean isOwner) {
+        if (dto.endDate() == null || !LocalDate.now().isAfter(dto.endDate())) {
+            return;
+        }
+        if (dto.paymentStatus() == PaymentStatus.HELD) {
+            if (isOwner) {
+                card.add(actionButton("Auszahlung freigeben", () -> releasePayment(dto.id(), currentUserId)));
+            } else {
+                card.add(actionButton("Auszahlung anfordern", () -> requestPayment(dto.id(), currentUserId)));
+            }
+            return;
+        }
+        if (dto.paymentStatus() == PaymentStatus.RELEASE_REQUESTED) {
+            Span deadline = new Span("Auszahlung angefordert · automatische Freigabe am "
+                    + formatDateTime(dto.automaticReleaseAt()));
+            deadline.getStyle()
+                    .set("display", "block")
+                    .set("margin-top", "14px")
+                    .set("font-size", "12px")
+                    .set("font-weight", "700")
+                    .set("color", "#a5663b");
+            card.add(deadline);
+            if (isOwner) {
+                card.add(actionButton("Auszahlung freigeben", () -> releasePayment(dto.id(), currentUserId)));
+                card.add(actionButton("Problem melden", () -> Notification.show(
+                        "Während der Entwicklungsphase noch nicht implementiert.")));
+            }
+        }
+    }
+
+    private Button actionButton(String label, Runnable action) {
+        Button button = new Button(label);
+        button.setWidthFull();
+        button.getStyle()
+                .set("border-radius", "24px")
+                .set("background", "#f6e3bd")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("font-weight", "700")
+                .set("font-size", "13px")
+                .set("height", "40px")
+                .set("cursor", "pointer")
+                .set("margin-top", "10px");
+        button.addClickListener(event -> action.run());
+        return button;
+    }
+
+    private void releasePayment(UUID bookingId, UUID currentUserId) {
+        try {
+            bookingService.releasePayment(bookingId, currentUserId);
+            Notification.show("Auszahlung wurde freigegeben.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+
+    private void requestPayment(UUID bookingId, UUID currentUserId) {
+        try {
+            bookingService.requestPaymentRelease(bookingId, currentUserId);
+            Notification.show("Auszahlung wurde angefordert.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
     }
 
     private Span buildCancelLink(BookingDto dto) {
@@ -414,24 +504,26 @@ public class MyBookings extends Div {
         return b;
     }
 
-    private String statusLabel(BookingStatus status) {
-        if (status == null) return "Unbekannt";
-        return switch (status) {
-            case CREATED   -> "Aktiv";
+    private String statusLabel(BookingDto dto) {
+        if (dto.status() == null) return "Unbekannt";
+        return switch (dto.status()) {
+            case CREATED   -> isPast(dto) ? "Vergangen" : "Aktiv";
             case CANCELLED -> "Storniert";
             case COMPLETED -> "Abgeschlossen";
         };
     }
 
-    private String statusBackground(BookingStatus status) {
-        if (status == BookingStatus.CANCELLED) return "#f4e0d8";
-        if (status == BookingStatus.COMPLETED) return "#e0e7ff";
+    private String statusBackground(BookingDto dto) {
+        if (dto.status() == BookingStatus.CANCELLED) return "#f4e0d8";
+        if (dto.status() == BookingStatus.COMPLETED) return "#e0e7ff";
+        if (isPast(dto)) return "#e8e8e8";
         return "#edf7e8";
     }
 
-    private String statusColor(BookingStatus status) {
-        if (status == BookingStatus.CANCELLED) return "#9a4f36";
-        if (status == BookingStatus.COMPLETED) return "#3730a3";
+    private String statusColor(BookingDto dto) {
+        if (dto.status() == BookingStatus.CANCELLED) return "#9a4f36";
+        if (dto.status() == BookingStatus.COMPLETED) return "#3730a3";
+        if (isPast(dto)) return "#666666";
         return "#4f7f45";
     }
 
@@ -458,5 +550,27 @@ public class MyBookings extends Div {
     private String formatPrice(BigDecimal price) {
         if (price == null) return "–";
         return price.stripTrailingZeros().toPlainString() + " €";
+    }
+
+    private String paymentStatusLabel(PaymentStatus status) {
+        if (status == null) return "Unbekannt";
+        return switch (status) {
+            case HELD -> "In Treuhand";
+            case RELEASE_REQUESTED -> "Auszahlung angefordert";
+            case RELEASED -> "Ausgezahlt";
+            case REFUNDED -> "Erstattet";
+            case LEGACY_UNFUNDED -> "Legacy-Buchung";
+        };
+    }
+
+    private String paymentStatusColor(PaymentStatus status) {
+        if (status == PaymentStatus.RELEASED) return "#4f7f45";
+        if (status == PaymentStatus.REFUNDED) return "#9a4f36";
+        return "#a5663b";
+    }
+
+    private String formatDateTime(LocalDateTime value) {
+        if (value == null) return "–";
+        return value.format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"));
     }
 }

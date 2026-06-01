@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.booking.service;
 import com.softwareengineering.petsitter.booking.domain.Booking;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.dto.BookingDto;
+import com.softwareengineering.petsitter.booking.dto.BookingAcceptancePreview;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
@@ -14,9 +15,16 @@ import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRep
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
+import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.domain.User;
+import com.softwareengineering.petsitter.wallet.dto.BookingPaymentDto;
+import com.softwareengineering.petsitter.wallet.service.WalletService;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,17 +51,30 @@ public class BookingService {
     private final OfferRequestRepository offerRequestRepository;
     private final OfferRepository offerRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final WalletService walletService;
 
+    @Autowired
     public BookingService(
             BookingRepository bookingRepository,
             OfferRequestRepository offerRequestRepository,
             OfferRepository offerRepository,
-            ApplicationEventPublisher eventPublisher
+            ApplicationEventPublisher eventPublisher,
+            WalletService walletService
     ) {
         this.bookingRepository = bookingRepository;
         this.offerRequestRepository = offerRequestRepository;
         this.offerRepository = offerRepository;
         this.eventPublisher = eventPublisher;
+        this.walletService = walletService;
+    }
+
+    BookingService(
+            BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
+            OfferRepository offerRepository,
+            ApplicationEventPublisher eventPublisher
+    ) {
+        this(bookingRepository, offerRequestRepository, offerRepository, eventPublisher, null);
     }
 
     /**
@@ -78,7 +99,9 @@ public class BookingService {
         OfferRequest request = offerRequestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
 
-        Offer offer = request.getOffer();
+        UUID offerId = request.getOffer().getOfferId();
+        Offer offer = offerRepository.findByOfferIdForUpdate(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden: " + offerId));
 
         // Zugriffskontrolle: nur Offer-Creator darf akzeptieren
         if (!offer.getCreator().getId().equals(offerCreatorId)) {
@@ -105,6 +128,16 @@ public class BookingService {
         // Schritt 2: Booking erstellen
         Booking booking = buildBooking(offer, request);
         booking = bookingRepository.save(booking);
+        if (walletService != null) {
+            try {
+                walletService.holdForBooking(booking);
+            } catch (InsufficientBalanceException exception) {
+                if (!exception.getOwnerId().equals(offerCreatorId)) {
+                    walletService.notifyTopUpRequired(exception.getOwnerId());
+                }
+                throw exception;
+            }
+        }
 
         // Schritt 3: Offer auf BOOKED setzen
         offer.setStatus(OfferStatus.BOOKED);
@@ -144,11 +177,14 @@ public class BookingService {
         }
 
         if (booking.getStartDate() != null
-                && !booking.getStartDate().isAfter(java.time.LocalDate.now().plusDays(1))) {
+                && !booking.getStartDate().isAfter(java.time.LocalDate.now())) {
             throw new BusinessRuleViolationException(
-                    "Stornierung nicht möglich: Das Angebot beginnt morgen oder früher.");
+                    "Stornierung nicht moeglich: Die Betreuung hat bereits begonnen.");
         }
 
+        if (walletService != null) {
+            walletService.refundForCancelledBooking(booking);
+        }
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
 
@@ -170,6 +206,65 @@ public class BookingService {
         return bookings.stream().allMatch(b -> b.getStatus() == BookingStatus.CANCELLED);
     }
 
+    @Transactional(readOnly = true)
+    public BookingAcceptancePreview previewForOffer(UUID offerId, UUID requesterId) {
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden: " + offerId));
+
+        BigDecimal totalPrice = calculateTotalPrice(offer);
+
+        if (walletService == null) {
+            return new BookingAcceptancePreview(requesterId, true, offer.getPrice(), totalPrice, totalPrice, true);
+        }
+
+        if (offer.getType() != com.softwareengineering.petsitter.offer.domain.OfferType.SITTER_OFFER) {
+            return new BookingAcceptancePreview(requesterId, false, offer.getPrice(), totalPrice, totalPrice, true);
+        }
+
+        BigDecimal availableBalance = walletService.getAvailableBalance(requesterId);
+        return new BookingAcceptancePreview(
+                requesterId,
+                true,
+                offer.getPrice(),
+                totalPrice,
+                availableBalance,
+                availableBalance.compareTo(totalPrice) >= 0);
+    }
+
+    @Transactional(readOnly = true)
+    public BookingAcceptancePreview previewAcceptance(UUID requestId, UUID offerCreatorId) {
+        OfferRequest request = offerRequestRepository.findById(requestId)
+                .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));
+        Offer offer = request.getOffer();
+        if (!offer.getCreator().getId().equals(offerCreatorId)) {
+            throw new ForbiddenOperationException("Nur der Offer-Creator darf einen Request akzeptieren.");
+        }
+        if (request.getStatus() != RequestStatus.PENDING || offer.getStatus() != OfferStatus.OPEN) {
+            throw new BusinessRuleViolationException("Diese Anfrage kann nicht mehr angenommen werden.");
+        }
+
+        BookingParties parties = determineParties(offer, request);
+        BigDecimal totalPrice = calculateTotalPrice(offer);
+        BigDecimal availableBalance = walletService == null
+                ? BigDecimal.ZERO
+                : walletService.getAvailableBalance(parties.owner().getId());
+        return new BookingAcceptancePreview(
+                parties.owner().getId(),
+                parties.owner().getId().equals(offerCreatorId),
+                offer.getPrice(),
+                totalPrice,
+                availableBalance,
+                availableBalance.compareTo(totalPrice) >= 0);
+    }
+
+    public void releasePayment(UUID bookingId, UUID userId) {
+        walletService.releasePayment(bookingId, userId);
+    }
+
+    public void requestPaymentRelease(UUID bookingId, UUID userId) {
+        walletService.requestRelease(bookingId, userId);
+    }
+
     /**
      * Gibt alle Bookings eines Users zurück (als Owner oder Sitter), gemappt auf DTOs.
      *
@@ -187,31 +282,18 @@ public class BookingService {
     // ── Private Hilfsmethoden ────────────────────────────────────────────
 
     private Booking buildBooking(Offer offer, OfferRequest acceptedRequest) {
-        User creator  = offer.getCreator();
-        User requester = acceptedRequest.getRequester();
-
-        User owner;
-        User sitter;
-
-        if (offer.getType() == OfferType.OWNER_OFFER) {
-            // Owner hat das Offer erstellt, Sitter hat den Request gestellt
-            owner  = creator;
-            sitter = requester;
-        } else {
-            // Sitter hat das Offer erstellt, Owner hat den Request gestellt
-            sitter = creator;
-            owner  = requester;
-        }
+        BookingParties parties = determineParties(offer, acceptedRequest);
 
         Booking booking = new Booking();
         booking.setOffer(offer);
         booking.setAcceptedRequest(acceptedRequest);
-        booking.setOwner(owner);
-        booking.setSitter(sitter);
+        booking.setOwner(parties.owner());
+        booking.setSitter(parties.sitter());
         booking.setPet(offer.getPet());
         booking.setStartDate(offer.getStartDate());
         booking.setEndDate(offer.getEndDate());
-        booking.setPricePerWeek(offer.getPricePerWeek());
+        booking.setPricePerDay(offer.getPrice());
+        booking.setTotalPrice(calculateTotalPrice(offer));
         booking.setStatus(BookingStatus.CREATED);
         return booking;
     }
@@ -225,6 +307,9 @@ public class BookingService {
 
         String ownerName  = fullName(booking.getOwner());
         String sitterName = fullName(booking.getSitter());
+        BookingPaymentDto payment = walletService == null
+                ? null
+                : walletService.getPaymentForBooking(booking.getId());
 
         return new BookingDto(
                 booking.getId(),
@@ -235,10 +320,39 @@ public class BookingService {
                 petName,
                 booking.getStartDate(),
                 booking.getEndDate(),
-                booking.getPricePerWeek(),
+                booking.getPricePerDay(),
+                booking.getTotalPrice(),
                 booking.getStatus(),
-                booking.getCreatedAt()
+                booking.getCreatedAt(),
+                payment == null ? null : payment.status(),
+                payment == null ? null : payment.releaseRequestedAt(),
+                payment == null ? null : payment.automaticReleaseAt()
         );
+    }
+
+    private BookingParties determineParties(Offer offer, OfferRequest acceptedRequest) {
+        User creator = offer.getCreator();
+        User requester = acceptedRequest.getRequester();
+        if (offer.getType() == OfferType.OWNER_OFFER) {
+            return new BookingParties(creator, requester);
+        }
+        return new BookingParties(requester, creator);
+    }
+
+    private BigDecimal calculateTotalPrice(Offer offer) {
+        if (offer.getPrice() == null || offer.getStartDate() == null || offer.getEndDate() == null) {
+            throw new BusinessRuleViolationException("Preis und Betreuungszeitraum muessen vollstaendig sein.");
+        }
+        long days = ChronoUnit.DAYS.between(offer.getStartDate(), offer.getEndDate()) + 1;
+        if (days <= 0) {
+            throw new BusinessRuleViolationException("Das Enddatum muss am oder nach dem Startdatum liegen.");
+        }
+        return offer.getPrice()
+                .multiply(BigDecimal.valueOf(days))
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private record BookingParties(User owner, User sitter) {
     }
 
     private String fullName(User user) {

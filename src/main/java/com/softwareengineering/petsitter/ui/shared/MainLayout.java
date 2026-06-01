@@ -208,9 +208,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         rightIcons.setAlignItems(FlexComponent.Alignment.CENTER);
         rightIcons.getStyle().set("gap", "8px");
 
-        // Mail button with unread badge (for Chat)
-        Component mailBtnWithBadge = buildMailButtonWithBadge();
-        rightIcons.add(mailBtnWithBadge);
+        rightIcons.add(buildMailButtonWithTypingIndicator(), buildNotificationButtonWithBadge());
 
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
@@ -222,7 +220,38 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         return rightIcons;
     }
 
-    private Component buildMailButtonWithBadge() {
+    private Component buildMailButtonWithTypingIndicator() {
+        HorizontalLayout container = new HorizontalLayout();
+        container.setAlignItems(FlexComponent.Alignment.CENTER);
+        container.setSpacing(false);
+        container.getStyle()
+                .set("position", "relative")
+                .set("width", "42px")
+                .set("height", "42px");
+
+        Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
+        mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
+        container.add(mailBtn);
+
+        mailTypingIndicator = new Span("...");
+        mailTypingIndicator.getStyle()
+                .set("position", "absolute")
+                .set("right", "-4px")
+                .set("bottom", "-3px")
+                .set("display", "none")
+                .set("padding", "0 4px")
+                .set("border-radius", "8px")
+                .set("background", "#8db3c3")
+                .set("color", "white")
+                .set("font-size", "10px")
+                .set("font-weight", "700")
+                .set("line-height", "14px");
+        container.add(mailTypingIndicator);
+
+        return container;
+    }
+
+    private Component buildNotificationButtonWithBadge() {
         HorizontalLayout container = new HorizontalLayout();
         container.setAlignItems(FlexComponent.Alignment.CENTER);
         container.setSpacing(false);
@@ -231,9 +260,9 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             .set("width", "42px")
             .set("height", "42px");
 
-        Button mailBtn = headerIconButton(VaadinIcon.ENVELOPE_O, "transparent", DARK);
-        mailBtn.addClickListener(e -> UI.getCurrent().navigate("chat"));
-        container.add(mailBtn);
+        Button notificationBtn = headerIconButton(VaadinIcon.BELL_O, "transparent", DARK);
+        notificationBtn.addClickListener(e -> openNotificationDialog());
+        container.add(notificationBtn);
 
         // Badge with unread count
         mailBadge = new Span();
@@ -256,22 +285,6 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
         updateMailBadge(mailBadge);
         container.add(mailBadge);
-
-        mailTypingIndicator = new Span("...");
-        mailTypingIndicator.getStyle()
-                .set("position", "absolute")
-                .set("bottom", "-4px")
-                .set("right", "-8px")
-                .set("padding", "0 6px")
-                .set("height", "16px")
-                .set("line-height", "16px")
-                .set("border-radius", "10px")
-                .set("background", "#8db3c3")
-                .set("color", "white")
-                .set("font-size", "10px")
-                .set("font-weight", "700")
-                .set("display", "none");
-        container.add(mailTypingIndicator);
 
         return container;
     }
@@ -375,7 +388,12 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             authenticatedUser.get().ifPresent(user -> notificationService.markAsRead(notification.getId(), user.getId()));
             dialog.close();
 
-            if (notification.getType() == NotificationType.CHAT_MESSAGE
+            if (notification.getType() == NotificationType.WALLET_TOP_UP_REQUIRED) {
+                UI.getCurrent().navigate("profile", QueryParameters.of("tab", "wallet"));
+            } else if (notification.getType() == NotificationType.PAYOUT_REQUESTED
+                    || notification.getType() == NotificationType.PAYOUT_RELEASED) {
+                UI.getCurrent().navigate("profile", QueryParameters.of("tab", "bookings"));
+            } else if (notification.getType() == NotificationType.CHAT_MESSAGE
                     && notification.getReferenceId() != null
                     && !notification.getReferenceId().isBlank()) {
                 UI.getCurrent().navigate("chat", QueryParameters.of("conversation", notification.getReferenceId()));

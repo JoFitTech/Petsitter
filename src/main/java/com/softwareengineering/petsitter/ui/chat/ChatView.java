@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.ui.chat;
 
 import com.softwareengineering.petsitter.booking.service.BookingService;
+import com.softwareengineering.petsitter.booking.dto.BookingAcceptancePreview;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.dto.ChatRefreshEventDto;
@@ -13,6 +14,8 @@ import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
+import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
+import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
@@ -27,6 +30,7 @@ import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.router.*;
@@ -656,17 +660,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             buttons.getStyle().set("margin-top", "10px");
 
             UUID reqId = UUID.fromString(requestId);
-            Button acceptBtn = new Button("Annehmen", e -> {
-                try {
-                    bookingService.acceptRequest(reqId, currentUserId);
-                    Notification n = Notification.show("Anfrage angenommen – Booking erstellt");
-                    n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                    eventBus.publishRefresh(new ChatRefreshEventDto(activeConversationId, currentUserId, activeRecipientId));
-                    selectConversation(activeConversationId);
-                } catch (Exception ex) {
-                    Notification.show("Fehler: " + ex.getMessage());
-                }
-            });
+            Button acceptBtn = new Button("Annehmen", e -> handleAcceptRequest(reqId));
             acceptBtn.getStyle().set("background", "#774f35").set("color", "white").set("border-radius", "8px");
 
             Button denyBtn = new Button("Ablehnen", e -> {
@@ -719,6 +713,104 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         Span s = new Span("Angebot: " + offerTitle);
         s.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block");
         return s;
+    }
+
+    private void handleAcceptRequest(UUID requestId) {
+        try {
+            BookingAcceptancePreview preview = bookingService.previewAcceptance(requestId, currentUserId);
+            if (preview.currentUserIsOwner()) {
+                openPaymentConfirmation(requestId, preview);
+                return;
+            }
+            acceptRequest(requestId, null);
+        } catch (Exception exception) {
+            showAcceptError(exception);
+        }
+    }
+
+    private void openPaymentConfirmation(UUID requestId, BookingAcceptancePreview preview) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Buchung bestätigen");
+        dialog.setWidth("460px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(false);
+        content.getStyle().set("gap", "12px");
+
+        Paragraph explanation = new Paragraph(
+                "Der Gesamtpreis wird jetzt von deinem Guthaben abgezogen und bis zur Auszahlung sicher in Treuhand gehalten.");
+        explanation.getStyle().set("margin", "0").set("font-size", "14px").set("color", "#7a6050");
+
+        content.add(
+                explanation,
+                paymentLine("Preis pro Tag", preview.pricePerDay()),
+                paymentLine("Gesamtpreis", preview.totalPrice()),
+                paymentLine("Dein Guthaben", preview.availableBalance()));
+
+        if (!preview.sufficientBalance()) {
+            Paragraph warning = new Paragraph("Dein Guthaben reicht für diese Buchung noch nicht aus.");
+            warning.getStyle().set("margin", "0").set("color", "#9a4f36").set("font-weight", "700");
+            Button walletButton = new Button("Guthaben aufladen", event -> {
+                dialog.close();
+                UI.getCurrent().navigate("profile", QueryParameters.of("tab", "wallet"));
+            });
+            walletButton.getStyle().set("background", DARK).set("color", "white").set("border-radius", "22px");
+            content.add(warning, walletButton);
+        } else {
+            Button confirm = new Button("Mit Guthaben bezahlen und annehmen",
+                    event -> acceptRequest(requestId, dialog));
+            confirm.setWidthFull();
+            confirm.getStyle().set("background", DARK).set("color", "white").set("border-radius", "22px");
+            content.add(confirm);
+        }
+
+        content.add(new ExternalPaymentMethods());
+        dialog.add(content);
+        dialog.open();
+    }
+
+    private Component paymentLine(String label, java.math.BigDecimal amount) {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        Span key = new Span(label);
+        key.getStyle().set("color", "#7a6050");
+        Span value = new Span(amount.setScale(2) + " EUR");
+        value.getStyle().set("font-weight", "800").set("color", DARK);
+        row.add(key, value);
+        return row;
+    }
+
+    private void acceptRequest(UUID requestId, Dialog dialog) {
+        try {
+            bookingService.acceptRequest(requestId, currentUserId);
+            if (dialog != null) {
+                dialog.close();
+            }
+            Notification n = Notification.show("Anfrage angenommen · Guthaben wurde in Treuhand reserviert");
+            n.addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            eventBus.publishRefresh(new ChatRefreshEventDto(activeConversationId, currentUserId, activeRecipientId));
+            selectConversation(activeConversationId);
+        } catch (Exception exception) {
+            showAcceptError(exception);
+        }
+    }
+
+    private void showAcceptError(Exception exception) {
+        if (exception instanceof InsufficientBalanceException insufficientBalance) {
+            if (currentUserId.equals(insufficientBalance.getOwnerId())) {
+                Notification.show("Dein Guthaben reicht nicht aus. Bitte lade zuerst Guthaben auf.")
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                UI.getCurrent().navigate("profile", QueryParameters.of("tab", "wallet"));
+            } else {
+                Notification.show("Die Anfrage kann noch nicht angenommen werden. Der Tierhalter wurde informiert.")
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+            return;
+        }
+        Notification.show("Fehler: " + exception.getMessage())
+                .addThemeVariants(NotificationVariant.LUMO_ERROR);
     }
 
     private Div createBubble(String text, boolean isOwn) {
@@ -926,4 +1018,3 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     }
 
 }
-

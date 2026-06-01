@@ -1,8 +1,8 @@
-# Architecture – Petsitter Backend
+# Architecture – Pawsitters Backend
 
 ## Zielbild
 
-Das Petsitter-Backend ist als **monolithischer Schichtenaufbau** mit **Polyglot Persistence** strukturiert:
+Das Pawsitters-Backend ist als **monolithischer Schichtenaufbau** mit **Polyglot Persistence** strukturiert:
 
 - **Präsentation**: Vaadin 25 (Web-Framework)
 - **Geschäftslogik**: Spring Boot Services mit transaktionalen Rules
@@ -92,7 +92,6 @@ Das Petsitter-Backend ist als **monolithischer Schichtenaufbau** mit **Polyglot 
 ### 1. **Monolith statt Microservices**
 - **Grund**: Einfache Deployment, Single Database für transaktionale Konsistenz
 - **Trade-off**: Später skalierbar, heute schneller zu entwickeln
-- **Fallback**: Mono-Repo, klare Schichtengrenzen für spätere Extraktion
 
 ### 2. **MySQL + MongoDB (Polyglot)**
 - **MySQL**: User, Angebote, Buchungen (relationale Integrität)
@@ -100,24 +99,17 @@ Das Petsitter-Backend ist als **monolithischer Schichtenaufbau** mit **Polyglot 
 - **Grund**: Separate Concerns, spätere Event-Sourcing möglich
 - **Synchronisation**: Über Events (ApplicationEventPublisher)
 
-### 3. **Passwortloses Email+Code Login**
-- **Grund**: Weniger Phishing, keine Password-Reset-Komplexität
+### 3. **Email+Passwort+Code Registrierung**
+- **Grund**: 2-Faktor-Auth, erhöhte Sicherheit
 - **Implementierung**:
-  - 6-stelliger Code (Random, gehashed with BCrypt)
+  - Passwort erstellen (min 14 Zeichen, alphanumerisch, mit Sonderzeichen, Ausschluss gängiger Kombinationen, ...)
+  - 6-stelliger Code (Random, gehashed mit BCrypt)
   - 10 Min Gültigkeit
   - Max 3 Versuche (Rate-Limiting)
-  - Auto-User-Creation bei erstem Login
+  - bewusst keine Liste an "gängigen" Passwörtern, da diese oft durch andere Kriterein bereits ausgeschlossen sind
 - **Audit**: `requestIp`, `createdAt`, `usedAt` in `LoginCode` Entity
 
-### 4. **Race-Condition Handling in Services**
-- **Pattern**: Pre-Check + Catch-Handler
-- **Beispiel** (UserReviewService):
-  - 1. `existsByBooking_IdAndReviewer_Id()` – Soft-Check
-  - 2. Save → Exception bei Duplicate
-  - 3. Catch `DataIntegrityViolationException` → Log + Business-Exception
-- **Vorteil**: Transaktionale Sicherheit, klare Fehlermeldungen
-
-### 5. **Vaadin Push für Echtzeit-Chat**
+### 4. **Vaadin Push für Echtzeit-Chat**
 - **Grund**: Bi-direktionale Kommunikation ohne Polling
 - **Implementierung**:
   - `@Push` in `PetsitterAppShell` (Vaadin 25 AppShell-Pattern)
@@ -125,7 +117,7 @@ Das Petsitter-Backend ist als **monolithischer Schichtenaufbau** mit **Polyglot 
   - UI-Thread-Safe via `ui.access()`
 - **Fallback**: Polling-Fallback in Browser wenn Push-Transport ausfällt
 
-### 6. **Transaktionale Atomarität**
+### 5. **Transaktionale Atomarität**
 - **Pattern**: `@Transactional` auf kritischen Service-Methoden
 - **Beispiel** (BookingService.acceptRequest):
   - 1. Request → ACCEPTED (save)
@@ -149,7 +141,6 @@ UI-Schicht
        └→ Config-Schicht (Bean Setup)
             ↓
             MySQL / MongoDB (Persistent Storage)
-            H2 (Test-Storage)
 ```
 
 ## Fehlerbehandlung
@@ -172,5 +163,3 @@ UI-Schicht
 - **Test-Coverage**: Ziel **90%+** für kritische Services
 
 ---
-
-*Letztes Update: 2026-06-01 (Hardening-Commit: UserReviewService)*

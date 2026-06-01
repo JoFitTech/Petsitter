@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.user;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
@@ -50,6 +51,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
+    private final PostalCodeService postalCodeService;
     private final PetService petService;
     private final OfferService offerService;
     private final FavoriteService favoriteService;
@@ -72,6 +74,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     public UserView(
             UserService userService,
+            PostalCodeService postalCodeService,
             PetService petService,
             OfferService offerService,
             FavoriteService favoriteService,
@@ -81,6 +84,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             WalletService walletService,
             AuthenticatedUser authenticatedUser) {
         this.userService = userService;
+        this.postalCodeService = postalCodeService;
         this.petService = petService;
         this.offerService = offerService;
         this.favoriteService = favoriteService;
@@ -660,7 +664,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             return;
         }
         contentPanel.removeAll();
-        contentPanel.add(new PersonalDetailView(userService, currentProfile, profile -> currentProfile = profile));
+        contentPanel.add(new PersonalDetailView(userService, postalCodeService, currentProfile, profile -> currentProfile = profile));
     }
 
     private void handleLogout() {

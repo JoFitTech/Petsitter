@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.user;
 
+import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
@@ -45,15 +46,18 @@ public class PersonalDetailView extends Div {
             "andere");
 
     private final UserService userService;
+    private final PostalCodeService postalCodeService;
     private final Consumer<UserProfileDto> profileChanged;
     private UserProfileDto profile;
 
     public PersonalDetailView(
             UserService userService,
+            PostalCodeService postalCodeService,
             UserProfileDto profile,
             Consumer<UserProfileDto> profileChanged
     ) {
         this.userService = userService;
+        this.postalCodeService = postalCodeService;
         this.profile = profile;
         this.profileChanged = profileChanged;
 
@@ -104,6 +108,35 @@ public class PersonalDetailView extends Div {
         TextField cityField = styledTextField("Stadt", profile.city());
         TextField addressAdditionField = styledTextField("Adresszusatz", valueOrEmpty(profile.addressAddition()));
         TextField countryField = styledTextField("Land", valueOrDefault(profile.country(), "Deutschland"));
+
+        boolean[] cityAutoFilled = { true };
+        postalCodeField.addValueChangeListener(e -> {
+            String plz = e.getValue();
+            if (plz != null && plz.matches("\\d{5}")) {
+                postalCodeField.setInvalid(false);
+                postalCodeService.findGermanLocation(plz).ifPresent(loc -> {
+                    java.util.List<String> names = loc.getPlaceNamesList();
+                    if (!names.isEmpty() && (cityField.getValue().isBlank() || cityAutoFilled[0])) {
+                        cityField.setValue(names.get(0));
+                        cityAutoFilled[0] = true;
+                    }
+                });
+            } else {
+                if (plz != null && !plz.isBlank()) {
+                    postalCodeField.setErrorMessage("Bitte eine gültige 5-stellige PLZ eingeben");
+                    postalCodeField.setInvalid(true);
+                } else {
+                    postalCodeField.setInvalid(false);
+                }
+                if (cityAutoFilled[0]) {
+                    cityField.setValue("");
+                    cityAutoFilled[0] = false;
+                }
+            }
+        });
+        cityField.addValueChangeListener(e -> {
+            if (e.isFromClient()) cityAutoFilled[0] = false;
+        });
 
         Button save = saveBtn("Speichern");
         Button cancel = cancelBtn("Abbrechen");

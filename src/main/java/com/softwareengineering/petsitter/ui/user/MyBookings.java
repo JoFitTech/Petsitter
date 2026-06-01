@@ -132,11 +132,15 @@ public class MyBookings extends Div {
         Comparator<BookingDto> comparator = "BUCHUNGSDATUM".equals(activeSort)
                 ? Comparator.comparing(b -> b.bookedAt() != null ? b.bookedAt() : java.time.LocalDateTime.MIN)
                 : Comparator.comparing(b -> b.startDate() != null ? b.startDate() : LocalDate.MIN);
-        return list.stream().sorted(comparator.reversed()).collect(Collectors.toList());
+        return list.stream().sorted(comparator).collect(Collectors.toList());
     }
 
     private boolean isPast(BookingDto b) {
         return b.startDate() != null && b.startDate().isBefore(LocalDate.now());
+    }
+
+    private boolean hasStarted(BookingDto b) {
+        return b.startDate() != null && !b.startDate().isAfter(LocalDate.now());
     }
 
     // ── Header with filter/sort controls ─────────────────────────────────
@@ -233,7 +237,7 @@ public class MyBookings extends Div {
         Span roleBadge = badge(roleLabel, "#ffffff", DARK);
         roleBadge.getStyle().set("position", "absolute").set("top", "12px").set("left", "12px");
 
-        Span statusBadge = badge(statusLabel(dto.status()), statusBackground(dto.status()), statusColor(dto.status()));
+        Span statusBadge = badge(statusLabel(dto), statusBackground(dto), statusColor(dto));
         statusBadge.getStyle().set("position", "absolute").set("top", "12px").set("right", "12px");
 
         colorBar.add(roleBadge, statusBadge);
@@ -281,7 +285,7 @@ public class MyBookings extends Div {
         detailsRow.add(
                 buildDetailColumn("Zeitraum",    formatDateRange(dto.startDate(), dto.endDate()), DARK),
                 buildDetailColumn("Preis/Tag",   formatPrice(dto.pricePerDay()), "#a5663b"),
-                buildDetailColumn("Status",      statusLabel(dto.status()), DARK)
+                buildDetailColumn("Status",      statusLabel(dto), DARK)
         );
 
         HorizontalLayout paymentRow = new HorizontalLayout();
@@ -321,7 +325,9 @@ public class MyBookings extends Div {
         if (dto.status() == BookingStatus.CREATED) {
             card.add(chatBtn);
             addPaymentActions(card, dto, currentUserId, isOwner);
-            card.add(buildCancelLink(dto));
+            if (!hasStarted(dto)) {
+                card.add(buildCancelLink(dto));
+            }
         } else {
             card.add(chatBtn, buildHideLink(dto.id()));
         }
@@ -498,24 +504,26 @@ public class MyBookings extends Div {
         return b;
     }
 
-    private String statusLabel(BookingStatus status) {
-        if (status == null) return "Unbekannt";
-        return switch (status) {
-            case CREATED   -> "Aktiv";
+    private String statusLabel(BookingDto dto) {
+        if (dto.status() == null) return "Unbekannt";
+        return switch (dto.status()) {
+            case CREATED   -> isPast(dto) ? "Vergangen" : "Aktiv";
             case CANCELLED -> "Storniert";
             case COMPLETED -> "Abgeschlossen";
         };
     }
 
-    private String statusBackground(BookingStatus status) {
-        if (status == BookingStatus.CANCELLED) return "#f4e0d8";
-        if (status == BookingStatus.COMPLETED) return "#e0e7ff";
+    private String statusBackground(BookingDto dto) {
+        if (dto.status() == BookingStatus.CANCELLED) return "#f4e0d8";
+        if (dto.status() == BookingStatus.COMPLETED) return "#e0e7ff";
+        if (isPast(dto)) return "#e8e8e8";
         return "#edf7e8";
     }
 
-    private String statusColor(BookingStatus status) {
-        if (status == BookingStatus.CANCELLED) return "#9a4f36";
-        if (status == BookingStatus.COMPLETED) return "#3730a3";
+    private String statusColor(BookingDto dto) {
+        if (dto.status() == BookingStatus.CANCELLED) return "#9a4f36";
+        if (dto.status() == BookingStatus.COMPLETED) return "#3730a3";
+        if (isPast(dto)) return "#666666";
         return "#4f7f45";
     }
 

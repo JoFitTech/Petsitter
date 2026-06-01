@@ -15,6 +15,7 @@ import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationConfirmationRequest;
 import com.softwareengineering.petsitter.user.dto.UserRegistrationRequest;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
+import com.softwareengineering.petsitter.wallet.service.WalletService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +29,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class UserService {
@@ -41,6 +43,28 @@ public class UserService {
     private final PetService petService;
     private final PostalCodeService postalCodeService;
     private final PasswordPolicyService passwordPolicyService;
+    private final WalletService walletService;
+
+    @Autowired
+    public UserService(
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            PasswordEncoder passwordEncoder,
+            LoginCodeService loginCodeService,
+            PetService petService,
+            PostalCodeService postalCodeService,
+            PasswordPolicyService passwordPolicyService,
+            WalletService walletService
+    ) {
+        this.userRepository = userRepository;
+        this.authenticatedUser = authenticatedUser;
+        this.passwordEncoder = passwordEncoder;
+        this.loginCodeService = loginCodeService;
+        this.petService = petService;
+        this.postalCodeService = postalCodeService;
+        this.passwordPolicyService = passwordPolicyService;
+        this.walletService = walletService;
+    }
 
     public UserService(
             UserRepository userRepository,
@@ -51,13 +75,8 @@ public class UserService {
             PostalCodeService postalCodeService,
             PasswordPolicyService passwordPolicyService
     ) {
-        this.userRepository = userRepository;
-        this.authenticatedUser = authenticatedUser;
-        this.passwordEncoder = passwordEncoder;
-        this.loginCodeService = loginCodeService;
-        this.petService = petService;
-        this.postalCodeService = postalCodeService;
-        this.passwordPolicyService = passwordPolicyService;
+        this(userRepository, authenticatedUser, passwordEncoder, loginCodeService, petService,
+                postalCodeService, passwordPolicyService, null);
     }
 
     public Optional<User> findUserById(UUID userId) {
@@ -115,6 +134,7 @@ public class UserService {
             }
             updatePendingUser(existing, request, email);
             userRepository.save(existing);
+            createWalletIfConfigured(existing);
             loginCodeService.requestLoginCode(email, clientIp);
             return UserAuthResult.success("Registrierungs-Code wurde versendet.", toProfileDto(existing));
         }
@@ -124,6 +144,7 @@ public class UserService {
 
         try {
             userRepository.save(user);
+            createWalletIfConfigured(user);
         } catch (DataIntegrityViolationException ex) {
             return UserAuthResult.failure("Für diese E-Mail existiert bereits ein Account.");
         }
@@ -152,6 +173,7 @@ public class UserService {
         user.setAccountStatus(AccountStatus.VERIFIED);
         user.setDeleteAfter(null);
         User savedUser = userRepository.save(user);
+        createWalletIfConfigured(savedUser);
         return UserAuthResult.success("Registrierung erfolgreich abgeschlossen.", toProfileDto(savedUser));
     }
 
@@ -290,6 +312,12 @@ public class UserService {
                 user.getAccountRole(),
                 user.getAccountStatus()
         );
+    }
+
+    private void createWalletIfConfigured(User user) {
+        if (walletService != null) {
+            walletService.createWalletIfMissing(user);
+        }
     }
 
     private PublicUserProfileDto toPublicProfileDto(User user) {

@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import com.softwareengineering.petsitter.wallet.domain.PaymentStatus;
 
 /**
  * DTO für die Darstellung einer Buchung in der UI.
@@ -16,7 +17,8 @@ import java.util.UUID;
  * @param petName       Name des Haustieres (oder null bei SITTER_OFFER ohne Pet)
  * @param startDate     Startdatum der Betreuung
  * @param endDate       Enddatum der Betreuung
- * @param pricePerWeek  Preis pro Woche in EUR
+ * @param pricePerDay   Preis pro Tag in EUR
+ * @param totalPrice    Fester Gesamtpreis in EUR
  * @param status        Aktueller Booking-Status
  */
 public record BookingDto(
@@ -28,8 +30,11 @@ public record BookingDto(
         String petName,
         LocalDate startDate,
         LocalDate endDate,
-        BigDecimal pricePerWeek,
+        BigDecimal pricePerDay,
+        BigDecimal totalPrice,
         BookingStatus status,
-        LocalDateTime bookedAt
+        LocalDateTime bookedAt,
+        PaymentStatus paymentStatus,
+        LocalDateTime releaseRequestedAt,
+        LocalDateTime automaticReleaseAt
 ) {}
-

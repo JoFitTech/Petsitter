@@ -46,7 +46,7 @@ class BookingServiceTest {
 
         BookingService service = serviceWith(
                 requestRepositoryWithRequest(request, savedRequest),
-                offerRepositoryCapturing(savedOffer),
+                offerRepositoryCapturing(savedOffer, offer),
                 bookingRepositoryCapturing(savedBooking)
         );
 
@@ -57,6 +57,8 @@ class BookingServiceTest {
         assertThat(savedBooking.get().getOwner()).isSameAs(creator);
         assertThat(savedBooking.get().getSitter()).isSameAs(requester);
         assertThat(savedBooking.get().getOffer()).isSameAs(offer);
+        assertThat(savedBooking.get().getPricePerDay()).isEqualByComparingTo("50.00");
+        assertThat(savedBooking.get().getTotalPrice()).isEqualByComparingTo("400.00");
         assertThat(savedOffer.get().getStatus()).isEqualTo(OfferStatus.BOOKED);
 
         // Expliziter Persistenz-Nachweis: save(...) wurde mit ACCEPTED aufgerufen.
@@ -78,7 +80,7 @@ class BookingServiceTest {
 
         BookingService service = serviceWith(
                 requestRepositoryWithAcceptedAndOtherPending(acceptedReq, List.of(otherReq), deniedRequests),
-                offerRepositoryCapturing(new AtomicReference<>()),
+                offerRepositoryCapturing(new AtomicReference<>(), offer),
                 bookingRepositoryCapturing(new AtomicReference<>())
         );
 
@@ -99,7 +101,7 @@ class BookingServiceTest {
 
         BookingService service = serviceWith(
                 requestRepositoryWithRequest(request, new AtomicReference<>()),
-                offerRepositoryCapturing(new AtomicReference<>()),
+                offerRepositoryCapturing(new AtomicReference<>(), offer),
                 bookingRepositoryCapturing(new AtomicReference<>())
         );
 
@@ -117,7 +119,7 @@ class BookingServiceTest {
 
         BookingService service = serviceWith(
                 requestRepositoryWithRequest(request, new AtomicReference<>()),
-                offerRepositoryCapturing(new AtomicReference<>()),
+                offerRepositoryCapturing(new AtomicReference<>(), offer),
                 bookingRepositoryCapturing(new AtomicReference<>())
         );
 
@@ -135,7 +137,7 @@ class BookingServiceTest {
 
         BookingService service = serviceWith(
                 requestRepositoryWithRequest(request, new AtomicReference<>()),
-                offerRepositoryCapturing(new AtomicReference<>()),
+                offerRepositoryCapturing(new AtomicReference<>(), offer),
                 bookingRepositoryCapturing(new AtomicReference<>())
         );
 
@@ -162,6 +164,7 @@ class BookingServiceTest {
         User owner  = user(UUID.randomUUID());
         User sitter = user(UUID.randomUUID());
         Booking booking = existingBooking(UUID.randomUUID(), owner, sitter, BookingStatus.CREATED);
+        booking.setStartDate(LocalDate.now().plusDays(1));
         booking.setOffer(offer(UUID.randomUUID(), owner, OfferStatus.BOOKED, OfferType.OWNER_OFFER));
 
         AtomicReference<Booking> savedBooking = new AtomicReference<>();
@@ -175,6 +178,23 @@ class BookingServiceTest {
         service.cancelBooking(booking.getId(), owner.getId());
 
         assertThat(savedBooking.get().getStatus()).isEqualTo(BookingStatus.CANCELLED);
+    }
+
+    @Test
+    void cancelBooking_failsOnStartDate() {
+        User owner  = user(UUID.randomUUID());
+        User sitter = user(UUID.randomUUID());
+        Booking booking = existingBooking(UUID.randomUUID(), owner, sitter, BookingStatus.CREATED);
+        booking.setStartDate(LocalDate.now());
+
+        BookingService service = serviceWith(
+                requestRepositoryEmpty(),
+                offerRepositoryCapturing(new AtomicReference<>()),
+                bookingRepositoryWithBooking(booking, new AtomicReference<>())
+        );
+
+        assertThatThrownBy(() -> service.cancelBooking(booking.getId(), owner.getId()))
+                .isInstanceOf(BusinessRuleViolationException.class);
     }
 
     @Test
@@ -214,7 +234,7 @@ class BookingServiceTest {
         o.setType(type);
         o.setStartDate(LocalDate.now());
         o.setEndDate(LocalDate.now().plusDays(7));
-        o.setPricePerWeek(new BigDecimal("50.00"));
+        o.setPrice(new BigDecimal("50.00"));
         return o;
     }
 
@@ -308,10 +328,15 @@ class BookingServiceTest {
     }
 
     private OfferRepository offerRepositoryCapturing(AtomicReference<Offer> savedRef) {
+        return offerRepositoryCapturing(savedRef, null);
+    }
+
+    private OfferRepository offerRepositoryCapturing(AtomicReference<Offer> savedRef, Offer lockedOffer) {
         return (OfferRepository) Proxy.newProxyInstance(
                 OfferRepository.class.getClassLoader(),
                 new Class<?>[] {OfferRepository.class},
                 (proxy, method, args) -> switch (method.getName()) {
+                    case "findByOfferIdForUpdate" -> Optional.ofNullable(lockedOffer);
                     case "save" -> { var o = (Offer) args[0]; savedRef.set(o); yield o; }
                     case "toString" -> "OfferRepositoryTestDouble";
                     default -> throw new UnsupportedOperationException("Not stubbed: " + method.getName());
@@ -348,4 +373,3 @@ class BookingServiceTest {
         );
     }
 }
-

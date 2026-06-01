@@ -47,7 +47,7 @@ import java.time.LocalDate;
 public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK     = "#4a3428";
-    private static final String CREAM    = "#fbf8f1";
+    private static final String CREAM    = "#e8d9c8";
     private static final String CARD_BG  = "#ffffff";
 
     private final UserService userService;
@@ -208,12 +208,14 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         VerticalLayout sidebar = new VerticalLayout();
         sidebar.setPadding(false);
         sidebar.setSpacing(false);
-        sidebar.setWidth("210px");
-        sidebar.setMinWidth("210px");
+        sidebar.setWidth("240px");
+        sidebar.setMinWidth("240px");
         sidebar.getStyle()
-            .set("gap", "6px")
-            .set("padding", "8px 0")
-            .set("background", "transparent");
+            .set("gap", "8px")
+            .set("padding", "24px")
+            .set("background", "#fdf6ec")
+            .set("border-radius", "20px")
+            .set("box-sizing", "border-box");
 
         btnUeberMich      = sidebarBtn("Über mich");
         btnMeineTiere     = sidebarBtn("Meine Tiere");
@@ -260,7 +262,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
                 btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
-        active.getStyle().set("background", DARK).set("color", "white");
+        active.getStyle().set("background", "#774f35").set("color", "white");
     }
 
     private Div cardPanel() {
@@ -300,7 +302,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         Button btn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
         btn.getStyle()
             .set("border-radius", "24px")
-            .set("background", DARK)
+            .set("background", "#774f35")
             .set("color", "white")
             .set("box-shadow", "none")
             .set("font-weight", "600")
@@ -315,7 +317,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         Button btn = new Button(label);
         btn.getStyle()
             .set("border-radius", "24px")
-            .set("background", DARK)
+            .set("background", "#774f35")
             .set("color", "white")
             .set("box-shadow", "none")
             .set("font-weight", "600")
@@ -464,7 +466,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
                 .set("bottom", "2px").set("right", "2px")
                 .set("width", "28px").set("height", "28px")
                 .set("border-radius", "50%")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("display", "flex")
                 .set("align-items", "center")
                 .set("justify-content", "center")

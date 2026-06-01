@@ -33,6 +33,12 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
+import com.vaadin.flow.component.popover.Popover;
+import com.vaadin.flow.component.popover.PopoverPosition;
+import com.vaadin.flow.component.popover.PopoverVariant;
+import com.vaadin.flow.component.dependency.CssImport;
 import com.vaadin.flow.router.BeforeEnterEvent;
 import com.vaadin.flow.router.BeforeEnterObserver;
 import com.vaadin.flow.router.PageTitle;
@@ -41,15 +47,21 @@ import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.RolesAllowed;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.DayOfWeek;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
 @PageTitle("Auftrag erstellen | Pawsitter")
 @RolesAllowed(AccountRole.ROLE_SIGNED_IN_USER)
+@CssImport(value = "./styles/filter-search-popover.css", themeFor = "vaadin-popover-overlay")
+@CssImport(value = "./styles/custom-readonly-field.css", themeFor = "vaadin-text-field")
 public class CreateOfferView extends VerticalLayout implements BeforeEnterObserver {
 
     private static final String DARK = "#4a3428";
@@ -59,6 +71,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
     private static final String BEIGE = "#f6e8d0";
     private static final String BORDER = "#eadfce";
+    private static final Locale GERMAN = Locale.GERMANY;
+    private static final DateTimeFormatter DAY_MONTH_FORMATTER =
+            DateTimeFormatter.ofPattern("d. MMMM", GERMAN);
+    private static final DateTimeFormatter MONTH_YEAR_FORMATTER =
+            DateTimeFormatter.ofPattern("MMMM yyyy", GERMAN);
     private static final String RETURN_TO_PARAMETER = "returnTo";
     private static final NavigationTarget DEFAULT_RETURN_TARGET =
             new NavigationTarget("profile", QueryParameters.of("tab", "offers"));
@@ -79,8 +96,14 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private Select<OfferAnimalType> animalTypeSelect;
     private MultiSelectComboBox<OfferPetOptionDto> petSelect;
     private RadioButtonGroup<OfferFrequency> frequencyGroup;
-    private DatePicker fromDatePicker;
-    private DatePicker toDatePicker;
+    private TextField dateRangeField;
+    private Popover whenPopover;
+    private Div dateCalendar;
+    private Span dateRangeStatus;
+    private YearMonth displayedMonth;
+    private LocalDate selectedFrom;
+    private LocalDate selectedTo;
+    private boolean selectingRangeEnd;
     private Span dateSummary;
     private RadioButtonGroup<OfferCareType> careTypeGroup;
     private BigDecimalField priceField;
@@ -127,7 +150,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         uploadedFileNames.clear();
 
         String mode = modeForCurrentOfferType();
-        String pageBg = isOwnerOffer() ? "#ebf6f0" : LIGHT_BG;
+        String pageBg = isOwnerOffer() ? LIGHT_BG : "#ebf6f0";
         getStyle().set("background", pageBg);
 
         add(createPageWrapper(mode, pageBg));
@@ -161,7 +184,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("top", "60px")
                 .set("width", "400px")
                 .set("height", "400px")
-                .set("background", "request".equals(mode) ? "#e2f5ec" : "#f6ead5")
+                .set("background", "request".equals(mode) ? "#f6ead5" : "#e2f5ec")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -172,7 +195,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("top", "100px")
                 .set("width", "440px")
                 .set("height", "440px")
-                .set("background", "request".equals(mode) ? "#eef0fa" : "#e7f0f0")
+                .set("background", "request".equals(mode) ? "#e7f0f0" : "#eef0fa")
                 .set("border-radius", "50%")
                 .set("z-index", "0");
 
@@ -204,8 +227,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         titleLayout.setSpacing(false);
 
         String headlineText = isEditMode()
-                ? (isOwnerOffer() ? "Auftrag bearbeiten" : "Angebot bearbeiten")
-                : ("request".equals(mode) ? "Neuen Auftrag erstellen" : "Neues Angebot erstellen");
+                ? (isOwnerOffer() ? "Tierhalter Angebot bearbeiten" : "Tiersitter Angebot bearbeiten")
+                : ("request".equals(mode) ? "Neues Tierhalter Angebot erstellen" : "Neues Tiersitter Angebot erstellen");
         H1 headline = new H1(headlineText);
         headline.getStyle()
                 .set("font-size", "28px")
@@ -214,8 +237,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         String subtitleText = isEditMode()
                 ? "Passe die gespeicherten Details an."
-                : ("request".equals(mode) ? "Details für deine Haustierbetreuung angeben"
-                : "Details für dein Betreuungsangebot angeben");
+                : ("request".equals(mode) ? "Details für dein Tierhalter Angebot angeben"
+                : "Details für dein Tiersitting Angebot angeben");
         Paragraph subtitle = new Paragraph(subtitleText);
         subtitle.getStyle()
                 .set("font-size", "15px")
@@ -298,9 +321,14 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         imageUpload.setMaxFileSize(10 * 1024 * 1024); // 10 MB
 
         String btnText = isOwnerOffer()
-                ? "📷  Lade hier Bilder deiner Haustiere hoch"
-                : "📷  Lade hier Bilder von dir hoch";
-        Button uploadBtn = new Button(btnText);
+                ? " Lade hier Bilder deiner Haustiere hoch"
+                : " Lade hier Bilder von dir hoch";
+        Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
+        cameraIcon.setSize("22px");
+        cameraIcon.getStyle()
+                .set("color", "white")
+                .set("flex-shrink", "0");
+        Button uploadBtn = new Button(btnText, cameraIcon);
         uploadBtn.getStyle()
                 .set("width", "100%")
                 .set("height", "56px")
@@ -381,7 +409,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         titleField.addValueChangeListener(event -> titleField.setInvalid(false));
         titleField.getStyle()
                 .set("border-radius", "12px")
-                .set("border", "1px solid " + BORDER);
+                .set("--vaadin-input-field-background", "#fffdf8")
+                .set("border", "1px solid #ead5ae");
 
         section.add(label, titleField);
         return section;
@@ -409,7 +438,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         animalTypeSelect.setEmptySelectionCaption("Egal / keine Präferenz");
         animalTypeSelect.setWidthFull();
         animalTypeSelect.getStyle()
-                .set("border-radius", "12px");
+                .set("border-radius", "12px")
+                .set("--vaadin-input-field-background", "#fffdf8")
+                .set("border", "1px solid #ead5ae");
 
         section.add(label, animalTypeSelect);
         return section;
@@ -435,6 +466,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         petSelect.setClearButtonVisible(true);
         petSelect.setWidthFull();
         petSelect.addValueChangeListener(event -> petSelect.setInvalid(false));
+        petSelect.getStyle()
+                .set("border-radius", "12px")
+                .set("--vaadin-input-field-background", "#fffdf8")
+                .set("border", "1px solid #ead5ae");
 
         section.add(label, petSelect);
         return section;
@@ -462,29 +497,30 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("color", DARK)
                 .set("font-size", "14px");
 
-        HorizontalLayout dateRow = new HorizontalLayout();
-        dateRow.setWidthFull();
-        dateRow.setSpacing(true);
-        dateRow.getStyle().set("margin-top", "10px").set("gap", "16px");
+        dateRangeField = new TextField();
+        dateRangeField.setPlaceholder("Wann?");
+        dateRangeField.setReadOnly(true);
+        dateRangeField.setWidthFull();
+        dateRangeField.getStyle()
+                .set("border-radius", "12px")
+                .set("border", "none")
+                .set("cursor", "pointer")
+                .set("margin-top", "10px");
 
-        fromDatePicker = new DatePicker("von");
-        fromDatePicker.setWidthFull();
-        fromDatePicker.setMin(formData.minimumStartDate());
-        fromDatePicker.getStyle().set("border-radius", "12px");
-        fromDatePicker.addValueChangeListener(event -> {
-            fromDatePicker.setInvalid(false);
-            applyDateSelection(
-                    offerService.updateCreateOfferDateSelection(event.getValue(), toDatePicker.getValue()));
-        });
+        displayedMonth = initialDisplayedMonth();
 
-        toDatePicker = new DatePicker("bis");
-        toDatePicker.setWidthFull();
-        toDatePicker.getStyle().set("border-radius", "12px");
-        toDatePicker.addValueChangeListener(event -> {
-            toDatePicker.setInvalid(false);
-            applyDateSelection(
-                    offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), event.getValue()));
-        });
+        whenPopover = new Popover();
+        whenPopover.setTarget(dateRangeField);
+        whenPopover.setPosition(PopoverPosition.BOTTOM_START);
+        whenPopover.setCloseOnEsc(true);
+        whenPopover.setCloseOnOutsideClick(true);
+        whenPopover.setOpenOnClick(true);
+        whenPopover.setWidth("500px");
+        whenPopover.addThemeVariants(PopoverVariant.LUMO_NO_PADDING);
+        whenPopover.getElement().getThemeList().add("filter-search-popover");
+        whenPopover.add(buildDatePopover());
+
+        dateRangeField.addFocusListener(event -> whenPopover.open());
 
         dateSummary = new Span();
         dateSummary.getStyle()
@@ -494,10 +530,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("font-size", "13px")
                 .set("font-weight", "600");
 
-        dateRow.add(fromDatePicker, toDatePicker);
         applyDateSelection(formData.dateSelection());
 
-        section.add(label, frequencyGroup, dateRow, dateSummary);
+        section.add(label, frequencyGroup, dateRangeField, whenPopover, dateSummary);
         return section;
     }
 
@@ -548,6 +583,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             priceField.setInvalid(false);
             updatePriceSummary();
         });
+        priceField.getStyle()
+                .set("border-radius", "12px")
+                .set("--vaadin-input-field-background", "#fffdf8")
+                .set("border", "1px solid #ead5ae");
 
         priceSummary = new Span();
         priceSummary.getStyle()
@@ -585,7 +624,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         additionalInfoArea.setMaxLength(formData.descriptionMaxLength());
         additionalInfoArea.getStyle()
                 .set("border-radius", "12px")
-                .set("border", "1px solid " + BORDER);
+                .set("--vaadin-input-field-background", "#fffdf8")
+                .set("border", "1px solid #ead5ae");
 
         section.add(label, additionalInfoArea);
         return section;
@@ -760,8 +800,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             System.out.println("  Haustiere:   " + petSelect.getValue());
         }
         System.out.println("  Häufigkeit:  " + frequencyGroup.getValue());
-        System.out.println("  Von:         " + fromDatePicker.getValue());
-        System.out.println("  Bis:         " + toDatePicker.getValue());
+        System.out.println("  Von:         " + selectedFrom);
+        System.out.println("  Bis:         " + selectedTo);
         System.out.println("  Betreuung:   " + careTypeGroup.getValue());
         System.out.println("  Zusatzinfo:  " + additionalInfoArea.getValue());
         System.out.println("  Bilder:      " + uploadedFileNames);
@@ -882,23 +922,19 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             valid = false;
         }
 
-        LocalDate startDate = fromDatePicker.getValue();
-        LocalDate endDate = toDatePicker.getValue();
+        LocalDate startDate = selectedFrom;
+        LocalDate endDate = selectedTo;
 
         if (startDate == null) {
-            fromDatePicker.setInvalid(true);
-            fromDatePicker.setErrorMessage("Pflichtfeld");
+            dateRangeField.setInvalid(true);
+            dateRangeField.setErrorMessage("Bitte wähle einen Zeitraum aus");
             valid = false;
-        }
-
-        if (endDate == null) {
-            toDatePicker.setInvalid(true);
-            toDatePicker.setErrorMessage("Pflichtfeld");
+        } else if (endDate == null) {
+            dateRangeField.setInvalid(true);
+            dateRangeField.setErrorMessage("Bitte wähle ein Enddatum aus");
             valid = false;
-        } else if (startDate != null && startDate.isAfter(endDate)) {
-            toDatePicker.setInvalid(true);
-            toDatePicker.setErrorMessage("Enddatum muss am oder nach dem Startdatum liegen");
-            valid = false;
+        } else {
+            dateRangeField.setInvalid(false);
         }
 
         if (priceField.getValue() == null) {
@@ -913,8 +949,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private CreateOfferRequest buildRequest(List<OfferPetOptionDto> selectedPets, OfferAnimalType selectedAnimalType) {
         return new CreateOfferRequest(
                 currentOfferType,
-                fromDatePicker.getValue(),
-                toDatePicker.getValue(),
+                selectedFrom,
+                selectedTo,
                 null,
                 selectedPets.stream().map(OfferPetOptionDto::id).toList(),
                 priceField.getValue(),
@@ -926,9 +962,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private void applyDateSelection(CreateOfferDateSelection dateSelection) {
-        toDatePicker.setMin(dateSelection.minimumEndDate());
         if (dateSelection.clearEndDate()) {
-            toDatePicker.clear();
+            selectedTo = null;
+            updateDateFilter();
         }
         dateSummary.setText(dateSelection.summary());
         updatePriceSummary();
@@ -940,8 +976,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         }
         BigDecimal price = priceField == null ? null : priceField.getValue();
         priceSummary.setText(offerService.summarizeCreateOfferTotalPrice(
-                fromDatePicker == null ? null : fromDatePicker.getValue(),
-                toDatePicker == null ? null : toDatePicker.getValue(),
+                selectedFrom,
+                selectedTo,
                 price));
     }
 
@@ -956,12 +992,15 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             petSelect.setInvalid(false);
         }
         frequencyGroup.setValue(OfferFrequency.ONE_TIME);
-        fromDatePicker.clear();
-        fromDatePicker.setInvalid(false);
-        toDatePicker.clear();
-        toDatePicker.setInvalid(false);
+        selectedFrom = null;
+        selectedTo = null;
+        if (dateRangeField != null) {
+            dateRangeField.clear();
+            dateRangeField.setInvalid(false);
+        }
+        updateDateFilter();
         applyDateSelection(
-                offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
+                offerService.updateCreateOfferDateSelection(null, null));
         careTypeGroup.setValue(OfferCareType.PET_SITTING);
         priceField.clear();
         priceField.setInvalid(false);
@@ -1027,9 +1066,11 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             petSelect.setValue(findPetOptions(editOfferData.petIds()));
         }
         frequencyGroup.setValue(editOfferData.frequency() != null ? editOfferData.frequency() : OfferFrequency.ONE_TIME);
-        fromDatePicker.setValue(editableDateOrNull(editOfferData.startDate()));
-        toDatePicker.setValue(editableDateOrNull(editOfferData.endDate()));
-        applyDateSelection(offerService.updateCreateOfferDateSelection(fromDatePicker.getValue(), toDatePicker.getValue()));
+        selectedFrom = editableDateOrNull(editOfferData.startDate());
+        selectedTo = editableDateOrNull(editOfferData.endDate());
+        displayedMonth = initialDisplayedMonth();
+        updateDateFilter();
+        applyDateSelection(offerService.updateCreateOfferDateSelection(selectedFrom, selectedTo));
         careTypeGroup.setValue(editOfferData.careType() != null ? editOfferData.careType() : OfferCareType.PET_SITTING);
         priceField.setValue(editOfferData.price());
         additionalInfoArea.setValue(valueOrEmpty(editOfferData.description()));
@@ -1107,6 +1148,327 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             case "/profile?tab=offers", "profile?tab=offers" -> DEFAULT_RETURN_TARGET;
             default -> DEFAULT_RETURN_TARGET;
         };
+    }
+
+    private VerticalLayout popoverContent() {
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(false);
+        content.getStyle()
+                .set("background", "white")
+                .set("border-radius", "32px")
+                .set("padding", "24px")
+                .set("box-sizing", "border-box")
+                .set("gap", "14px")
+                .set("box-shadow", "0 12px 28px rgba(74, 52, 40, 0.12)");
+        return content;
+    }
+
+    private Span popoverTitle(String text) {
+        Span title = new Span(text);
+        title.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+        return title;
+    }
+
+    private Component buildDatePopover() {
+        VerticalLayout content = popoverContent();
+        content.getStyle()
+                .set("gap", "5px")
+                .set("min-height", "370px")
+                .set("padding", "12px 16px");
+
+        dateRangeStatus = new Span();
+        dateRangeStatus.getStyle()
+                .set("background", "#fdf6ec")
+                .set("border", "1px solid " + BORDER)
+                .set("border-radius", "18px")
+                .set("box-sizing", "border-box")
+                .set("color", DARK)
+                .set("font-size", "12px")
+                .set("font-weight", "800")
+                .set("padding", "4px 11px")
+                .set("width", "100%");
+
+        dateCalendar = new Div();
+        dateCalendar.setWidthFull();
+
+        updateDateFilter();
+
+        content.add(popoverTitle("Zeitraum"), dateRangeStatus, dateCalendar);
+        return content;
+    }
+
+    private void updateDateFilter() {
+        if (selectedFrom != null && selectedTo != null) {
+            String formatted = formatPlainDateRange();
+            dateRangeField.setValue(formatted);
+            dateRangeStatus.setText(formatted);
+        } else if (selectedFrom != null) {
+            String formatted = "ab " + selectedFrom.format(DAY_MONTH_FORMATTER);
+            dateRangeField.setValue(formatted);
+            dateRangeStatus.setText(formatted);
+        } else {
+            if (dateRangeField != null) {
+                dateRangeField.clear();
+            }
+            if (dateRangeStatus != null) {
+                dateRangeStatus.setText("Wann?");
+            }
+        }
+        refreshDateCalendar();
+        updatePriceSummary();
+    }
+
+    private YearMonth initialDisplayedMonth() {
+        LocalDate today = LocalDate.now();
+        if (selectedFrom != null && !selectedFrom.isBefore(today)) {
+            return YearMonth.from(selectedFrom);
+        }
+        if (selectedTo != null && !selectedTo.isBefore(today)) {
+            return YearMonth.from(selectedTo);
+        }
+        return YearMonth.from(today);
+    }
+
+    private void refreshDateCalendar() {
+        if (dateCalendar == null) {
+            return;
+        }
+        dateCalendar.removeAll();
+        dateCalendar.add(calendarHeader(), weekdayHeader(), dayGrid());
+    }
+
+    private Component calendarHeader() {
+        Button previousMonth = calendarNavButton(VaadinIcon.CHEVRON_LEFT, "Vorheriger Monat");
+        previousMonth.setEnabled(displayedMonth.isAfter(YearMonth.from(LocalDate.now())));
+        previousMonth.addClickListener(event -> {
+            displayedMonth = displayedMonth.minusMonths(1);
+            refreshDateCalendar();
+        });
+
+        Button nextMonth = calendarNavButton(VaadinIcon.CHEVRON_RIGHT, "Nächster Monat");
+        nextMonth.addClickListener(event -> {
+            displayedMonth = displayedMonth.plusMonths(1);
+            refreshDateCalendar();
+        });
+
+        Span monthLabel = new Span(displayedMonth.atDay(1).format(MONTH_YEAR_FORMATTER));
+        monthLabel.getStyle()
+                .set("color", DARK)
+                .set("font-size", "15px")
+                .set("font-weight", "900")
+                .set("text-transform", "capitalize");
+
+        HorizontalLayout header = new HorizontalLayout(previousMonth, monthLabel, nextMonth);
+        header.setWidthFull();
+        header.setPadding(false);
+        header.setSpacing(false);
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        return header;
+    }
+
+    private Button calendarNavButton(VaadinIcon icon, String ariaLabel) {
+        Button button = new Button(new Icon(icon));
+        button.setAriaLabel(ariaLabel);
+        button.getStyle()
+                .set("background", "#fdf6ec")
+                .set("border", "1px solid " + BORDER)
+                .set("border-radius", "50%")
+                .set("box-shadow", "none")
+                .set("color", BROWN)
+                .set("cursor", "pointer")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("padding", "0")
+                .set("width", "28px");
+        return button;
+    }
+
+    private Component weekdayHeader() {
+        Div weekdays = calendarGrid();
+        List<String> labels = List.of("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So");
+        for (String label : labels) {
+            Span day = new Span(label);
+            day.getStyle()
+                    .set("color", "#9e8c7b")
+                    .set("font-size", "11px")
+                    .set("font-weight", "900")
+                    .set("line-height", "20px")
+                    .set("text-align", "center");
+            weekdays.add(day);
+        }
+        return weekdays;
+    }
+
+    private Component dayGrid() {
+        Div grid = calendarGrid();
+        LocalDate firstDay = displayedMonth.atDay(1);
+        int leadingBlankDays = firstDay.getDayOfWeek().getValue() - DayOfWeek.MONDAY.getValue();
+        for (int i = 0; i < leadingBlankDays; i++) {
+            grid.add(blankCalendarCell());
+        }
+        for (int day = 1; day <= displayedMonth.lengthOfMonth(); day++) {
+            grid.add(calendarDayButton(displayedMonth.atDay(day)));
+        }
+        return grid;
+    }
+
+    private Div calendarGrid() {
+        Div grid = new Div();
+        grid.getStyle()
+                .set("display", "grid")
+                .set("grid-template-columns", "repeat(7, minmax(0, 1fr))")
+                .set("gap", "0")
+                .set("width", "100%");
+        return grid;
+    }
+
+    private Component blankCalendarCell() {
+        Div blank = new Div();
+        blank.getStyle().set("height", "30px");
+        return blank;
+    }
+
+    private Component calendarDayButton(LocalDate date) {
+        Div cell = new Div();
+        Button button = new Button(String.valueOf(date.getDayOfMonth()));
+        boolean disabled = date.isBefore(LocalDate.now());
+        boolean selectedStart = date.equals(selectedFrom);
+        boolean selectedEnd = date.equals(selectedTo);
+        boolean insideRange = isInsideSelectedRange(date);
+        boolean hasCompleteRange = hasCompleteSelectedRange();
+
+        cell.getStyle()
+                .set("align-items", "center")
+                .set("box-sizing", "border-box")
+                .set("display", "flex")
+                .set("height", "30px")
+                .set("justify-content", "center")
+                .set("width", "100%");
+        applyRangeCellBackground(cell, selectedStart, selectedEnd, insideRange, hasCompleteRange);
+
+        button.setEnabled(!disabled);
+        button.setAriaLabel(date.format(DateTimeFormatter.ISO_LOCAL_DATE));
+        button.getStyle()
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("font-size", "13px")
+                .set("font-weight", "800")
+                .set("height", "30px")
+                .set("margin", "0")
+                .set("min-width", "0")
+                .set("padding", "0")
+                .set("width", "100%");
+
+        if (disabled) {
+            button.getStyle()
+                    .set("background", "transparent")
+                    .set("color", "#c8b9aa")
+                    .set("cursor", "not-allowed");
+            cell.add(button);
+            return cell;
+        }
+
+        button.getStyle()
+                .set("background", "transparent")
+                .set("color", DARK)
+                .set("cursor", "pointer");
+        if (date.equals(LocalDate.now())) {
+            button.getStyle().set("box-shadow", "inset 0 0 0 1px " + BROWN);
+        }
+        if (insideRange) {
+            button.getStyle()
+                    .set("background", "transparent")
+                    .set("border-radius", "0")
+                    .set("color", DARK);
+        }
+        if (selectedStart || selectedEnd) {
+            button.getStyle()
+                    .set("background", BROWN)
+                    .set("border-radius", "999px")
+                    .set("box-shadow", "none")
+                    .set("color", "white");
+        }
+
+        button.addClickListener(event -> selectCalendarDate(date));
+        cell.add(button);
+        return cell;
+    }
+
+    private void applyRangeCellBackground(Div cell, boolean selectedStart, boolean selectedEnd,
+            boolean insideRange, boolean hasCompleteRange) {
+        if (!hasCompleteRange) {
+            cell.getStyle().set("background", "transparent");
+            return;
+        }
+        String rangeColor = "#f1dfcf";
+        if (insideRange) {
+            cell.getStyle().set("background", rangeColor);
+        } else if (selectedStart && !selectedEnd) {
+            cell.getStyle().set("background",
+                    "linear-gradient(to right, transparent 0 50%, " + rangeColor + " 50% 100%)");
+        } else if (selectedEnd && !selectedStart) {
+            cell.getStyle().set("background",
+                    "linear-gradient(to right, " + rangeColor + " 0 50%, transparent 50% 100%)");
+        } else {
+            cell.getStyle().set("background", "transparent");
+        }
+    }
+
+    private void selectCalendarDate(LocalDate date) {
+        if (date.isBefore(LocalDate.now())) {
+            return;
+        }
+        if (selectedFrom == null || selectedTo != null || !selectingRangeEnd) {
+            selectedFrom = date;
+            selectedTo = null;
+            selectingRangeEnd = true;
+        } else if (date.isBefore(selectedFrom)) {
+            selectedFrom = date;
+            selectedTo = null;
+            selectingRangeEnd = true;
+        } else {
+            selectedTo = date;
+            selectingRangeEnd = false;
+            if (whenPopover != null) {
+                whenPopover.close();
+            }
+        }
+        displayedMonth = YearMonth.from(date);
+        updateDateFilter();
+    }
+
+    private boolean isInsideSelectedRange(LocalDate date) {
+        return selectedFrom != null
+                && selectedTo != null
+                && date.isAfter(selectedFrom)
+                && date.isBefore(selectedTo);
+    }
+
+    private boolean hasCompleteSelectedRange() {
+        return selectedFrom != null
+                && selectedTo != null
+                && !selectedFrom.equals(selectedTo);
+    }
+
+    private String formatPlainDateRange() {
+        if (selectedFrom != null && selectedTo != null) {
+            if (selectedFrom.getMonth().equals(selectedTo.getMonth())) {
+                return selectedFrom.getDayOfMonth() + ".–" + selectedTo.format(DAY_MONTH_FORMATTER);
+            }
+            return selectedFrom.format(DAY_MONTH_FORMATTER) + " – " + selectedTo.format(DAY_MONTH_FORMATTER);
+        }
+        if (selectedFrom != null) {
+            return "ab " + selectedFrom.format(DAY_MONTH_FORMATTER);
+        }
+        if (selectedTo != null) {
+            return "bis " + selectedTo.format(DAY_MONTH_FORMATTER);
+        }
+        return "Wann?";
     }
 
     private record NavigationTarget(String path, QueryParameters queryParameters) {

@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
@@ -28,7 +29,11 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.dependency.CssImport;
 
+@CssImport(value = "./styles/custom-dialog-overlay.css", themeFor = "vaadin-dialog-overlay")
+@CssImport(value = "./styles/custom-readonly-field.css", themeFor = "vaadin-text-field")
+@CssImport(value = "./styles/custom-readonly-field.css", themeFor = "vaadin-text-area")
 public class PetsitterDetailPopUp extends Dialog {
 
     private static final String DARK  = "#4a3428";
@@ -66,7 +71,7 @@ public class PetsitterDetailPopUp extends Dialog {
         content.setPadding(false);
         content.setSpacing(false);
         content.getStyle()
-                .set("background", "#fdf8f0")
+                .set("background", "#f3eada")
                 .set("font-family", "Inter, Arial, sans-serif")
                 .set("border-radius", "20px")
                 .set("padding", "28px 28px 24px 28px")
@@ -86,8 +91,10 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("color", DARK);
 
         Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("color", DARK)
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
@@ -121,13 +128,24 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("padding", "6px 14px");
         imageArea.add(starsBadge);
 
-        // ── Offer title ───────────────────────────────────────────────────
+        // ── Offer title & Creator Link ────────────────────────────────────
         H3 offerTitle = new H3(dto.title());
         offerTitle.getStyle()
                 .set("font-size", "18px")
                 .set("font-weight", "800")
                 .set("margin", "4px 0 0 0")
                 .set("color", DARK);
+
+        VerticalLayout titleLayout = new VerticalLayout();
+        titleLayout.setPadding(false);
+        titleLayout.setSpacing(false);
+        titleLayout.getStyle().set("gap", "4px");
+        titleLayout.add(offerTitle);
+
+        Component creatorLink = createCreatorLink(dto);
+        if (creatorLink != null) {
+            titleLayout.add(creatorLink);
+        }
 
         // ── Facts row: Zeitraum | Verdienst | Entfernung ──────────────────
         Div factsRow = new Div();
@@ -137,7 +155,9 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("background", "white")
                 .set("border-radius", "14px")
                 .set("padding", "14px 18px")
-                .set("gap", "0");
+                .set("gap", "0")
+                .set("width", "100%")
+                .set("box-sizing", "border-box");
 
         factsRow.add(
                 factColumn("Zeitraum",   date),
@@ -175,11 +195,7 @@ public class PetsitterDetailPopUp extends Dialog {
         infoRow.add(careSpan, infoSep, freqSpan);
 
         // ── Tier-Feld: dynamisch je nach OWNER_OFFER vs SITTER_OFFER ──────
-        content.add(header, imageArea, offerTitle, factsRow, infoRow);
-        Component creatorRow = createCreatorRow(dto);
-        if (creatorRow != null) {
-            content.add(creatorRow);
-        }
+        content.add(header, imageArea, titleLayout, factsRow, infoRow);
 
         if (dto.petName() != null) {
             // OWNER_OFFER: zeige konkretes Haustier
@@ -211,9 +227,11 @@ public class PetsitterDetailPopUp extends Dialog {
         zusatzField.setValue(dto.description() != null ? dto.description() : "");
         zusatzField.setReadOnly(true);
         zusatzField.getStyle()
-                .set("background", "white")
-                .set("border-radius", "10px")
-                .set("font-family", "Inter, Arial, sans-serif");
+                .set("background", "#f3eada")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("--lumo-secondary-text-color", "#7b5236")
+                .set("--lumo-body-text-color", "#7b5236")
+                .set("color", "#7b5236");
         content.add(zusatzField);
 
         Button actionButton = createActionButton(dto);
@@ -282,29 +300,15 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         Button btn = styledButton("Auftrag anfragen");
+        btn.getStyle().set("background", BROWN);
         btn.addClickListener(e -> onAuftragAnfragenClicked(dto.id()));
         return btn;
     }
 
-    private Component createCreatorRow(OfferCardDto dto) {
+    private Component createCreatorLink(OfferCardDto dto) {
         if (dto.creatorUserId() == null || isBlank(dto.creatorDisplayName())) {
             return null;
         }
-
-        HorizontalLayout row = new HorizontalLayout();
-        row.setAlignItems(FlexComponent.Alignment.CENTER);
-        row.setSpacing(false);
-        row.getStyle()
-                .set("gap", "6px")
-                .set("background", "white")
-                .set("border-radius", "12px")
-                .set("padding", "10px 14px");
-
-        Span label = new Span("Anbieter:");
-        label.getStyle()
-                .set("font-size", "14px")
-                .set("font-weight", "700")
-                .set("color", "#7a6050");
 
         Button nameButton = new Button(dto.creatorDisplayName());
         nameButton.getStyle()
@@ -313,26 +317,26 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("padding", "0")
                 .set("height", "auto")
                 .set("min-width", "0")
-                .set("color", DARK)
+                .set("color", BROWN)
+                .set("font-family", "Inter, Arial, sans-serif")
                 .set("font-size", "14px")
-                .set("font-weight", "800")
+                .set("font-weight", "700")
                 .set("text-decoration", "underline")
-                .set("cursor", "pointer");
+                .set("cursor", "pointer")
+                .set("margin", "0");
         nameButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
                 .ifPresentOrElse(
                         profile -> new ProfilePopUp(profile).open(),
                         () -> Notification.show("Profil konnte nicht geladen werden.")
                 ));
-
-        row.add(label, nameButton);
-        return row;
+        return nameButton;
     }
 
     private Button styledButton(String label) {
         Button btn = new Button(label);
         btn.setWidthFull();
         btn.getStyle()
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("height", "52px")
                 .set("border-radius", "28px")
@@ -365,25 +369,64 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         Dialog dialog = new Dialog();
-        dialog.setWidth("400px");
+        dialog.setWidth("440px");
+        dialog.getElement().getThemeList().add("no-padding");
 
         VerticalLayout dialogContent = new VerticalLayout();
         dialogContent.setPadding(true);
-        dialogContent.setSpacing(true);
+        dialogContent.setSpacing(false);
+        dialogContent.getStyle()
+                .set("background-color", "#f3eada")
+                .set("padding", "32px")
+                .set("border-radius", "20px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("gap", "16px");
+
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
         H2 dialogTitle = new H2("Anfrage senden");
-        dialogTitle.getStyle().set("font-size", "18px").set("margin", "0 0 8px 0").set("color", DARK);
+        dialogTitle.getStyle()
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("margin", "0")
+                .set("color", DARK);
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("width", "36px")
+                .set("height", "36px")
+                .set("border-radius", "50%");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        header.add(dialogTitle, closeBtn);
 
         TextArea messageArea = new TextArea("Nachricht (optional)");
         messageArea.setWidthFull();
         messageArea.setPlaceholder("Schreibe dem Anbieter eine kurze Nachricht...");
         messageArea.setMaxLength(1000);
+        messageArea.getStyle()
+                .set("--vaadin-input-field-background", "#FCF9F2")
+                .set("--vaadin-input-field-border", "1px solid #efe4d3")
+                .set("--vaadin-input-field-border-radius", "12px")
+                .set("--vaadin-input-field-value-color", "#4a3428")
+                .set("--lumo-secondary-text-color", "#4a3428")
+                .set("--lumo-body-text-color", "#4a3428")
+                .set("color", "#4a3428");
 
         HorizontalLayout buttons = new HorizontalLayout();
         buttons.setWidthFull();
         buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.getStyle().set("margin-top", "8px");
 
-        Button cancelBtn = new Button("Abbrechen", e -> dialog.close());
         Button submitBtn = new Button("Anfragen", e -> {
             try {
                 var request = requestService.createRequest(offerId, currentUserId, messageArea.getValue());
@@ -399,10 +442,19 @@ public class PetsitterDetailPopUp extends Dialog {
                 Notification.show("Fehler: " + ex.getMessage());
             }
         });
-        submitBtn.getStyle().set("background", DARK).set("color", "white").set("border-radius", "8px");
+        submitBtn.getStyle()
+                .set("background-color", BROWN)
+                .set("color", "white")
+                .set("border-radius", "24px")
+                .set("padding", "0 28px")
+                .set("height", "44px")
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("cursor", "pointer")
+                .set("border", "none");
 
-        buttons.add(cancelBtn, submitBtn);
-        dialogContent.add(dialogTitle, messageArea, buttons);
+        buttons.add(submitBtn);
+        dialogContent.add(header, messageArea, buttons);
         dialog.add(dialogContent);
         dialog.open();
     }
@@ -490,9 +542,11 @@ public class PetsitterDetailPopUp extends Dialog {
         field.setValue(value != null ? value : "");
         field.setReadOnly(true);
         field.getStyle()
-                .set("background", "white")
-                .set("border-radius", "10px")
-                .set("font-family", "Inter, Arial, sans-serif");
+                .set("background", "#f3eada")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("--lumo-secondary-text-color", "#7b5236")
+                .set("--lumo-body-text-color", "#7b5236")
+                .set("color", "#7b5236");
         return field;
     }
 

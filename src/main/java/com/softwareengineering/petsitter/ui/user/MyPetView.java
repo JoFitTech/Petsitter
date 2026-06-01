@@ -90,7 +90,7 @@ public class MyPetView extends Div {
         Button addBtn = new Button("Tier hinzufügen", new Icon(VaadinIcon.PLUS));
         addBtn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")
@@ -166,7 +166,7 @@ public class MyPetView extends Div {
         Button editBtn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
         editBtn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")
@@ -485,7 +485,7 @@ public class MyPetView extends Div {
         Button btn = new Button(label);
         btn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")

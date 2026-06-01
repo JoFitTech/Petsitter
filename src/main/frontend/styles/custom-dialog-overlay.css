@@ -1,0 +1,9 @@
+:host([theme~="no-padding"]) [part="content"] {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-radius: 20px !important;
+}
+
+:host([theme~="no-padding"]) [part="overlay"] {
+  border-radius: 20px !important;
+}

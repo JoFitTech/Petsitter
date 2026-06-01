@@ -16,6 +16,7 @@ import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
@@ -65,7 +66,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private static final Logger log = LoggerFactory.getLogger(ChatView.class);
 
     private static final String DARK = "#4a3428";
-    private static final String CREAM = "#fbf8f1";
+    private static final String CREAM = "#e8d9c8";
     private static final String CARD_BG = "#ffffff";
     private static final String SIDEBAR_ITEM_BG = "#fdf6e8";
     private static final String SIDEBAR_ITEM_ACTIVE = "#f0e0c4";
@@ -76,6 +77,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private final ChatEventBus eventBus;
     private final RequestService requestService;
     private final BookingService bookingService;
+    private final UserService userService;
 
     // UI Components
     private VerticalLayout conversationList;
@@ -104,12 +106,14 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             ChatEventBus eventBus,
             AuthenticatedUser authenticatedUser,
             RequestService requestService,
-            BookingService bookingService
+            BookingService bookingService,
+            UserService userService
     ) {
         this.chatService = chatService;
         this.eventBus = eventBus;
         this.requestService = requestService;
         this.bookingService = bookingService;
+        this.userService = userService;
 
         setSizeFull();
         setPadding(true);
@@ -273,7 +277,10 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         // Avatar in header
         chatHeaderAvatar = createChatAvatar(38);
-        chatHeaderAvatar.getStyle().set("display", "none");
+        chatHeaderAvatar.getStyle()
+            .set("display", "none")
+            .set("cursor", "pointer");
+        chatHeaderAvatar.addClickListener(event -> openProfilePopUp());
         header.add(chatHeaderAvatar);
 
         VerticalLayout titleWrap = new VerticalLayout();
@@ -654,7 +661,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
             UUID reqId = UUID.fromString(requestId);
             Button acceptBtn = new Button("Annehmen", e -> handleAcceptRequest(reqId));
-            acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
+            acceptBtn.getStyle().set("background", "#774f35").set("color", "white").set("border-radius", "8px");
 
             Button denyBtn = new Button("Ablehnen", e -> {
                 try {
@@ -820,6 +827,22 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         bubble.add(new Span(text));
         return bubble;
+    }
+
+    private void openProfilePopUp() {
+        if (activeRecipientId == null) {
+            return;
+        }
+        userService.getPublicUserProfile(activeRecipientId).ifPresentOrElse(
+            profile -> {
+                ProfilePopUp popUp = new ProfilePopUp(profile);
+                popUp.open();
+            },
+            () -> {
+                Notification n = Notification.show("Profil konnte nicht geladen werden.");
+                n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        );
     }
 
     private Component buildAvatar(String displayName) {

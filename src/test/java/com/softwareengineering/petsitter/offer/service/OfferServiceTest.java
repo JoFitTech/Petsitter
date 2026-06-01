@@ -20,6 +20,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferHeroStatisticsDto;
 import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -828,6 +829,89 @@ class OfferServiceTest {
         List<OfferCardDto> result = offerService.getOpenOffersByType(OfferType.SITTER_OFFER);
 
         assertThat(result).extracting(OfferCardDto::id).containsExactly(visibleOfferId);
+    }
+
+    @Test
+    void getHeroStatisticsForAuthenticatedUserCountsVisibleOffersInSameCity() {
+        User currentUser = user(UUID.randomUUID());
+        User sameCityUser = user(UUID.randomUUID());
+        sameCityUser.setCity("  kOeLn ");
+        User otherCityUser = user(UUID.randomUUID());
+        otherCityUser.setCity("Bonn");
+        Offer sameCityOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        sameCityOffer.setCreateUser(sameCityUser);
+        Offer otherCityOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        otherCityOffer.setCreateUser(otherCityUser);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(sameCityOffer, otherCityOffer),
+                        new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser),
+                fixedCreateOfferFormRules()
+        );
+
+        OfferHeroStatisticsDto result = offerService.getHeroStatistics(OfferType.SITTER_OFFER);
+
+        assertThat(result.openOfferCount()).isEqualTo(1);
+        assertThat(result.averageRating()).isEmpty();
+        assertThat(result.cityScoped()).isTrue();
+    }
+
+    @Test
+    void getHeroStatisticsExcludesOwnExpiredAndDifferentOfferTypes() {
+        User currentUser = user(UUID.randomUUID());
+        User otherUser = user(UUID.randomUUID());
+        Offer visibleOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        visibleOffer.setCreateUser(otherUser);
+        Offer ownOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        ownOffer.setCreateUser(currentUser);
+        Offer expiredOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 9), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        expiredOffer.setCreateUser(otherUser);
+        Offer ownerOffer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        ownerOffer.setCreateUser(otherUser);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(visibleOffer, ownOffer, expiredOffer, ownerOffer),
+                        new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser),
+                fixedCreateOfferFormRules()
+        );
+
+        OfferHeroStatisticsDto result = offerService.getHeroStatistics(OfferType.SITTER_OFFER);
+
+        assertThat(result.openOfferCount()).isEqualTo(1);
+    }
+
+    @Test
+    void getHeroStatisticsForAnonymousUserCountsVisibleOffersGlobally() {
+        User koelnUser = user(UUID.randomUUID());
+        User bonnUser = user(UUID.randomUUID());
+        bonnUser.setCity("Bonn");
+        Offer koelnOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        koelnOffer.setCreateUser(koelnUser);
+        Offer bonnOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        bonnOffer.setCreateUser(bonnUser);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(koelnOffer, bonnOffer),
+                        new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                fixedCreateOfferFormRules()
+        );
+
+        OfferHeroStatisticsDto result = offerService.getHeroStatistics(OfferType.SITTER_OFFER);
+
+        assertThat(result.openOfferCount()).isEqualTo(2);
+        assertThat(result.averageRating()).isEmpty();
+        assertThat(result.cityScoped()).isFalse();
     }
 
     @Test

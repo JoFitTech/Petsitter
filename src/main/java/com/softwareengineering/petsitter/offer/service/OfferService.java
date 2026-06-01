@@ -17,6 +17,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferHeroStatisticsDto;
 import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -131,6 +132,19 @@ public class OfferService {
                 .filter(offer -> isVisibleInPublicLists(offer, currentUser))
                 .map(this::toCardDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OfferHeroStatisticsDto getHeroStatistics(OfferType offerType) {
+        User currentUser = authenticatedUser.get().orElse(null);
+        long openOfferCount = offerRepository
+                .findAllByOfferTypeAndStatus(offerType, OfferStatus.OPEN)
+                .stream()
+                .filter(offer -> isVisibleInPublicLists(offer, currentUser))
+                .filter(offer -> currentUser == null || isInCurrentUsersCity(offer, currentUser))
+                .count();
+
+        return new OfferHeroStatisticsDto(openOfferCount, Optional.empty(), currentUser != null);
     }
 
     @Transactional(readOnly = true)
@@ -994,6 +1008,17 @@ public class OfferService {
 
     private boolean isVisibleInPublicLists(Offer offer, User currentUser) {
         return !isExpiredOpenOffer(offer) && !isCreatedBy(offer, currentUser);
+    }
+
+    private boolean isInCurrentUsersCity(Offer offer, User currentUser) {
+        String currentUserCity = normalizedCity(currentUser.getCity());
+        return offer.getCreateUser() != null
+                && !currentUserCity.isEmpty()
+                && currentUserCity.equals(normalizedCity(offer.getCreateUser().getCity()));
+    }
+
+    private String normalizedCity(String city) {
+        return city == null ? "" : city.trim().toLowerCase(java.util.Locale.GERMANY);
     }
 
     private boolean isExpiredOpenOffer(Offer offer) {

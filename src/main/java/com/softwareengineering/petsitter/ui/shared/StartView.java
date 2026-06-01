@@ -31,7 +31,6 @@ public class StartView extends VerticalLayout {
 
     private static final String DARK       = "#4a3428";
     private static final String LIGHT_BG   = "#fbf8f1";
-    private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
 
     private final OfferService offerService;
     private final FavoriteService favoriteService;
@@ -175,39 +174,10 @@ public class StartView extends VerticalLayout {
 
         copy.add(title, subtitle, createOfferBtn);
 
-        Div statBox = new Div();
-        statBox.getStyle()
-                .set("background", "white")
-                .set("border-radius", "28px")
-                .set("padding", "26px 34px")
-                .set("width", "210px")
-                .set("min-width", "210px")
-                .set("margin-top", "10px")
-                .set("box-shadow", CARD_SHADOW);
-
-        Span available = new Span("Heute verfügbar");
-        available.getStyle()
-                .set("display", "block")
-                .set("font-size", "14px")
-                .set("font-weight", "700")
-                .set("color", "#71946e")
-                .set("margin-bottom", "8px");
-
-        H2 statHeadline = new H2();
-        statHeadline.getElement().setProperty("innerHTML",
-                "128 neue<br>Halter<br>in deiner<br>Umgebung");
-        statHeadline.getStyle()
-                .set("font-size", "26px")
-                .set("line-height", "1.12")
-                .set("margin", "0 0 14px 0")
-                .set("color", DARK);
-
-        Span rating = new Span("Ø 4,9 Sterne");
-        rating.getStyle()
-                .set("font-size", "15px")
-                .set("color", "#6f6862");
-
-        statBox.add(available, statHeadline, rating);
+        OfferHeroStatisticsCard statBox = new OfferHeroStatisticsCard(
+                offerService.getHeroStatistics(OfferType.OWNER_OFFER),
+                "Halter-Angebot",
+                "Halter-Angebote");
         heroTop.add(copy, statBox);
 
         FilterSearchBar searchBar = new FilterSearchBar(

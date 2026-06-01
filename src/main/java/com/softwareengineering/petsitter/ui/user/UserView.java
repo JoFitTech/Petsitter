@@ -12,6 +12,7 @@ import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
 import com.softwareengineering.petsitter.user.service.UserService;
+import com.softwareengineering.petsitter.wallet.service.WalletService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -55,6 +56,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private final RequestService requestService;
     private final ChatService chatService;
     private final BookingService bookingService;
+    private final WalletService walletService;
     private final AuthenticatedUser authenticatedUser;
     private UserProfileDto currentProfile;
 
@@ -63,6 +65,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnMeineAuftraege;
     private Button btnMeineBuchungen;
     private Button btnMeineFavoriten;
+    private Button btnGuthaben;
     private Button btnPersAngaben;
     private Button btnLogout;
     private Div contentPanel;
@@ -75,6 +78,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             RequestService requestService,
             ChatService chatService,
             BookingService bookingService,
+            WalletService walletService,
             AuthenticatedUser authenticatedUser) {
         this.userService = userService;
         this.petService = petService;
@@ -83,6 +87,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         this.requestService = requestService;
         this.chatService = chatService;
         this.bookingService = bookingService;
+        this.walletService = walletService;
         this.authenticatedUser = authenticatedUser;
         reloadProfile();
 
@@ -120,6 +125,11 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         if ("pets".equals(tab)) {
             setActiveStyle(btnMeineTiere);
             showMeineTiere();
+            return;
+        }
+        if ("wallet".equals(tab)) {
+            setActiveStyle(btnGuthaben);
+            showGuthaben();
             return;
         }
         setActiveStyle(btnUeberMich);
@@ -206,6 +216,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege = sidebarBtn("Meine Aufträge");
         btnMeineBuchungen = sidebarBtn("Meine Buchungen");
         btnMeineFavoriten = sidebarBtn("Meine Favoriten");
+        btnGuthaben        = sidebarBtn("Guthaben");
         btnPersAngaben    = sidebarBtn("Persönliche Angaben");
         btnLogout         = sidebarBtn("Log out");
 
@@ -214,10 +225,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         btnMeineAuftraege.addClickListener(e -> { setActiveStyle(btnMeineAuftraege); showMeineAuftraege(); });
         btnMeineBuchungen.addClickListener(e -> { setActiveStyle(btnMeineBuchungen); showMeineBuchungen(); });
         btnMeineFavoriten.addClickListener(e -> { setActiveStyle(btnMeineFavoriten); showMeineFavoriten(); });
+        btnGuthaben.addClickListener(e        -> { setActiveStyle(btnGuthaben);        showGuthaben(); });
         btnPersAngaben.addClickListener(e    -> { setActiveStyle(btnPersAngaben);    showPersAngaben(); });
         btnLogout.addClickListener(e         -> handleLogout());
 
-        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout);
+        sidebar.add(btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen,
+                btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout);
         return sidebar;
     }
 
@@ -239,7 +252,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private void setActiveStyle(Button active) {
-        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen, btnMeineFavoriten, btnPersAngaben, btnLogout}) {
+        for (Button b : new Button[]{btnUeberMich, btnMeineTiere, btnMeineAuftraege, btnMeineBuchungen,
+                btnMeineFavoriten, btnGuthaben, btnPersAngaben, btnLogout}) {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
         active.getStyle().set("background", DARK).set("color", "white");
@@ -633,7 +647,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private void showMeineFavoriten() {
         contentPanel.removeAll();
         contentPanel.add(new MyFavoritesView(favoriteService, offerService, requestService, chatService,
-                authenticatedUser, userService));
+                authenticatedUser, userService, bookingService));
+    }
+
+    private void showGuthaben() {
+        contentPanel.removeAll();
+        contentPanel.add(new MyWalletView(walletService, authenticatedUser));
     }
 
     private void showPersAngaben() {

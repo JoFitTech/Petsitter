@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
@@ -38,17 +39,20 @@ public class StartView extends VerticalLayout {
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
     private final UserService userService;
+    private final BookingService bookingService;
 
     @Autowired
     public StartView(OfferService offerService, FavoriteService favoriteService,
                      RequestService requestService, ChatService chatService,
-                     AuthenticatedUser authenticatedUser, UserService userService) {
+                     AuthenticatedUser authenticatedUser, UserService userService,
+                     BookingService bookingService) {
         this.offerService = offerService;
         this.favoriteService = favoriteService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
         this.userService = userService;
+        this.bookingService = bookingService;
         setWidthFull();
         setPadding(false);
         setSpacing(false);
@@ -267,7 +271,7 @@ public class StartView extends VerticalLayout {
 
     private void openOfferDialog(OfferCardDto dto) {
         new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
-                offerService, requestService, chatService, authenticatedUser, userService).open();
+                offerService, requestService, chatService, authenticatedUser, userService, bookingService).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

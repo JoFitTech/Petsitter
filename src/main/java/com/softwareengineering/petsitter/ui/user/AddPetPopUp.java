@@ -23,7 +23,7 @@ public class AddPetPopUp extends Dialog {
     private static final String DARK = "#4a3428";
     private static final String BROWN_BTN = "#5c3d1e";
     private static final String CREAM = "#e8d9c8";
-    private static final String LIGHT_BG = "#F8EFE4";
+    private static final String LIGHT_BG = "#f3eada";
     private static final String TYPE_DOG = "Hund";
     private static final String TYPE_CAT = "Katze";
     private static final String TYPE_BIRD = "Vogel";

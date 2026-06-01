@@ -33,7 +33,7 @@ public class FilterPopUp extends Dialog {
 
     private static final String DARK      = "#4a3428";
     private static final String BROWN     = "#7b5236";
-    private static final String CREAM_BG  = "#fdf6ec";
+    private static final String CREAM_BG  = "#f3eada";
     private static final String CARD_BG   = "#ffffff";
     private static final String BORDER    = "#e8d8bf";
     private static final String STAR_COLOR = "#f5a623";

@@ -207,6 +207,31 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
+    public BookingAcceptancePreview previewForOffer(UUID offerId, UUID requesterId) {
+        Offer offer = offerRepository.findById(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden: " + offerId));
+
+        BigDecimal totalPrice = calculateTotalPrice(offer);
+
+        if (walletService == null) {
+            return new BookingAcceptancePreview(requesterId, true, offer.getPrice(), totalPrice, totalPrice, true);
+        }
+
+        if (offer.getType() != com.softwareengineering.petsitter.offer.domain.OfferType.SITTER_OFFER) {
+            return new BookingAcceptancePreview(requesterId, false, offer.getPrice(), totalPrice, totalPrice, true);
+        }
+
+        BigDecimal availableBalance = walletService.getAvailableBalance(requesterId);
+        return new BookingAcceptancePreview(
+                requesterId,
+                true,
+                offer.getPrice(),
+                totalPrice,
+                availableBalance,
+                availableBalance.compareTo(totalPrice) >= 0);
+    }
+
+    @Transactional(readOnly = true)
     public BookingAcceptancePreview previewAcceptance(UUID requestId, UUID offerCreatorId) {
         OfferRequest request = offerRequestRepository.findById(requestId)
                 .orElseThrow(() -> new NotFoundException("Request nicht gefunden: " + requestId));

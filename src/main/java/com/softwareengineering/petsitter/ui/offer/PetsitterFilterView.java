@@ -12,6 +12,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
@@ -79,6 +80,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private final ChatService chatService;
     private final AuthenticatedUser authenticatedUser;
     private final UserService userService;
+    private final BookingService bookingService;
 
     private H1 pageTitle;
     private Div leftBlob;
@@ -93,13 +95,15 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     @Autowired
     public PetsitterFilterView(OfferService offerService, FavoriteService favoriteService,
                                RequestService requestService, ChatService chatService,
-                               AuthenticatedUser authenticatedUser, UserService userService) {
+                               AuthenticatedUser authenticatedUser, UserService userService,
+                               BookingService bookingService) {
         this.offerService = offerService;
         this.favoriteService = favoriteService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.authenticatedUser = authenticatedUser;
         this.userService = userService;
+        this.bookingService = bookingService;
         this.currentCriteria = defaultCriteria(OfferSearchMode.TIERSITTER);
 
         setSizeFull();
@@ -642,7 +646,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
 
     private void openOfferDialog(OfferCardDto dto) {
         new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
-                offerService, requestService, chatService, authenticatedUser, userService).open();
+                offerService, requestService, chatService, authenticatedUser, userService, bookingService).open();
     }
 
     private boolean onFavoriteClicked(OfferCardDto dto) {

@@ -537,7 +537,7 @@ public class MyOffers extends Div {
 
     private void openOfferDialog(MyOfferCardDto offer) {
         new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4,
-                offerService, requestService, chatService, authenticatedUser, userService).open();
+                offerService, requestService, chatService, authenticatedUser, userService, bookingService).open();
     }
 
     private boolean isExpiredOpenOffer(MyOfferCardDto offer) {

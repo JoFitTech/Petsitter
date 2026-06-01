@@ -133,10 +133,11 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .set("align-items", "center");
         logoWrapper.addClickListener(e -> UI.getCurrent().navigate(""));
 
-        // Center: Navigation Pills
-        HorizontalLayout nav = new HorizontalLayout();
-        nav.setSpacing(true);
-        nav.setAlignItems(FlexComponent.Alignment.CENTER);
+        // Center: Navigation Pills + fixed Create-Offer button
+        HorizontalLayout centerGroup = new HorizontalLayout();
+        centerGroup.setSpacing(false);
+        centerGroup.setAlignItems(FlexComponent.Alignment.CENTER);
+        centerGroup.getStyle().set("gap", "12px");
 
         findOwnerBtn = pillButton("Tierhalter finden");
         findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
@@ -144,9 +145,27 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         findSitterBtn = pillButton("Tiersitter finden");
         findSitterBtn.addClickListener(e -> UI.getCurrent().navigate("tierhalter-finden"));
 
-        nav.add(findOwnerBtn, findSitterBtn);
+        centerGroup.add(findOwnerBtn, findSitterBtn);
 
-        header.add(logoWrapper, nav, buildHeaderActions());
+        // Fixed "Angebot erstellen" button – only visible for logged-in users
+        if (authenticatedUser.get().isPresent()) {
+            Button createOfferBtn = new Button("Angebot erstellen");
+            createOfferBtn.getStyle()
+                    .set("height", "42px")
+                    .set("padding", "0 22px")
+                    .set("border-radius", "22px")
+                    .set("background", DARK)
+                    .set("color", "white")
+                    .set("font-weight", "700")
+                    .set("font-size", "14px")
+                    .set("box-shadow", "none")
+                    .set("cursor", "pointer")
+                    .set("flex-shrink", "0");
+            createOfferBtn.addClickListener(e -> openCreateOfferDialog());
+            centerGroup.add(createOfferBtn);
+        }
+
+        header.add(logoWrapper, centerGroup, buildHeaderActions());
         return header;
     }
 
@@ -428,6 +447,144 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             return "Gestern";
         }
         return date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+    }
+
+
+    // ── Create-Offer Dialog ───────────────────────────────────────────────
+    private void openCreateOfferDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("520px");
+        dialog.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("padding", "0")
+                .set("font-family", "Inter, Arial, sans-serif");
+
+        // Wrapper with position:relative so X can be placed absolute
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "24px 24px 22px 24px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "14px")
+                .set("box-sizing", "border-box");
+
+        // X close button – absolute, top-right corner
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "12px")
+                .set("right", "12px")
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("color", "#9a8070")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        com.vaadin.flow.component.html.H2 title =
+                new com.vaadin.flow.component.html.H2("Was möchtest du erstellen?");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "21px")
+                .set("font-weight", "800")
+                .set("line-height", "1.2")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("padding-right", "32px")  // prevent overlap with X
+                .set("color", DARK);
+
+        Paragraph copy = new Paragraph(
+                "Wähle aus, ob du Betreuung suchst oder selbst Betreuung anbieten möchtest.");
+        copy.getStyle()
+                .set("margin", "0")
+                .set("font-size", "13px")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("line-height", "1.5")
+                .set("color", "#9a8070");
+
+        wrapper.add(
+                closeBtn,
+                title,
+                copy,
+                createDialogOption(dialog, VaadinIcon.HOME,
+                        "Betreuung für mein Haustier suchen",
+                        "Erstelle einen Auftrag für dein Haustier.", "request"),
+                createDialogOption(dialog, VaadinIcon.HEART,
+                        "Betreuung anbieten",
+                        "Erstelle ein Angebot als Tiersitter.", "offer")
+        );
+
+        dialog.add(wrapper);
+        dialog.open();
+    }
+
+    private Component createDialogOption(Dialog dialog, VaadinIcon iconType,
+            String titleText, String description, String mode) {
+        Button option = new Button();
+        option.setWidthFull();
+        option.getStyle()
+                .set("height", "auto")
+                .set("min-height", "68px")
+                .set("padding", "14px 16px")
+                .set("border", "1.5px solid #e8d9c4")
+                .set("border-radius", "14px")
+                .set("background", "#fefcf8")
+                .set("color", DARK)
+                .set("box-shadow", "0 2px 8px rgba(74,52,40,0.05)")
+                .set("cursor", "pointer")
+                .set("text-align", "left");
+
+        Icon icon = new Icon(iconType);
+        icon.setSize("22px");
+        icon.getStyle()
+                .set("color", DARK)
+                .set("flex-shrink", "0");
+
+        VerticalLayout optionContent = new VerticalLayout();
+        optionContent.setPadding(false);
+        optionContent.setSpacing(false);
+        optionContent.getStyle().set("gap", "3px");
+
+        Span optTitle = new Span(titleText);
+        optTitle.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("letter-spacing", "-0.1px")
+                .set("color", DARK);
+
+        Span desc = new Span(description);
+        desc.getStyle()
+                .set("font-size", "12.5px")
+                .set("font-weight", "400")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("color", "#9a8070");
+
+        optionContent.add(optTitle, desc);
+
+        HorizontalLayout row = new HorizontalLayout(icon, optionContent);
+        row.setPadding(false);
+        row.setSpacing(false);
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.getStyle().set("gap", "14px");
+
+        option.getElement().appendChild(row.getElement());
+        option.addClickListener(event -> {
+            dialog.close();
+            UI ui = UI.getCurrent();
+            if (ui != null) {
+                Map<String, List<String>> params = new LinkedHashMap<>();
+                params.put("mode", List.of(mode));
+                params.put("returnTo", List.of("/profile?tab=offers"));
+                ui.navigate("auftrag-erstellen", new QueryParameters(params));
+            }
+        });
+        return option;
     }
 
     @Override

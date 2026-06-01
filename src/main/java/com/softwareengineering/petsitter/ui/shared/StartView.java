@@ -11,7 +11,6 @@ import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
-import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.*;
@@ -153,27 +152,7 @@ public class StartView extends VerticalLayout {
                 .set("margin", "0 0 32px 0")
                 .set("color", "#7b7069");
 
-        Button createOfferBtn = new Button();
-        Span plusIcon = new Span("+ ");
-        plusIcon.getStyle().set("font-size", "18px").set("font-weight", "900");
-        Span btnLabel = new Span("Auftrag anbieten");
-        createOfferBtn.getElement().appendChild(plusIcon.getElement(), btnLabel.getElement());
-        createOfferBtn.getStyle()
-                .set("background", DARK)
-                .set("color", "white")
-                .set("border-radius", "28px")
-                .set("padding", "0 30px")
-                .set("height", "52px")
-                .set("font-size", "16px")
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("gap", "4px");
-        createOfferBtn.addClickListener(event -> onCreateOfferClicked());
-
-        copy.add(title, subtitle, createOfferBtn);
+        copy.add(title, subtitle);
 
         Div statBox = new Div();
         statBox.getStyle()
@@ -261,13 +240,6 @@ public class StartView extends VerticalLayout {
 
     private void onSearchClicked(FilterSearchBar.SearchCriteria criteria) {
         UI.getCurrent().navigate("petsitter-suche", queryParametersFor(OfferSearchMode.TIERHALTER, criteria));
-    }
-
-    private void onCreateOfferClicked() {
-        Map<String, List<String>> parameters = new LinkedHashMap<>();
-        parameters.put("mode", List.of("offer"));
-        parameters.put("returnTo", List.of("/"));
-        UI.getCurrent().navigate("auftrag-erstellen", new QueryParameters(parameters));
     }
 
     private QueryParameters queryParametersFor(OfferSearchMode mode, FilterSearchBar.SearchCriteria criteria) {

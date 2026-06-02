@@ -228,7 +228,8 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .set("background", "transparent")
                 .set("border", "none")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer");
+                .set("cursor", "pointer")
+                .set("flex-shrink", "0");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
         rightIcons.add(heartBtn, profileBtn);
@@ -246,7 +247,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 authenticatedUser.get()
                         .flatMap(user -> imageAssetService.findUserImage(user.getId()))
                         .orElse(null),
-                36,
+                42,
                 "#8db3c3");
     }
 

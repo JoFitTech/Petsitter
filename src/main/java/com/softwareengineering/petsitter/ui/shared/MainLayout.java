@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.notification.domain.Notification;
@@ -49,6 +50,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private final AuthenticatedUser authenticatedUser;
     private final NotificationService notificationService;
     private final ChatEventBus chatEventBus;
+    private final ImageAssetService imageAssetService;
     private Button findOwnerBtn;
     private Button findSitterBtn;
     private Span mailBadge;
@@ -63,11 +65,13 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     public MainLayout(
             AuthenticatedUser authenticatedUser,
             NotificationService notificationService,
-            ChatEventBus chatEventBus
+            ChatEventBus chatEventBus,
+            ImageAssetService imageAssetService
     ) {
         this.authenticatedUser = authenticatedUser;
         this.notificationService = notificationService;
         this.chatEventBus = chatEventBus;
+        this.imageAssetService = imageAssetService;
 
         // ── Global page background & font ─────────────────────────────────
         getElement().getStyle()
@@ -213,7 +217,22 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
 
-        Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
+        Button profileBtn = new Button(ImageComponents.avatar(
+                authenticatedUser.get()
+                        .flatMap(user -> imageAssetService.findUserImage(user.getId()))
+                        .orElse(null),
+                36,
+                "#8db3c3"));
+        profileBtn.setAriaLabel("Profil öffnen");
+        profileBtn.getStyle()
+                .set("width", "42px")
+                .set("height", "42px")
+                .set("min-width", "42px")
+                .set("padding", "0")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
         rightIcons.add(heartBtn, profileBtn);

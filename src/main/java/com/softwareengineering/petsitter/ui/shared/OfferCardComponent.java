@@ -60,10 +60,8 @@ public class OfferCardComponent extends Div {
                 ? ANIMAL_COLORS.getOrDefault(dto.animalType(), "#f1dfb9")
                 : "#f1dfb9";
 
-        Div imageArea = new Div();
+        Div imageArea = ImageComponents.offerCover(dto.coverTiles(), "148px", topColor);
         imageArea.getStyle()
-                .set("height", "148px")
-                .set("background", topColor)
                 .set("position", "relative")
                 .set("border-radius", "14px")
                 .set("margin", "12px 12px 0 12px")

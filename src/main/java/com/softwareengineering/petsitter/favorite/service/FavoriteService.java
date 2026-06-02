@@ -1,12 +1,15 @@
 package com.softwareengineering.petsitter.favorite.service;
 
+import com.softwareengineering.petsitter.image.dto.ImageRefDto;
 import com.softwareengineering.petsitter.favorite.domain.Favorite;
 import com.softwareengineering.petsitter.favorite.repository.FavoriteRepository;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferCoverTileDto;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.offer.service.OfferImagePresentationMapper;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.domain.PetTag;
@@ -36,13 +39,22 @@ public class FavoriteService {
     private final OfferRepository offerRepository;
     private final AuthenticatedUser authenticatedUser;
     private final Clock clock;
+    private final OfferImagePresentationMapper imagePresentationMapper;
 
     @Autowired
     public FavoriteService(
             FavoriteRepository favoriteRepository,
             OfferRepository offerRepository,
+            AuthenticatedUser authenticatedUser,
+            OfferImagePresentationMapper imagePresentationMapper) {
+        this(favoriteRepository, offerRepository, authenticatedUser, Clock.systemDefaultZone(), imagePresentationMapper);
+    }
+
+    public FavoriteService(
+            FavoriteRepository favoriteRepository,
+            OfferRepository offerRepository,
             AuthenticatedUser authenticatedUser) {
-        this(favoriteRepository, offerRepository, authenticatedUser, Clock.systemDefaultZone());
+        this(favoriteRepository, offerRepository, authenticatedUser, Clock.systemDefaultZone(), null);
     }
 
     FavoriteService(
@@ -50,10 +62,20 @@ public class FavoriteService {
             OfferRepository offerRepository,
             AuthenticatedUser authenticatedUser,
             Clock clock) {
+        this(favoriteRepository, offerRepository, authenticatedUser, clock, null);
+    }
+
+    FavoriteService(
+            FavoriteRepository favoriteRepository,
+            OfferRepository offerRepository,
+            AuthenticatedUser authenticatedUser,
+            Clock clock,
+            OfferImagePresentationMapper imagePresentationMapper) {
         this.favoriteRepository = favoriteRepository;
         this.offerRepository = offerRepository;
         this.authenticatedUser = authenticatedUser;
         this.clock = clock;
+        this.imagePresentationMapper = imagePresentationMapper;
     }
 
     @Transactional
@@ -76,12 +98,10 @@ public class FavoriteService {
     @Transactional(readOnly = true)
     public List<OfferCardDto> getCurrentUserFavoriteOffers() {
         return authenticatedUser.get()
-                .map(user -> favoriteRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId())
-                        .stream()
+                .map(user -> toCardDtos(favoriteRepository.findAllByUserIdOrderByCreatedAtDesc(user.getId()).stream()
                         .map(Favorite::getOffer)
                         .filter(offer -> isAvailableForFavorite(offer, user))
-                        .map(this::toCardDto)
-                        .toList())
+                        .toList()))
                 .orElseGet(List::of);
     }
 
@@ -146,6 +166,18 @@ public class FavoriteService {
     }
 
     private OfferCardDto toCardDto(Offer offer) {
+        return toCardDto(
+                offer,
+                imagePresentationMapper == null ? List.of() : imagePresentationMapper.coverTiles(offer),
+                imagePresentationMapper == null ? petDtos(offerPets(offer)) : imagePresentationMapper.petDtos(offerPets(offer)),
+                imagePresentationMapper == null ? null : imagePresentationMapper.userImage(offer.getCreateUser()));
+    }
+
+    private OfferCardDto toCardDto(
+            Offer offer,
+            List<OfferCoverTileDto> coverTiles,
+            List<PetDto> petDtos,
+            ImageRefDto creatorProfileImage) {
         boolean verified = offer.getCreateUser() != null
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
         List<Pet> pets = offerPets(offer);
@@ -165,15 +197,32 @@ public class FavoriteService {
                 petSpeciesLabels(pets),
                 petBreeds(pets),
                 petTags(pets),
-                petDtos(pets),
+                petDtos,
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
                 null,
                 true,
                 offer.getOfferType(),
                 createUser != null ? createUser.getId() : null,
-                creatorDisplayName(createUser)
+                creatorDisplayName(createUser),
+                coverTiles,
+                creatorProfileImage
         );
+    }
+
+    private List<OfferCardDto> toCardDtos(List<Offer> offers) {
+        if (imagePresentationMapper == null) {
+            return offers.stream().map(this::toCardDto).toList();
+        }
+        var tiles = imagePresentationMapper.coverTilesByOffer(offers);
+        var pets = imagePresentationMapper.petDtosByOffer(offers);
+        var creators = imagePresentationMapper.creatorImagesByOffer(offers);
+        return offers.stream()
+                .map(offer -> toCardDto(offer,
+                        tiles.getOrDefault(offer.getOfferId(), List.of()),
+                        pets.getOrDefault(offer.getOfferId(), List.of()),
+                        creators.get(offer.getOfferId())))
+                .toList();
     }
 
     private String creatorDisplayName(User user) {
@@ -205,6 +254,9 @@ public class FavoriteService {
     }
 
     private List<PetDto> petDtos(List<Pet> pets) {
+        if (imagePresentationMapper != null) {
+            return imagePresentationMapper.petDtos(pets);
+        }
         return pets.stream()
                 .filter(java.util.Objects::nonNull)
                 .map(PetDto::from)

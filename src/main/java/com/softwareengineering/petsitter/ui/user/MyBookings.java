@@ -6,6 +6,7 @@ import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.wallet.domain.PaymentStatus;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -225,12 +226,10 @@ public class MyBookings extends Div {
                 .set("flex-direction", "column")
                 .set("gap", "0");
 
-        Div colorBar = new Div();
+        Div colorBar = ImageComponents.offerCover(dto.coverTiles(), "120px", cardColor(dto.status()));
         colorBar.getStyle()
-                .set("height", "120px")
                 .set("width", "100%")
                 .set("border-radius", "12px")
-                .set("background", cardColor(dto.status()))
                 .set("position", "relative")
                 .set("margin-bottom", "20px");
 

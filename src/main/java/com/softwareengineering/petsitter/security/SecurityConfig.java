@@ -111,6 +111,7 @@ public class SecurityConfig {
                                 "/connect/**",
                                 "/favicon.ico",
                                 "/images/**",
+                                "/media/images/**",
                                 "/icons/**",
                                 "/line-awesome/**",
                                 "/manifest.webmanifest",

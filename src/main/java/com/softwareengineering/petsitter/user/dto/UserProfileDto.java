@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.user.dto;
 
+import com.softwareengineering.petsitter.image.dto.ImageRefDto;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import java.time.LocalDate;
@@ -27,6 +28,34 @@ public record UserProfileDto(
         LocalDateTime pendingEmailRequestedAt,
         String petSummary,
         AccountRole accountRole,
-        AccountStatus accountStatus
+        AccountStatus accountStatus,
+        ImageRefDto profileImage
 ) {
+    public UserProfileDto(
+            UUID id,
+            String email,
+            String firstName,
+            String lastName,
+            String displayName,
+            String phone,
+            LocalDate birthDate,
+            String nationality,
+            String language,
+            String bio,
+            String street,
+            String houseNumber,
+            String postalCode,
+            String city,
+            String addressAddition,
+            String country,
+            String pendingEmail,
+            LocalDateTime pendingEmailRequestedAt,
+            String petSummary,
+            AccountRole accountRole,
+            AccountStatus accountStatus
+    ) {
+        this(id, email, firstName, lastName, displayName, phone, birthDate, nationality, language, bio,
+                street, houseNumber, postalCode, city, addressAddition, country, pendingEmail,
+                pendingEmailRequestedAt, petSummary, accountRole, accountStatus, null);
+    }
 }

@@ -10,6 +10,7 @@ import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
@@ -281,12 +282,10 @@ public class MyOffers extends Div {
                 .set("cursor", "pointer");
         card.addClickListener(event -> openOfferDialog(offer));
 
-        Div imagePlaceholder = new Div();
+        Div imagePlaceholder = ImageComponents.offerCover(offer.coverTiles(), "160px", cardColor(offer));
         imagePlaceholder.getStyle()
-                .set("height", "160px")
                 .set("width", "100%")
                 .set("border-radius", "12px")
-                .set("background", cardColor(offer))
                 .set("position", "relative")
                 .set("margin-bottom", "20px");
 
@@ -620,6 +619,8 @@ public class MyOffers extends Div {
                 false,
                 offer.offerType(),
                 null,
+                null,
+                offer.coverTiles(),
                 null
         );
     }

@@ -53,6 +53,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private final ImageAssetService imageAssetService;
     private Button findOwnerBtn;
     private Button findSitterBtn;
+    private Button profileBtn;
     private Span mailBadge;
     private Span mailTypingIndicator;
     private Registration badgeRegistration;
@@ -217,12 +218,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
 
-        Button profileBtn = new Button(ImageComponents.avatar(
-                authenticatedUser.get()
-                        .flatMap(user -> imageAssetService.findUserImage(user.getId()))
-                        .orElse(null),
-                36,
-                "#8db3c3"));
+        profileBtn = new Button(headerProfileAvatar());
         profileBtn.setAriaLabel("Profil öffnen");
         profileBtn.getStyle()
                 .set("width", "42px")
@@ -237,6 +233,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
         rightIcons.add(heartBtn, profileBtn);
         return rightIcons;
+    }
+
+    public void refreshProfileImage() {
+        if (profileBtn != null) {
+            profileBtn.setIcon(headerProfileAvatar());
+        }
+    }
+
+    private Component headerProfileAvatar() {
+        return ImageComponents.avatar(
+                authenticatedUser.get()
+                        .flatMap(user -> imageAssetService.findUserImage(user.getId()))
+                        .orElse(null),
+                36,
+                "#8db3c3");
     }
 
     private Component buildMailButtonWithTypingIndicator() {

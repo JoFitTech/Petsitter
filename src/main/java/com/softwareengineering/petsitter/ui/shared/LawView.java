@@ -211,8 +211,11 @@ public class LawView extends VerticalLayout {
         H3 h2 = sectionHeading("2. Welche Daten wir erheben");
         Paragraph dataTypes = styledParagraph(
                 "Wir erheben und verarbeiten folgende Kategorien personenbezogener Daten: " +
-                "Name, E-Mail-Adresse, Profilbild, Standortdaten (nur bei aktivierter Standortfreigabe), " +
-                "Bewertungen und Nachrichten innerhalb der Plattform.");
+                "Name, E-Mail-Adresse, optionale Profil- und Haustierbilder, Standortdaten (nur bei aktivierter " +
+                "Standortfreigabe), Bewertungen und Nachrichten innerhalb der Plattform. Profil- und " +
+                "Haustierbilder werden in optimierten Varianten in MySQL gespeichert und öffentlich angezeigt, " +
+                "wenn ein Profil, ein Haustier oder ein daraus abgeleitetes Angebot sichtbar ist. Beim Entfernen " +
+                "eines Bildes sowie beim Löschen des zugehörigen Kontos oder Haustiers werden die Bilddaten gelöscht.");
 
         H3 h3 = sectionHeading("3. Zweck der Datenverarbeitung");
         Paragraph purpose = styledParagraph(

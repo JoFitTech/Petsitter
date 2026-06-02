@@ -9,8 +9,11 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.OfferCoverTileDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.softwareengineering.petsitter.ui.user.UserView;
@@ -31,8 +34,6 @@ import com.vaadin.flow.component.textfield.BigDecimalField;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.datepicker.DatePicker;
-import com.vaadin.flow.component.upload.Upload;
-import com.vaadin.flow.component.upload.receivers.MultiFileMemoryBuffer;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.popover.Popover;
@@ -51,6 +52,7 @@ import java.time.YearMonth;
 import java.time.DayOfWeek;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -82,10 +84,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private final OfferService offerService;
 
-    private Upload imageUpload;
-    private MultiFileMemoryBuffer uploadBuffer;
     private Div imagePreviewArea;
-    private final List<String> uploadedFileNames = new ArrayList<>();
 
     private CreateOfferFormData formData;
     private OfferType currentOfferType;
@@ -147,7 +146,6 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         formData = offerService.getCreateOfferFormData();
         animalTypeSelect = null;
         petSelect = null;
-        uploadedFileNames.clear();
 
         String mode = modeForCurrentOfferType();
         String pageBg = isOwnerOffer() ? LIGHT_BG : "#ebf6f0";
@@ -312,52 +310,20 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         return spacer;
     }
 
-    // ── 1. Image upload button ────────────────────────────────────────────
+    // ── 1. Derived image hint ─────────────────────────────────────────────
     private Component createImageUploadSection(String mode) {
-        uploadBuffer = new MultiFileMemoryBuffer();
-        imageUpload = new Upload(uploadBuffer);
-        imageUpload.setAcceptedFileTypes("image/jpeg", "image/png", "image/webp", "image/gif");
-        imageUpload.setMaxFiles(10);
-        imageUpload.setMaxFileSize(10 * 1024 * 1024); // 10 MB
-
-        String btnText = isOwnerOffer()
-                ? " Lade hier Bilder deiner Haustiere hoch"
-                : " Lade hier Bilder von dir hoch";
-        Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
-        cameraIcon.setSize("22px");
-        cameraIcon.getStyle()
-                .set("color", "white")
-                .set("flex-shrink", "0");
-        Button uploadBtn = new Button(btnText, cameraIcon);
-        uploadBtn.getStyle()
-                .set("width", "100%")
-                .set("height", "56px")
-                .set("background", BROWN)
-                .set("color", "white")
-                .set("border-radius", "28px")
-                .set("font-size", "16px")
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-
-        imageUpload.setUploadButton(uploadBtn);
-
-        // Hide the default drag-drop text
-        imageUpload.setDropLabel(new Span(""));
-        imageUpload.setDropLabelIcon(new Span(""));
-
-        imageUpload.getStyle()
-                .set("width", "100%")
-                .set("border", "none")
-                .set("background", "transparent");
-
-        imageUpload.addSucceededListener(event -> {
-            uploadedFileNames.add(event.getFileName());
-            System.out.println("Bild hochgeladen: " + event.getFileName());
-            onImageUploaded(event.getFileName());
-        });
-
-        return imageUpload;
+        Paragraph hint = new Paragraph(isOwnerOffer()
+                ? "Das Titelbild wird automatisch aus den Bildern deiner ausgewählten Haustiere erstellt. Bilder kannst du unter „Meine Tiere“ verwalten."
+                : "Als Titelbild wird automatisch dein Profilbild verwendet. Du kannst es in deinem Profil verwalten.");
+        hint.getStyle()
+                .set("margin", "0")
+                .set("padding", "14px 16px")
+                .set("border-radius", "14px")
+                .set("background", "#f6e8d0")
+                .set("color", BROWN)
+                .set("font-size", "14px")
+                .set("line-height", "1.5");
+        return hint;
     }
 
     // ── 2. Image preview area ─────────────────────────────────────────────
@@ -375,17 +341,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("flex-wrap", "wrap")
                 .set("gap", "10px")
                 .set("padding", "16px")
-                .set("box-sizing", "border-box");
+                .set("box-sizing", "border-box")
+                .set("overflow", "hidden");
 
-        String previewText = imagePreviewPlaceholderText();
-        Span placeholder = new Span(previewText);
-        placeholder.setId("preview-placeholder");
-        placeholder.getStyle()
-                .set("color", BROWN)
-                .set("font-size", "16px")
-                .set("font-weight", "600");
-
-        imagePreviewArea.add(placeholder);
+        updateImagePreview();
         return imagePreviewArea;
     }
 
@@ -465,7 +424,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         petSelect.setPlaceholder("Wähle Haustiere");
         petSelect.setClearButtonVisible(true);
         petSelect.setWidthFull();
-        petSelect.addValueChangeListener(event -> petSelect.setInvalid(false));
+        petSelect.addValueChangeListener(event -> {
+            petSelect.setInvalid(false);
+            updateImagePreview();
+        });
         petSelect.getStyle()
                 .set("border-radius", "12px")
                 .set("--vaadin-input-field-background", "#fffdf8")
@@ -781,33 +743,6 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         // TODO: UI.getCurrent().navigate("entwuerfe");
     }
 
-    private void onImageUploaded(String fileName) {
-        System.out.println("Bild-Upload erfolgreich: " + fileName);
-        // TODO: Vorschau-Thumbnail aus uploadBuffer rendern und in imagePreviewArea
-        // einfügen
-        // Beispiel:
-        // InputStream stream = uploadBuffer.getInputStream(fileName);
-        // StreamResource resource = new StreamResource(fileName, () -> stream);
-        // Image img = new Image(resource, fileName);
-        // img.setWidth("100px"); img.setHeight("100px");
-        // imagePreviewArea.add(img);
-
-        // Minimal visual feedback: remove placeholder text on first upload
-        imagePreviewArea.getChildren()
-                .filter(c -> c.getId().map(id -> id.equals("preview-placeholder")).orElse(false))
-                .findFirst()
-                .ifPresent(imagePreviewArea::remove);
-
-        Span hint = new Span("📎 " + fileName);
-        hint.getStyle()
-                .set("background", BORDER)
-                .set("border-radius", "8px")
-                .set("padding", "4px 10px")
-                .set("font-size", "13px")
-                .set("color", DARK);
-        imagePreviewArea.add(hint);
-    }
-
     private void onSaveDraftClicked() {
         System.out.println("Entwurf speichern geklickt");
         System.out.println("  Titel:       " + titleField.getValue());
@@ -822,7 +757,6 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         System.out.println("  Bis:         " + selectedTo);
         System.out.println("  Betreuung:   " + careTypeGroup.getValue());
         System.out.println("  Zusatzinfo:  " + additionalInfoArea.getValue());
-        System.out.println("  Bilder:      " + uploadedFileNames);
 
         // TODO: draftService.saveDraft(buildDraftDto());
     }
@@ -1023,17 +957,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         priceField.clear();
         priceField.setInvalid(false);
         additionalInfoArea.clear();
-        uploadedFileNames.clear();
-        if (imagePreviewArea != null) {
-            imagePreviewArea.removeAll();
-            Span placeholder = new Span(imagePreviewPlaceholderText());
-            placeholder.setId("preview-placeholder");
-            placeholder.getStyle()
-                    .set("color", BROWN)
-                    .set("font-size", "16px")
-                    .set("font-weight", "600");
-            imagePreviewArea.add(placeholder);
-        }
+        updateImagePreview();
     }
 
     private boolean isOwnerOffer() {
@@ -1118,7 +1042,72 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     }
 
     private String imagePreviewPlaceholderText() {
-        return isOwnerOffer() ? "Vorschau deiner Haustierbilder" : "Vorschau deiner Bilder";
+        return isOwnerOffer() ? "Vorschau deiner Haustier-Collage" : "Vorschau deines Profilbilds";
+    }
+
+    private void updateImagePreview() {
+        if (imagePreviewArea == null) {
+            return;
+        }
+
+        imagePreviewArea.removeAll();
+        List<OfferCoverTileDto> tiles = selectedPetCoverTiles();
+        if (!isOwnerOffer() || tiles.isEmpty()) {
+            imagePreviewArea.getStyle()
+                    .set("display", "flex")
+                    .set("align-items", "center")
+                    .set("justify-content", "center")
+                    .set("gap", "10px")
+                    .set("padding", "16px");
+            imagePreviewArea.add(imagePreviewPlaceholder());
+            return;
+        }
+
+        imagePreviewArea.getStyle()
+                .set("display", "block")
+                .set("gap", "0")
+                .set("padding", "0");
+        imagePreviewArea.add(ImageComponents.offerCover(tiles, "140px", BEIGE));
+    }
+
+    private Span imagePreviewPlaceholder() {
+        Span placeholder = new Span(imagePreviewPlaceholderText());
+        placeholder.setId("preview-placeholder");
+        placeholder.getStyle()
+                .set("color", BROWN)
+                .set("font-size", "16px")
+                .set("font-weight", "600");
+        return placeholder;
+    }
+
+    private List<OfferCoverTileDto> selectedPetCoverTiles() {
+        if (!isOwnerOffer()) {
+            return List.of();
+        }
+        return selectedPets().stream()
+                .sorted(Comparator
+                        .comparing(OfferPetOptionDto::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(option -> option.id() == null ? "" : option.id().toString()))
+                .map(option -> new OfferCoverTileDto(
+                        option.profileImage(),
+                        option.name(),
+                        animalType(option.species())))
+                .toList();
+    }
+
+    private OfferAnimalType animalType(PetSpecies species) {
+        if (species == null) {
+            return OfferAnimalType.OTHER;
+        }
+        return switch (species) {
+            case DOG -> OfferAnimalType.DOG;
+            case CAT -> OfferAnimalType.CAT;
+            case BIRD -> OfferAnimalType.BIRD;
+            case RABBIT -> OfferAnimalType.SMALL_ANIMAL;
+            case FISH -> OfferAnimalType.FISH;
+            case REPTILE -> OfferAnimalType.REPTILE;
+            case OTHER -> OfferAnimalType.OTHER;
+        };
     }
 
     private String currentOfferTitle() {

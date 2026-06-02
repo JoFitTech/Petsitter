@@ -2,6 +2,7 @@ package com.softwareengineering.petsitter.ui.chat;
 
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.dto.PublicUserProfileDto;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -100,7 +101,7 @@ public class ProfilePopUp extends Dialog {
         profileContent.getStyle().set("gap", "40px");
 
         // Avatar
-        Div avatar = createAvatar(160);
+        Div avatar = ImageComponents.avatar(safeProfile.profileImage(), 160, "#e0c4a4");
         
         // Info Section
         VerticalLayout infoSection = new VerticalLayout();
@@ -278,28 +279,6 @@ public class ProfilePopUp extends Dialog {
 
     private String valueOrEmpty(String value) {
         return value == null ? "" : value;
-    }
-
-    private Div createAvatar(int size) {
-        Div avatar = new Div();
-        avatar.getStyle()
-                .set("width", size + "px")
-                .set("height", size + "px")
-                .set("min-width", size + "px")
-                .set("border-radius", "50%")
-                .set("background-color", "#e0c4a4") // Light brown matching the design
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("overflow", "hidden");
-
-        Div svgWrap = new Div();
-        svgWrap.getElement().setProperty("innerHTML",
-                "<svg width='" + (size * 0.7) + "' height='" + (size * 0.7) + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
-                        "<circle cx='12' cy='8' r='4' fill='white'/>" +
-                        "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='white'/></svg>");
-        avatar.add(svgWrap);
-        return avatar;
     }
 
     private Div createReviewItem(int starsCount, String titleText, String reviewText) {

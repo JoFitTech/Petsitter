@@ -4,20 +4,32 @@ import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
+import com.softwareengineering.petsitter.pet.service.PetService;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.ImageCropDialog;
+import com.softwareengineering.petsitter.ui.shared.PendingImageChange;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.H2;
+import com.vaadin.flow.component.html.Div;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.upload.Upload;
+import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.dom.Element;
 import java.time.LocalDate;
+import java.io.IOException;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
@@ -41,7 +53,7 @@ public class AddPetPopUp extends Dialog {
     private static final String TYPE_RODENT = "Nagetier";
     private static final String TYPE_OTHER = "Sonstiges";
 
-    public AddPetPopUp(PetDto existing, Consumer<PetDto> onSave) {
+    public AddPetPopUp(PetDto existing, PetService petService, Consumer<PetEditorResult> onSave) {
         this.setWidth("560px");
         this.setMaxWidth("95vw");
         this.setCloseOnEsc(true);
@@ -85,6 +97,94 @@ public class AddPetPopUp extends Dialog {
                 .set("font-size", "28px")
                 .set("font-weight", "800")
                 .set("margin", "0 0 8px 0");
+
+        AtomicReference<PendingImageChange> imageChange =
+                new AtomicReference<>(PendingImageChange.unchanged());
+        Div imagePreview = new Div();
+        renderImagePreview(imagePreview, existing, imageChange.get());
+        Div imagePreviewWrap = new Div(imagePreview);
+        imagePreviewWrap.getStyle()
+                .set("position", "relative")
+                .set("width", "112px")
+                .set("height", "112px")
+                .set("flex-shrink", "0");
+
+        MemoryBuffer imageBuffer = new MemoryBuffer();
+        Upload imageUpload = new Upload(imageBuffer);
+        imageUpload.setAcceptedFileTypes("image/jpeg", "image/png");
+        imageUpload.setMaxFiles(1);
+        imageUpload.setMaxFileSize(5 * 1024 * 1024);
+        imageUpload.setDropAllowed(false);
+        Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
+        cameraIcon.setSize("13px");
+        Button imageUploadButton = new Button(cameraIcon);
+        imageUploadButton.setAriaLabel("Haustierbild hochladen");
+        imageUploadButton.getStyle()
+                .set("width", "28px").set("height", "28px")
+                .set("min-width", "28px").set("padding", "0")
+                .set("border-radius", "50%")
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        imageUpload.setUploadButton(imageUploadButton);
+        imageUpload.getStyle()
+                .set("position", "absolute")
+                .set("bottom", "2px").set("right", "2px")
+                .set("width", "28px").set("height", "28px")
+                .set("--vaadin-upload-border-width", "0px")
+                .set("--vaadin-upload-padding", "0px")
+                .set("background", "transparent")
+                .set("overflow", "visible");
+
+        Button removeImage = new Button(new Icon(VaadinIcon.TRASH));
+        removeImage.setAriaLabel("Haustierbild entfernen");
+        removeImage.getStyle()
+                .set("position", "absolute")
+                .set("bottom", "2px").set("left", "2px")
+                .set("width", "28px").set("height", "28px")
+                .set("min-width", "28px").set("padding", "0")
+                .set("border-radius", "50%")
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
+        removeImage.setVisible(existing != null && existing.profileImage() != null);
+        removeImage.addClickListener(event -> {
+            imageChange.set(PendingImageChange.remove());
+            renderImagePreview(imagePreview, existing, imageChange.get());
+            removeImage.setVisible(false);
+        });
+        imageUpload.addSucceededListener(event -> {
+            try {
+                byte[] content = imageBuffer.getInputStream().readAllBytes();
+                petService.validatePetImageUpload(content, event.getMIMEType());
+                new ImageCropDialog(content, event.getMIMEType(), cropped -> {
+                    imageChange.set(PendingImageChange.replace(cropped));
+                    renderImagePreview(imagePreview, existing, imageChange.get());
+                    removeImage.setVisible(true);
+                }).open();
+            } catch (IOException | RuntimeException exception) {
+                Notification.show("Fehler: " + exception.getMessage(), 3500, Notification.Position.TOP_CENTER);
+            } finally {
+                imageUpload.clearFileList();
+            }
+        });
+        imageUpload.addFailedListener(event -> {
+            imageUpload.clearFileList();
+            Notification.show("Das Haustierbild konnte nicht hochgeladen werden.", 3500,
+                    Notification.Position.TOP_CENTER);
+        });
+        imageUpload.addFileRejectedListener(event -> {
+            imageUpload.clearFileList();
+            Notification.show("Bitte wähle ein JPEG- oder PNG-Bild mit maximal 5 MiB aus.", 3500,
+                    Notification.Position.TOP_CENTER);
+        });
+
+        imagePreviewWrap.add(imageUpload, removeImage);
+        VerticalLayout imageSection = new VerticalLayout(imagePreviewWrap);
+        imageSection.setPadding(false);
+        imageSection.setSpacing(false);
 
         TextField nameField = new TextField("Name");
         nameField.setWidthFull();
@@ -159,7 +259,7 @@ public class AddPetPopUp extends Dialog {
                 return;
             }
             try {
-                onSave.accept(dto);
+                onSave.accept(new PetEditorResult(dto, imageChange.get()));
                 this.close();
             } catch (Exception ex) {
                 Notification.show("Fehler: " + ex.getMessage(), 3500, Notification.Position.TOP_CENTER);
@@ -168,7 +268,7 @@ public class AddPetPopUp extends Dialog {
 
         footerButtons.add(btnSave);
 
-        mainContainer.add(closeBtn, title, nameField, typeField, customTypeField, breedField, birthDateField,
+        mainContainer.add(closeBtn, title, imageSection, nameField, typeField, customTypeField, breedField, birthDateField,
                 vaccinationStatusTags, petTagSelector, infoField, footerButtons);
         add(mainContainer);
     }
@@ -235,7 +335,28 @@ public class AddPetPopUp extends Dialog {
                 selectedVaccinationStatus == null
                         ? PetVaccinationStatus.UNBEKANNT
                         : selectedVaccinationStatus,
-                selectedTags == null ? Set.of() : new LinkedHashSet<>(selectedTags));
+                selectedTags == null ? Set.of() : new LinkedHashSet<>(selectedTags),
+                existing == null ? null : existing.profileImage());
+    }
+
+    private void renderImagePreview(Div preview, PetDto existing, PendingImageChange change) {
+        preview.removeAll();
+        preview.getStyle().set("width", "112px").set("height", "112px");
+        if (change.type() == PendingImageChange.Type.REPLACE) {
+            Image image = new Image("data:image/jpeg;base64,"
+                    + Base64.getEncoder().encodeToString(change.content()), "Haustierbild");
+            image.getStyle()
+                    .set("width", "112px")
+                    .set("height", "112px")
+                    .set("border-radius", "50%")
+                    .set("object-fit", "cover");
+            preview.add(image);
+            return;
+        }
+        preview.add(ImageComponents.avatar(
+                change.type() == PendingImageChange.Type.REMOVE || existing == null ? null : existing.profileImage(),
+                112,
+                "#e3cda8"));
     }
 
     private PetVaccinationStatus initialVaccinationStatus(PetDto existing) {

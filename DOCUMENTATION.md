@@ -90,7 +90,7 @@ Eine Buchung entsteht, wenn eine Anfrage akzeptiert wird. Sie verbindet Owner, S
 
 Der Chat ist als Zusatzfunktion umgesetzt. Er ist an eine Buchung gebunden. Nur Owner und Sitter einer Buchung dürfen die zugehörige Konversation sehen und Nachrichten senden.
 
-Für den Chat wird MongoDB verwendet. Das passt besser zu Chatverläufen, weil Nachrichten als Dokumente mit Zeitstempeln gespeichert werden und nicht stark relational modelliert werden müssen. App-Kerndaten bleiben in MySQL.
+Für den Chat wird MongoDB verwendet. Das passt besser zu Chatverläufen, weil Nachrichten als Dokumente mit Zeitstempeln gespeichert werden und nicht stark relational modelliert werden müssen. App-Kerndaten bleiben in MySQL. Dazu zählen auch optionale Profil- und Haustierbilder: Nach einem runden Zuschnitt speichert MySQL ausschließlich optimierte `AVATAR`- und `DISPLAY`-Varianten. Offer-Cover werden aus diesen Bildern dynamisch zusammengesetzt. Beim Löschen eines Users oder Haustiers entfernt die Datenbank die zugehörigen Bildvarianten per Cascade.
 
 ### Benachrichtigungen
 

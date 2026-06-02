@@ -113,11 +113,9 @@ public class PetsitterDetailPopUp extends Dialog {
         header.add(dialogTitle, closeBtn);
 
         // ── Image area ────────────────────────────────────────────────────
-        Div imageArea = new Div();
+        Div imageArea = ImageComponents.offerCover(dto.coverTiles(), "160px", topColor);
         imageArea.getStyle()
                 .set("width", "100%")
-                .set("height", "160px")
-                .set("background", topColor)
                 .set("border-radius", "16px")
                 .set("position", "relative")
                 .set("overflow", "hidden");
@@ -364,7 +362,9 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("font-weight", "700")
                 .set("line-height", "1.1");
 
-        profileContent.add(createCreatorAvatar(36), creatorName);
+        Div creatorAvatar = ImageComponents.avatar(dto.creatorProfileImage(), 36, "#e0c4a4");
+        creatorAvatar.addClassName("offer-creator-avatar");
+        profileContent.add(creatorAvatar, creatorName);
         profileButton.getElement().appendChild(profileContent.getElement());
         profileButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
                 .ifPresentOrElse(
@@ -372,29 +372,6 @@ public class PetsitterDetailPopUp extends Dialog {
                         () -> Notification.show("Profil konnte nicht geladen werden.")
                 ));
         return profileButton;
-    }
-
-    private Div createCreatorAvatar(int size) {
-        Div avatar = new Div();
-        avatar.addClassName("offer-creator-avatar");
-        avatar.getStyle()
-                .set("width", size + "px")
-                .set("height", size + "px")
-                .set("min-width", size + "px")
-                .set("border-radius", "50%")
-                .set("background-color", "#e0c4a4")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("overflow", "hidden");
-
-        Div svgWrap = new Div();
-        svgWrap.getElement().setProperty("innerHTML",
-                "<svg width='" + (size * 0.7) + "' height='" + (size * 0.7) + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
-                        "<circle cx='12' cy='8' r='4' fill='white'/>" +
-                        "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='white'/></svg>");
-        avatar.add(svgWrap);
-        return avatar;
     }
 
     private Button styledButton(String label) {
@@ -627,7 +604,7 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("background", "white")
                 .set("border", "1px solid #ead5ae")
                 .set("border-radius", "14px")
-                .set("padding", "14px 16px")
+                .set("padding", "12px 16px 14px")
                 .set("box-sizing", "border-box")
                 .set("width", "100%");
 
@@ -636,14 +613,15 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("color", DARK)
                 .set("font-size", "17px")
                 .set("font-weight", "800")
-                .set("margin", "0 0 10px 0");
+                .set("margin", "0");
 
         Div attributes = new Div();
         attributes.addClassName("offer-pet-attributes");
         attributes.getStyle()
                 .set("display", "flex")
                 .set("flex-wrap", "wrap")
-                .set("gap", "7px");
+                .set("gap", "7px")
+                .set("margin-top", "10px");
         addChipIfPresent(attributes, speciesLabel(pet));
         addChipIfPresent(attributes, pet.breed());
         if (pet.birthDate() != null) {
@@ -680,7 +658,11 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("line-height", "1.5")
                 .set("margin-top", "4px");
 
-        card.add(name, attributes, descriptionLabel, description);
+        HorizontalLayout header = new HorizontalLayout();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.getStyle().set("gap", "12px");
+        header.add(ImageComponents.avatar(pet.profileImage(), 52, "#e3cda8"), name);
+        card.add(header, attributes, descriptionLabel, description);
         return card;
     }
 

@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.pet.service;
 
+import com.softwareengineering.petsitter.image.dto.ImageRefDto;
+import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
@@ -37,16 +39,23 @@ public class PetService {
     private final PetRepository petRepository;
     private final AuthenticatedUser authenticatedUser;
     private final OfferRepository offerRepository;
+    private final ImageAssetService imageAssetService;
 
     @Autowired
-    public PetService(PetRepository petRepository, AuthenticatedUser authenticatedUser, OfferRepository offerRepository) {
+    public PetService(PetRepository petRepository, AuthenticatedUser authenticatedUser, OfferRepository offerRepository,
+            ImageAssetService imageAssetService) {
         this.petRepository = petRepository;
         this.authenticatedUser = authenticatedUser;
         this.offerRepository = offerRepository;
+        this.imageAssetService = imageAssetService;
+    }
+
+    public PetService(PetRepository petRepository, AuthenticatedUser authenticatedUser, OfferRepository offerRepository) {
+        this(petRepository, authenticatedUser, offerRepository, null);
     }
 
     public PetService(PetRepository petRepository, AuthenticatedUser authenticatedUser) {
-        this(petRepository, authenticatedUser, null);
+        this(petRepository, authenticatedUser, null, null);
     }
 
     @Transactional(readOnly = true)
@@ -84,19 +93,18 @@ public class PetService {
     @Transactional(readOnly = true)
     public List<PetDto> getPetDtosForCurrentUser() {
         return authenticatedUser.get()
-                .map(user -> petRepository.findAllByOwnerId(user.getId()).stream()
-                        .map(this::toDto).toList())
+                .map(user -> toDtos(petRepository.findAllByOwnerId(user.getId())))
                 .orElseGet(List::of);
     }
 
     @Transactional
-    public void createPetForCurrentUser(PetDto dto) {
+    public PetDto createPetForCurrentUser(PetDto dto) {
         User user = authenticatedUser.get()
                 .orElseThrow(() -> new ForbiddenOperationException("Nicht angemeldet."));
         Pet pet = new Pet();
         pet.setOwner(user);
         applyDtoToPet(pet, dto);
-        petRepository.save(pet);
+        return toDto(petRepository.save(pet));
     }
 
     @Transactional
@@ -115,6 +123,18 @@ public class PetService {
     @Transactional
     public void deletePet(UUID petId) {
         deleteCurrentUserPet(petId, List.of());
+    }
+
+    public void validatePetImageUpload(byte[] content, String mimeType) {
+        requireImageAssetService().validateUpload(content, mimeType);
+    }
+
+    public ImageRefDto replaceCurrentUserPetImage(UUID petId, byte[] content) {
+        return requireImageAssetService().replaceCurrentUserPetImage(petId, content);
+    }
+
+    public void removeCurrentUserPetImage(UUID petId) {
+        requireImageAssetService().removeCurrentUserPetImage(petId);
     }
 
     @Transactional(readOnly = true)
@@ -182,7 +202,23 @@ public class PetService {
     }
 
     private PetDto toDto(Pet pet) {
-        return PetDto.from(pet);
+        ImageRefDto image = imageAssetService == null ? null : imageAssetService.findPetImage(pet.getId()).orElse(null);
+        return PetDto.from(pet, image);
+    }
+
+    private List<PetDto> toDtos(List<Pet> pets) {
+        if (imageAssetService == null || pets.isEmpty()) {
+            return pets.stream().map(PetDto::from).toList();
+        }
+        Map<UUID, ImageRefDto> images = imageAssetService.findPetImages(pets.stream().map(Pet::getId).toList());
+        return pets.stream().map(pet -> PetDto.from(pet, images.get(pet.getId()))).toList();
+    }
+
+    private ImageAssetService requireImageAssetService() {
+        if (imageAssetService == null) {
+            throw new IllegalStateException("Bildverwaltung ist nicht konfiguriert.");
+        }
+        return imageAssetService;
     }
 
     private Set<PetTag> normalizeTags(Set<PetTag> tags) {

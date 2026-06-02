@@ -2,6 +2,7 @@ package com.softwareengineering.petsitter.chat.service;
 
 import com.softwareengineering.petsitter.booking.domain.Booking;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
+import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.chat.domain.ChatConversationDocument;
 import com.softwareengineering.petsitter.chat.domain.ChatMessageDocument;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
@@ -25,9 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * Chat-Service – zentrale Businesslogik für Chat-Operationen.
@@ -59,6 +62,32 @@ public class ChatService {
     private final NotificationService notificationService;
     private final AuthenticatedUser authenticatedUser;
     private final UserRepository userRepository;
+    private final ImageAssetService imageAssetService;
+
+    @Autowired
+    public ChatService(
+            ChatConversationRepository conversationRepository,
+            ChatMessageRepository messageRepository,
+            BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
+            ChatAccessService accessService,
+            ChatEventBus eventBus,
+            NotificationService notificationService,
+            AuthenticatedUser authenticatedUser,
+            UserRepository userRepository,
+            ImageAssetService imageAssetService
+    ) {
+        this.conversationRepository = conversationRepository;
+        this.messageRepository = messageRepository;
+        this.bookingRepository = bookingRepository;
+        this.offerRequestRepository = offerRequestRepository;
+        this.accessService = accessService;
+        this.eventBus = eventBus;
+        this.notificationService = notificationService;
+        this.authenticatedUser = authenticatedUser;
+        this.userRepository = userRepository;
+        this.imageAssetService = imageAssetService;
+    }
 
     public ChatService(
             ChatConversationRepository conversationRepository,
@@ -71,15 +100,8 @@ public class ChatService {
             AuthenticatedUser authenticatedUser,
             UserRepository userRepository
     ) {
-        this.conversationRepository = conversationRepository;
-        this.messageRepository = messageRepository;
-        this.bookingRepository = bookingRepository;
-        this.offerRequestRepository = offerRequestRepository;
-        this.accessService = accessService;
-        this.eventBus = eventBus;
-        this.notificationService = notificationService;
-        this.authenticatedUser = authenticatedUser;
-        this.userRepository = userRepository;
+        this(conversationRepository, messageRepository, bookingRepository, offerRequestRepository, accessService,
+                eventBus, notificationService, authenticatedUser, userRepository, null);
     }
 
     /**
@@ -210,8 +232,14 @@ public class ChatService {
                 currentUserId, currentUserId
             );
 
+        Map<UUID, com.softwareengineering.petsitter.image.dto.ImageRefDto> images = imageAssetService == null
+            ? Map.of()
+            : imageAssetService.findUserImages(conversations.stream()
+                .flatMap(conversation -> java.util.stream.Stream.of(conversation.getOwnerId(), conversation.getSitterId()))
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new)));
         return conversations.stream()
-            .map(this::toConversationDto)
+            .map(conversation -> toConversationDto(conversation, images))
             .toList();
     }
 
@@ -420,6 +448,15 @@ public class ChatService {
     // ── Private Hilfsmethoden ────────────────────────────────────────────
 
     private ChatConversationDto toConversationDto(ChatConversationDocument doc) {
+        Map<UUID, com.softwareengineering.petsitter.image.dto.ImageRefDto> images = imageAssetService == null
+                ? Map.of()
+                : imageAssetService.findUserImages(List.of(doc.getOwnerId(), doc.getSitterId()));
+        return toConversationDto(doc, images);
+    }
+
+    private ChatConversationDto toConversationDto(
+            ChatConversationDocument doc,
+            Map<UUID, com.softwareengineering.petsitter.image.dto.ImageRefDto> images) {
         return new ChatConversationDto(
             doc.getId(),
             doc.getBookingId(),
@@ -431,7 +468,9 @@ public class ChatService {
             doc.getLastMessageAt(),
             doc.getLastMessagePreview(),
             doc.getRequestId(),
-            doc.getOfferId()
+            doc.getOfferId(),
+            images.get(doc.getOwnerId()),
+            images.get(doc.getSitterId())
         );
     }
 

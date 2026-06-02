@@ -10,6 +10,7 @@
     "@vaadin/vaadin-lumo-styles": "25.1.1",
     "@vaadin/vaadin-themable-mixin": "25.1.1",
     "@vaadin/vaadin-usage-statistics": "2.1.3",
+    "cropperjs": "2.1.0",
     "date-fns": "4.1.0",
     "leaflet": "^1.9.4",
     "lit": "3.3.2",
@@ -69,7 +70,7 @@
       "vite": "7.3.2",
       "vite-plugin-checker": "0.12.0"
     },
-    "hash": "5668ae66e5e531bfd11c6b080a02dcca05e6849291d9db1f741b6d09c9cc4a75",
+    "hash": "5d12e8e698af38e145bdd6155dabbabb1d3e060c43e0ec07b98e0ca12e5d1ca1",
     "overrides": {
       "@vaadin/a11y-base": "25.1.1",
       "@vaadin/accordion": "25.1.1",
@@ -139,6 +140,7 @@
       "@vaadin/vaadin-usage-statistics": "$@vaadin/vaadin-usage-statistics",
       "@vaadin/vertical-layout": "25.1.1",
       "@vaadin/virtual-list": "25.1.1",
+      "cropperjs": "$cropperjs",
       "date-fns": "$date-fns",
       "leaflet": "$leaflet",
       "lit": "$lit",
@@ -221,6 +223,7 @@
     "@vaadin/vaadin-lumo-styles": "$@vaadin/vaadin-lumo-styles",
     "@vaadin/email-field": "25.1.1",
     "@vaadin/message-input": "25.1.1",
-    "leaflet": "$leaflet"
+    "leaflet": "$leaflet",
+    "cropperjs": "$cropperjs"
   }
 }

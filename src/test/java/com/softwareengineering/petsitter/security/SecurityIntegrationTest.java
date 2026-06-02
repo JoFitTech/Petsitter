@@ -33,6 +33,16 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void profileImageRouteIsPublic() throws Exception {
+        MockHttpServletResponse response = execute(request(
+                "GET",
+                "/media/images/11111111-1111-1111-1111-111111111111/avatar"));
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getRedirectedUrl()).isNull();
+    }
+
+    @Test
     void protectedRouteRedirectsAnonymousUserToLogin() throws Exception {
         MockHttpServletResponse response = execute(request("GET", "/profile"));
 

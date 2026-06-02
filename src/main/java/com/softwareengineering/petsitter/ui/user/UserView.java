@@ -9,6 +9,9 @@ import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.ImageCropDialog;
+import com.softwareengineering.petsitter.ui.shared.PendingImageChange;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
@@ -22,6 +25,7 @@ import com.vaadin.flow.component.html.H1;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Hr;
+import com.vaadin.flow.component.html.Image;
 import com.vaadin.flow.component.html.Paragraph;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
@@ -40,6 +44,9 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import jakarta.annotation.security.PermitAll;
 import java.time.LocalDate;
+import java.io.IOException;
+import java.util.Base64;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Route(value = "profile", layout = MainLayout.class)
 @PageTitle("Mein Profil | Pawsitter")
@@ -356,7 +363,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         bearbeiten.addClickListener(e -> showUeberMichEdit());
         panel.add(panelHeader("Über mich", bearbeiten));
 
-        panel.add(buildAvatarCard(false));
+        panel.add(buildAvatarCard(false, null));
         panel.add(divider());
         panel.add(buildBioSection(false, null));
         panel.add(divider());
@@ -376,6 +383,8 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         TextField langField = styledTextField("Sprache", valueOrDefault(currentProfile.language(), "deutsch"));
         TextArea bioArea = styledTextArea("Über mich");
         bioArea.setValue(valueOrEmpty(currentProfile.bio()));
+        AtomicReference<PendingImageChange> imageChange =
+                new AtomicReference<>(PendingImageChange.unchanged());
 
         Button save = saveBtn("Speichern");
         Button cancel = cancelBtn("Abbrechen");
@@ -397,14 +406,22 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
                     currentProfile.addressAddition(),
                     currentProfile.country()));
             handleProfileResult(result, () -> {
-                showStatus(result.message());
-                showUeberMich();
+                try {
+                    applyProfileImageChange(imageChange.get());
+                    reloadProfile();
+                    refreshHeaderProfileImage();
+                    showStatus(result.message());
+                    showUeberMich();
+                } catch (RuntimeException exception) {
+                    reloadProfile();
+                    showError("Fehler: " + exception.getMessage());
+                }
             });
         });
         cancel.addClickListener(e -> showUeberMich());
 
         panel.add(panelHeader("Über mich", cancel, save));
-        panel.add(buildAvatarCard(true));
+        panel.add(buildAvatarCard(true, imageChange));
         panel.add(divider());
 
         Span infoLabel = new Span("Angaben bearbeiten:");
@@ -425,7 +442,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         contentPanel.add(panel);
     }
 
-    private Component buildAvatarCard(boolean editMode) {
+    private Component buildAvatarCard(boolean editMode, AtomicReference<PendingImageChange> imageChange) {
         Div card = new Div();
         card.setWidthFull();
         card.getStyle()
@@ -441,52 +458,85 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         Div avatarWrap = new Div();
         avatarWrap.getStyle().set("position", "relative").set("flex-shrink", "0");
 
-        Div avatar = new Div();
-        avatar.getStyle()
-            .set("width", "96px").set("height", "96px")
-            .set("border-radius", "50%")
-            .set("background", "#d4b896")
-            .set("display", "flex")
-            .set("align-items", "center")
-            .set("justify-content", "center")
-            .set("overflow", "hidden");
-
-        Div svgWrap = new Div();
-        svgWrap.getElement().setProperty("innerHTML",
-            "<svg width='56' height='56' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
-            "<circle cx='12' cy='8' r='4' fill='#a07850'/>" +
-            "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='#a07850'/></svg>");
-        avatar.add(svgWrap);
-        avatarWrap.add(avatar);
+        Div imagePreview = new Div();
+        renderProfileImagePreview(imagePreview,
+                imageChange == null ? PendingImageChange.unchanged() : imageChange.get());
+        avatarWrap.add(imagePreview);
 
         if (editMode) {
-            Div camOverlay = new Div();
-            camOverlay.getStyle()
-                .set("position", "absolute")
-                .set("bottom", "2px").set("right", "2px")
+            Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
+            cameraIcon.setSize("13px");
+            Button cameraUploadButton = new Button(cameraIcon);
+            cameraUploadButton.setAriaLabel("Profilbild hochladen");
+            cameraUploadButton.getStyle()
                 .set("width", "28px").set("height", "28px")
+                .set("min-width", "28px").set("padding", "0")
                 .set("border-radius", "50%")
                 .set("background", "#774f35")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "center")
+                .set("color", "white")
+                .set("box-shadow", "none")
                 .set("cursor", "pointer");
-            Icon cam = new Icon(VaadinIcon.CAMERA);
-            cam.setSize("13px");
-            cam.getStyle().set("color", "white");
-            camOverlay.add(cam);
-            avatarWrap.add(camOverlay);
 
             MemoryBuffer buffer = new MemoryBuffer();
             Upload upload = new Upload(buffer);
-            upload.setAcceptedFileTypes("image/jpeg", "image/png", "image/gif", "image/webp");
+            upload.setAcceptedFileTypes("image/jpeg", "image/png");
             upload.setMaxFiles(1);
             upload.setMaxFileSize(5 * 1024 * 1024);
-            upload.getStyle().set("display", "none");
-            camOverlay.getElement().executeJs(
-                "this.addEventListener('click', () => { var inp = $0.querySelector('input[type=file]'); if(inp) inp.click(); })",
-                upload.getElement());
+            upload.setDropAllowed(false);
+            upload.setUploadButton(cameraUploadButton);
+            upload.getStyle()
+                .set("position", "absolute")
+                .set("bottom", "2px").set("right", "2px")
+                .set("width", "28px").set("height", "28px")
+                .set("--vaadin-upload-border-width", "0px")
+                .set("--vaadin-upload-padding", "0px")
+                .set("background", "transparent")
+                .set("overflow", "visible");
+            Button removeImage = new Button(new Icon(VaadinIcon.TRASH));
+            removeImage.setAriaLabel("Profilbild entfernen");
+            removeImage.getStyle()
+                    .set("position", "absolute")
+                    .set("bottom", "2px").set("left", "2px")
+                    .set("width", "28px").set("height", "28px")
+                    .set("min-width", "28px").set("padding", "0")
+                    .set("border-radius", "50%")
+                    .set("background", "#774f35")
+                    .set("color", "white")
+                    .set("box-shadow", "none")
+                    .set("cursor", "pointer");
+            removeImage.setVisible(currentProfile.profileImage() != null);
+            removeImage.addClickListener(event -> {
+                imageChange.set(PendingImageChange.remove());
+                renderProfileImagePreview(imagePreview, imageChange.get());
+                removeImage.setVisible(false);
+            });
+            upload.addSucceededListener(event -> {
+                try {
+                    byte[] content = buffer.getInputStream().readAllBytes();
+                    userService.validateProfileImageUpload(content, event.getMIMEType());
+                    new ImageCropDialog(content, event.getMIMEType(), cropped -> {
+                        imageChange.set(PendingImageChange.replace(cropped));
+                        renderProfileImagePreview(imagePreview, imageChange.get());
+                        removeImage.setVisible(true);
+                    }).open();
+                } catch (IOException | RuntimeException exception) {
+                    Notification.show("Fehler: " + exception.getMessage(), 3500, Notification.Position.TOP_CENTER);
+                } finally {
+                    upload.clearFileList();
+                }
+            });
+            upload.addFailedListener(event -> {
+                upload.clearFileList();
+                Notification.show("Das Profilbild konnte nicht hochgeladen werden.", 3500,
+                        Notification.Position.TOP_CENTER);
+            });
+            upload.addFileRejectedListener(event -> {
+                upload.clearFileList();
+                Notification.show("Bitte wähle ein JPEG- oder PNG-Bild mit maximal 5 MiB aus.", 3500,
+                        Notification.Position.TOP_CENTER);
+            });
             avatarWrap.add(upload);
+            avatarWrap.add(removeImage);
         }
 
         VerticalLayout info = new VerticalLayout();
@@ -525,6 +575,45 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         info.add(topRow, name, pets, userAge, loc, lang);
         card.add(avatarWrap, info);
         return card;
+    }
+
+    private void renderProfileImagePreview(Div preview, PendingImageChange imageChange) {
+        preview.removeAll();
+        preview.getStyle().set("width", "96px").set("height", "96px");
+        if (imageChange.type() == PendingImageChange.Type.REPLACE) {
+            Image image = new Image("data:image/jpeg;base64,"
+                    + Base64.getEncoder().encodeToString(imageChange.content()), "Profilbild");
+            image.getStyle()
+                    .set("width", "96px")
+                    .set("height", "96px")
+                    .set("border-radius", "50%")
+                    .set("object-fit", "cover");
+            preview.add(image);
+            return;
+        }
+        preview.add(ImageComponents.avatar(
+                imageChange.type() == PendingImageChange.Type.REMOVE ? null : currentProfile.profileImage(),
+                96,
+                "#d4b896"));
+    }
+
+    private void applyProfileImageChange(PendingImageChange imageChange) {
+        if (imageChange.type() == PendingImageChange.Type.REPLACE) {
+            userService.replaceCurrentUserProfileImage(imageChange.content());
+        } else if (imageChange.type() == PendingImageChange.Type.REMOVE) {
+            userService.removeCurrentUserProfileImage();
+        }
+    }
+
+    private void refreshHeaderProfileImage() {
+        Component parent = this;
+        while (parent != null) {
+            if (parent instanceof MainLayout mainLayout) {
+                mainLayout.refreshProfileImage();
+                return;
+            }
+            parent = parent.getParent().orElse(null);
+        }
     }
 
     private Component styledInfoLineWithIcon(VaadinIcon icon, String text) {

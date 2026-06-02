@@ -211,13 +211,21 @@ MySQL speichert die relationalen Kerndaten der Anwendung:
 - OfferRequest,
 - Booking,
 - Notification,
-- LoginCode.
+- LoginCode,
+- ImageAsset und ImageAssetVariant für optionale Profil- und Haustierbilder.
 
 Flyway verwaltet die Schemaänderungen.
+
+Profil- und Haustierbilder werden als optimierte JPEG-Varianten (`AVATAR` und `DISPLAY`) in separaten MySQL-Tabellen
+gespeichert. Die Originaldatei wird nach dem Zuschneiden verworfen. Ein Bild gehört genau einem User oder Pet;
+Fremdschlüssel mit `ON DELETE CASCADE` entfernen Varianten beim Löschen des Besitzers. Öffentliche Profile und Offers
+verwenden unveränderliche URLs unter `/media/images/{assetId}/{variant}`. Offer-Cover werden nicht zusätzlich
+persistiert: Sitter-Angebote nutzen das Profilbild, Tierhalter-Aufträge erzeugen ihre Haustier-Collage dynamisch.
 
 ### MongoDB
 
 MongoDB speichert Chatdaten. Diese Trennung wurde gewählt, weil Chatnachrichten append-orientiert sind und sich als Dokumente mit Zeitstempel und Konversationsbezug gut modellieren lassen.
+Bildreferenzen werden beim Lesen aus MySQL ergänzt und nicht in MongoDB kopiert.
 
 ### Docker Compose
 

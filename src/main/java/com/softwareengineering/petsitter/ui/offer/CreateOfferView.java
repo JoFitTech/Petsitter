@@ -9,8 +9,11 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
+import com.softwareengineering.petsitter.offer.dto.OfferCoverTileDto;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.softwareengineering.petsitter.ui.user.UserView;
@@ -49,6 +52,7 @@ import java.time.YearMonth;
 import java.time.DayOfWeek;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -337,17 +341,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("flex-wrap", "wrap")
                 .set("gap", "10px")
                 .set("padding", "16px")
-                .set("box-sizing", "border-box");
+                .set("box-sizing", "border-box")
+                .set("overflow", "hidden");
 
-        String previewText = imagePreviewPlaceholderText();
-        Span placeholder = new Span(previewText);
-        placeholder.setId("preview-placeholder");
-        placeholder.getStyle()
-                .set("color", BROWN)
-                .set("font-size", "16px")
-                .set("font-weight", "600");
-
-        imagePreviewArea.add(placeholder);
+        updateImagePreview();
         return imagePreviewArea;
     }
 
@@ -427,7 +424,10 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         petSelect.setPlaceholder("Wähle Haustiere");
         petSelect.setClearButtonVisible(true);
         petSelect.setWidthFull();
-        petSelect.addValueChangeListener(event -> petSelect.setInvalid(false));
+        petSelect.addValueChangeListener(event -> {
+            petSelect.setInvalid(false);
+            updateImagePreview();
+        });
         petSelect.getStyle()
                 .set("border-radius", "12px")
                 .set("--vaadin-input-field-background", "#fffdf8")
@@ -957,16 +957,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         priceField.clear();
         priceField.setInvalid(false);
         additionalInfoArea.clear();
-        if (imagePreviewArea != null) {
-            imagePreviewArea.removeAll();
-            Span placeholder = new Span(imagePreviewPlaceholderText());
-            placeholder.setId("preview-placeholder");
-            placeholder.getStyle()
-                    .set("color", BROWN)
-                    .set("font-size", "16px")
-                    .set("font-weight", "600");
-            imagePreviewArea.add(placeholder);
-        }
+        updateImagePreview();
     }
 
     private boolean isOwnerOffer() {
@@ -1052,6 +1043,71 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private String imagePreviewPlaceholderText() {
         return isOwnerOffer() ? "Vorschau deiner Haustier-Collage" : "Vorschau deines Profilbilds";
+    }
+
+    private void updateImagePreview() {
+        if (imagePreviewArea == null) {
+            return;
+        }
+
+        imagePreviewArea.removeAll();
+        List<OfferCoverTileDto> tiles = selectedPetCoverTiles();
+        if (!isOwnerOffer() || tiles.isEmpty()) {
+            imagePreviewArea.getStyle()
+                    .set("display", "flex")
+                    .set("align-items", "center")
+                    .set("justify-content", "center")
+                    .set("gap", "10px")
+                    .set("padding", "16px");
+            imagePreviewArea.add(imagePreviewPlaceholder());
+            return;
+        }
+
+        imagePreviewArea.getStyle()
+                .set("display", "block")
+                .set("gap", "0")
+                .set("padding", "0");
+        imagePreviewArea.add(ImageComponents.offerCover(tiles, "140px", BEIGE));
+    }
+
+    private Span imagePreviewPlaceholder() {
+        Span placeholder = new Span(imagePreviewPlaceholderText());
+        placeholder.setId("preview-placeholder");
+        placeholder.getStyle()
+                .set("color", BROWN)
+                .set("font-size", "16px")
+                .set("font-weight", "600");
+        return placeholder;
+    }
+
+    private List<OfferCoverTileDto> selectedPetCoverTiles() {
+        if (!isOwnerOffer()) {
+            return List.of();
+        }
+        return selectedPets().stream()
+                .sorted(Comparator
+                        .comparing(OfferPetOptionDto::name, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                        .thenComparing(option -> option.id() == null ? "" : option.id().toString()))
+                .map(option -> new OfferCoverTileDto(
+                        option.profileImage(),
+                        option.name(),
+                        animalType(option.species())))
+                .toList();
+    }
+
+    private OfferAnimalType animalType(PetSpecies species) {
+        if (species == null) {
+            return OfferAnimalType.OTHER;
+        }
+        return switch (species) {
+            case DOG -> OfferAnimalType.DOG;
+            case CAT -> OfferAnimalType.CAT;
+            case BIRD -> OfferAnimalType.BIRD;
+            case RABBIT -> OfferAnimalType.SMALL_ANIMAL;
+            case FISH -> OfferAnimalType.FISH;
+            case REPTILE -> OfferAnimalType.REPTILE;
+            case OTHER -> OfferAnimalType.OTHER;
+        };
     }
 
     private String currentOfferTitle() {

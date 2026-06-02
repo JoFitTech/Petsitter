@@ -692,51 +692,74 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
     private void openDeleteConfirmDialog() {
         Dialog confirm = new Dialog();
-        confirm.setWidth("380px");
-        confirm.setCloseOnEsc(true);
-        confirm.setCloseOnOutsideClick(false);
+        confirm.setWidth("400px");
+        confirm.getElement().getThemeList().add("no-padding");
+        confirm.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "Inter, Arial, sans-serif");
 
-        VerticalLayout layout = new VerticalLayout();
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle().set("gap", "18px");
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "28px 28px 24px 28px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("box-sizing", "border-box");
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        closeBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "12px")
+                .set("right", "12px")
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", "#9a8070")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> confirm.close());
 
         H3 title = new H3("Offer löschen?");
         title.getStyle()
                 .set("margin", "0")
-                .set("font-size", "20px")
+                .set("font-size", "21px")
                 .set("font-weight", "800")
+                .set("line-height", "1.2")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("padding-right", "32px")
                 .set("color", DARK);
 
         Paragraph message = new Paragraph("Möchtest du \"" + currentOfferTitle()
                 + "\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.");
         message.getStyle()
                 .set("margin", "0")
-                .set("font-size", "14px")
-                .set("color", "#7b7069")
-                .set("line-height", "1.5");
-
-        Button cancel = new Button("Abbrechen");
-        cancel.getStyle()
-                .set("background", BEIGE)
-                .set("color", BROWN)
-                .set("border", "1px solid " + BORDER)
-                .set("border-radius", "22px")
-                .set("height", "40px")
-                .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        cancel.addClickListener(event -> confirm.close());
+                .set("font-size", "13.5px")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("line-height", "1.5")
+                .set("color", "#9a8070");
 
         Button delete = new Button("Löschen");
+        delete.setWidthFull();
         delete.getStyle()
-                .set("background", "#9a4f36")
+                .set("height", "44px")
+                .set("border-radius", "14px")
+                .set("background", BROWN)
                 .set("color", "white")
-                .set("border-radius", "22px")
-                .set("height", "40px")
                 .set("font-weight", "700")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("font-size", "15px")
+                .set("box-shadow", "0 2px 8px rgba(74,52,40,0.1)")
+                .set("cursor", "pointer")
+                .set("border", "none");
         delete.addClickListener(event -> {
             try {
                 offerService.deleteCurrentUserOffer(editingOfferId);
@@ -748,13 +771,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             }
         });
 
-        HorizontalLayout buttons = new HorizontalLayout(cancel, delete);
-        buttons.setWidthFull();
-        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        buttons.getStyle().set("gap", "10px");
-
-        layout.add(title, message, buttons);
-        confirm.add(layout);
+        wrapper.add(closeBtn, title, message, delete);
+        confirm.add(wrapper);
         confirm.open();
     }
 
@@ -825,13 +843,13 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             CreateOfferResult result;
             if (isEditMode()) {
                 result = offerService.updateCurrentUserOffer(editingOfferId, buildRequest(selectedPets, selectedAnimalType));
-                showSuccess("Änderungen wurden gespeichert: " + result.offerId());
+                showSuccess("Änderungen wurden gespeichert.");
                 navigateToReturnTarget();
                 return;
             }
 
             result = offerService.createOffer(buildRequest(selectedPets, selectedAnimalType));
-            showSuccess("Eintrag wurde gespeichert: " + result.offerId());
+            showSuccess("Eintrag wurde gespeichert.");
             navigateToReturnTarget();
         } catch (RuntimeException exception) {
             showError("Eintrag konnte nicht gespeichert werden: " + exception.getMessage());

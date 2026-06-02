@@ -472,6 +472,88 @@ public class ChatService {
         eventBus.publish(toMessageDto(saved));
     }
 
+    /**
+     * Speichert eine Review-Benachrichtigung im Chat.
+     *
+     * Diese wird automatisch nach einer Bewertung versendet.
+     *
+     * @param conversationId ID der Konversation
+     * @param reviewerId ID der bewertenden Person
+     * @param rating Bewertung (1-5)
+     * @param comment Bewertungs-Kommentar (optional)
+     */
+    public void saveReviewNotificationMessage(String conversationId, UUID reviewerId,
+                                              int rating, String comment) {
+        // Bestimme Empfänger (die andere Person in der Konversation)
+        ChatConversationDocument conversation = conversationRepository.findById(conversationId)
+            .orElseThrow(() -> new NotFoundException("Konversation nicht gefunden: " + conversationId));
+
+        UUID recipientId = conversation.getOwnerId().equals(reviewerId)
+            ? conversation.getSitterId()
+            : conversation.getOwnerId();
+
+        ChatMessageDocument card = new ChatMessageDocument();
+        card.setConversationId(conversationId);
+        card.setSenderId(reviewerId);
+        card.setRecipientId(recipientId);
+        card.setType("REVIEW_CARD");
+        card.setBookingId(conversation.getBookingId()); // Link zur Booking
+        card.setCreatedAt(LocalDateTime.now());
+        card.setRead(false);
+
+        int normalizedRating = Math.max(1, Math.min(5, rating));
+        String normalizedComment = (comment != null && !comment.isBlank())
+            ? comment.trim()
+            : "Bewertung abgegeben";
+        card.setMessage("[RATING:" + normalizedRating + "] " + normalizedComment);
+
+        String reviewPreview = "Neue Bewertung: " + normalizedComment;
+        LocalDateTime now = LocalDateTime.now();
+        conversation.setLastMessageAt(now);
+        conversation.setLastMessagePreview(truncatePreview(reviewPreview));
+        conversationRepository.save(conversation);
+
+        ChatMessageDocument saved = messageRepository.save(card);
+        log.info("Review notification message saved in conversation {} from {} to {}",
+                conversationId, reviewerId, recipientId);
+        eventBus.publish(toMessageDto(saved));
+    }
+
+    /**
+     * Speichert eine Review-Erinnerungsnachricht im Chat.
+     *
+     * Diese wird automatisch nach dem Abschluss eines Bookings versendet,
+     * um beide Parteien daran zu erinnern, dass Bewertungen nun verfügbar sind.
+     *
+     * @param conversationId ID der Konversation
+     * @param bookingId ID des abgeschlossenen Bookings
+     */
+    public void postReviewReminderCard(String conversationId, UUID bookingId) {
+        ChatConversationDocument conversation = conversationRepository.findById(conversationId)
+            .orElseThrow(() -> new NotFoundException("Konversation nicht gefunden: " + conversationId));
+
+        ChatMessageDocument card = new ChatMessageDocument();
+        card.setConversationId(conversationId);
+        // System-Message: no specific sender (null for system-generated)
+        card.setSenderId(null);
+        card.setRecipientId(null);
+        card.setType("REVIEW_REMINDER_CARD");
+        card.setBookingId(bookingId);
+        card.setCreatedAt(LocalDateTime.now());
+        card.setRead(false);
+        card.setMessage("⏰ Der Termin ist abgeschlossen – Bewertung ist nun verfügbar!");
+
+        // Update conversation metadata
+        LocalDateTime now = LocalDateTime.now();
+        conversation.setLastMessageAt(now);
+        conversation.setLastMessagePreview(truncatePreview("Termin abgeschlossen – Bewertung verfügbar"));
+        conversationRepository.save(conversation);
+
+        ChatMessageDocument saved = messageRepository.save(card);
+        log.info("Review reminder card posted in conversation {} for booking {}", conversationId, bookingId);
+        eventBus.publish(toMessageDto(saved));
+    }
+
     private String buildUserPairKey(UUID a, UUID b) {
         String s1 = a.toString(), s2 = b.toString();
         return s1.compareTo(s2) <= 0 ? s1 + "_" + s2 : s2 + "_" + s1;

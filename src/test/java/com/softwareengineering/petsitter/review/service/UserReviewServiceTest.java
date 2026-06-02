@@ -3,12 +3,15 @@ package com.softwareengineering.petsitter.review.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.softwareengineering.petsitter.booking.domain.Booking;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.review.domain.UserReview;
 import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.review.repository.UserReviewRepository;
@@ -27,13 +30,16 @@ class UserReviewServiceTest {
 
     private UserReviewRepository userReviewRepository;
     private BookingRepository bookingRepository;
+    private ChatService chatService;
     private UserReviewService userReviewService;
 
     @BeforeEach
     void setUp() {
         userReviewRepository = Mockito.mock(UserReviewRepository.class);
         bookingRepository = Mockito.mock(BookingRepository.class);
-        userReviewService = new UserReviewService(userReviewRepository, bookingRepository);
+        chatService = Mockito.mock(ChatService.class);
+        when(chatService.getConversationIdForBooking(any(UUID.class))).thenReturn(Optional.empty());
+        userReviewService = new UserReviewService(userReviewRepository, bookingRepository, chatService);
     }
 
     @Test
@@ -56,6 +62,43 @@ class UserReviewServiceTest {
         assertThat(review.getRating()).isEqualTo(5);
         assertThat(review.getComment()).isEqualTo("Super Betreuung");
         verify(userReviewRepository).save(any(UserReview.class));
+        verify(chatService).getConversationIdForBooking(bookingId);
+    }
+
+    @Test
+    void submitReview_sendsReviewChatCard_whenConversationExists() {
+        UUID bookingId = UUID.randomUUID();
+        UUID reviewerId = UUID.randomUUID();
+        User owner = user(reviewerId, "Anna", "Owner");
+        User sitter = user(UUID.randomUUID(), "Ben", "Sitter");
+        Booking booking = booking(bookingId, owner, sitter, BookingStatus.COMPLETED);
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(userReviewRepository.existsByBooking_IdAndReviewer_Id(bookingId, reviewerId)).thenReturn(false);
+        when(userReviewRepository.save(any(UserReview.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(chatService.getConversationIdForBooking(bookingId)).thenReturn(Optional.of("conv-123"));
+
+        userReviewService.submitReview(bookingId, reviewerId, 5, "Top Service");
+
+        verify(chatService).saveReviewNotificationMessage("conv-123", reviewerId, 5, "Top Service");
+    }
+
+    @Test
+    void submitReview_doesNotSendReviewChatCard_whenConversationMissing() {
+        UUID bookingId = UUID.randomUUID();
+        UUID reviewerId = UUID.randomUUID();
+        User owner = user(reviewerId, "Anna", "Owner");
+        User sitter = user(UUID.randomUUID(), "Ben", "Sitter");
+        Booking booking = booking(bookingId, owner, sitter, BookingStatus.COMPLETED);
+
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(userReviewRepository.existsByBooking_IdAndReviewer_Id(bookingId, reviewerId)).thenReturn(false);
+        when(userReviewRepository.save(any(UserReview.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(chatService.getConversationIdForBooking(bookingId)).thenReturn(Optional.empty());
+
+        userReviewService.submitReview(bookingId, reviewerId, 4, "Gut");
+
+        verify(chatService, never()).saveReviewNotificationMessage(any(String.class), any(UUID.class), anyInt(), any(String.class));
     }
 
     @Test

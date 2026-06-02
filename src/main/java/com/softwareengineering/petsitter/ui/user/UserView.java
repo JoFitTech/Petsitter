@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
@@ -56,6 +57,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private final RequestService requestService;
     private final ChatService chatService;
     private final BookingService bookingService;
+    private final UserReviewService userReviewService;
     private final WalletService walletService;
     private final AuthenticatedUser authenticatedUser;
     private UserProfileDto currentProfile;
@@ -78,6 +80,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             RequestService requestService,
             ChatService chatService,
             BookingService bookingService,
+            UserReviewService userReviewService,
             WalletService walletService,
             AuthenticatedUser authenticatedUser) {
         this.userService = userService;
@@ -87,6 +90,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         this.requestService = requestService;
         this.chatService = chatService;
         this.bookingService = bookingService;
+        this.userReviewService = userReviewService;
         this.walletService = walletService;
         this.authenticatedUser = authenticatedUser;
         reloadProfile();
@@ -641,7 +645,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private void showMeineBuchungen() {
         contentPanel.removeAll();
-        contentPanel.add(new MyBookings(bookingService, chatService, authenticatedUser));
+        contentPanel.add(new MyBookings(bookingService, chatService, userReviewService, authenticatedUser));
     }
 
     private void showMeineFavoriten() {

@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.review.service;
 import com.softwareengineering.petsitter.booking.domain.Booking;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.review.domain.UserReview;
 import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.review.dto.UserReviewDto;
@@ -33,10 +34,13 @@ public class UserReviewService {
 
     private final UserReviewRepository userReviewRepository;
     private final BookingRepository bookingRepository;
+    private final ChatService chatService;
 
-    public UserReviewService(UserReviewRepository userReviewRepository, BookingRepository bookingRepository) {
+    public UserReviewService(UserReviewRepository userReviewRepository, BookingRepository bookingRepository,
+                           ChatService chatService) {
         this.userReviewRepository = userReviewRepository;
         this.bookingRepository = bookingRepository;
+        this.chatService = chatService;
     }
 
     @Transactional
@@ -74,8 +78,9 @@ public class UserReviewService {
         review.setRating(rating);
         review.setComment(normalizeComment(comment));
 
+        UserReview savedReview;
         try {
-            return userReviewRepository.save(review);
+            savedReview = userReviewRepository.save(review);
         } catch (DataIntegrityViolationException e) {
             // Race-Condition Handling (Hardening): Bei Parallel-Save schlägt Unique-Constraint fehl
             // Wir prüfen nochmal und geben eine fachliche Fehlermeldung statt DB-Exception
@@ -87,6 +92,21 @@ public class UserReviewService {
             // Falls es ein anderer Integrity-Fehler ist, re-throw
             throw e;
         }
+
+        // Chat-Nachricht versendet after review is successfully saved
+        try {
+            var convId = chatService.getConversationIdForBooking(bookingId);
+            if (convId.isPresent()) {
+                chatService.saveReviewNotificationMessage(convId.get(), reviewerId, rating, comment);
+                log.info("Review notification message sent in conversation for booking {}", bookingId);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send review notification message for booking {}: {}",
+                    bookingId, e.getMessage());
+            // Nicht kritisch – Review wurde trotzdem gespeichert
+        }
+
+        return savedReview;
     }
 
     @Transactional(readOnly = true)

@@ -47,6 +47,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Chat-View – Echtzeit-Chatfenster für Bookings.
@@ -71,6 +73,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private static final String SIDEBAR_ITEM_ACTIVE = "#f0e0c4";
     private static final String BUBBLE_SENT = "#f5ead6";
     private static final String BUBBLE_RECEIVED = "#e8d4b4";
+    private static final Pattern REVIEW_RATING_PATTERN = Pattern.compile("\\[RATING:(\\d)]\\s*(.*)");
 
     private final ChatService chatService;
     private final ChatEventBus eventBus;
@@ -580,6 +583,12 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         if ("REQUEST_CARD".equals(msg.type())) {
             return buildRequestCardBubble(msg);
         }
+        if ("REVIEW_CARD".equals(msg.type())) {
+            return buildReviewCardBubble(msg);
+        }
+        if ("REVIEW_REMINDER_CARD".equals(msg.type())) {
+            return buildReviewReminderCardBubble(msg);
+        }
 
         HorizontalLayout row = new HorizontalLayout();
         row.setWidthFull();
@@ -595,6 +604,114 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         }
 
         return row;
+    }
+
+    private Component buildReviewReminderCardBubble(ChatMessageDto msg) {
+        Div card = new Div();
+        card.getStyle()
+            .set("background", "#f0f4ff")
+            .set("border", "1px solid #c5d0e8")
+            .set("border-radius", "12px")
+            .set("padding", "14px 16px")
+            .set("max-width", "60%")
+            .set("width", "fit-content")
+            .set("text-align", "center");
+
+        Span title = new Span("⏰ Termin abgeschlossen");
+        title.getStyle()
+            .set("font-weight", "700")
+            .set("font-size", "14px")
+            .set("color", DARK)
+            .set("display", "block")
+            .set("margin-bottom", "6px");
+        card.add(title);
+
+        Span subtitle = new Span("Ihr könnt euch jetzt gegenseitig bewerten.");
+        subtitle.getStyle()
+            .set("font-size", "13px")
+            .set("color", "#7a6050")
+            .set("display", "block");
+        card.add(subtitle);
+
+        // Center the card in the view
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.setJustifyContentMode(FlexComponent.JustifyContentMode.CENTER);
+        row.setSpacing(false);
+        row.add(card);
+
+        return row;
+    }
+
+    private Component buildReviewCardBubble(ChatMessageDto msg) {
+        boolean ownReview = msg.senderId().equals(currentUserId);
+        int rating = extractReviewRating(msg.message());
+        String comment = extractReviewComment(msg.message());
+
+        Div card = new Div();
+        card.getStyle()
+            .set("background", "#fff6e6")
+            .set("border", "1px solid #f0d8a8")
+            .set("border-radius", "12px")
+            .set("padding", "12px 14px")
+            .set("max-width", "60%")
+            .set("width", "fit-content");
+
+        Span title = new Span("Neue Bewertung");
+        title.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", DARK);
+        card.add(title);
+
+        Span stars = new Span("Sterne: " + "★".repeat(Math.max(0, rating)) + "☆".repeat(Math.max(0, 5 - rating)));
+        stars.getStyle().set("display", "block").set("margin-top", "4px").set("font-size", "13px").set("color", "#7a5a00");
+        card.add(stars);
+
+        if (comment != null && !comment.isBlank()) {
+            Span commentSpan = new Span("\"" + comment + "\"");
+            commentSpan.getStyle().set("display", "block").set("margin-top", "6px").set("font-size", "13px").set("color", "#7a6050");
+            card.add(commentSpan);
+        }
+
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.END);
+        row.setSpacing(true);
+
+        if (ownReview) {
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+            row.add(buildAvatar("Ich"), card);
+        } else {
+            row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
+            row.add(buildAvatar(activeCounterpartName), card);
+        }
+
+        return row;
+    }
+
+    private int extractReviewRating(String encodedMessage) {
+        if (encodedMessage == null) {
+            return 0;
+        }
+        Matcher matcher = REVIEW_RATING_PATTERN.matcher(encodedMessage);
+        if (!matcher.matches()) {
+            return 0;
+        }
+        try {
+            return Integer.parseInt(matcher.group(1));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    private String extractReviewComment(String encodedMessage) {
+        if (encodedMessage == null) {
+            return "";
+        }
+        Matcher matcher = REVIEW_RATING_PATTERN.matcher(encodedMessage);
+        if (!matcher.matches()) {
+            return encodedMessage;
+        }
+        return matcher.group(2);
     }
 
     private Component buildRequestCardBubble(ChatMessageDto msg) {

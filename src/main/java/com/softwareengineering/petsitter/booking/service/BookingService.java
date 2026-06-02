@@ -20,6 +20,7 @@ import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.wallet.dto.BookingPaymentDto;
 import com.softwareengineering.petsitter.wallet.service.WalletService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.math.RoundingMode;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -263,6 +264,49 @@ public class BookingService {
 
     public void requestPaymentRelease(UUID bookingId, UUID userId) {
         walletService.requestRelease(bookingId, userId);
+    }
+
+    /**
+     * Markiert ein Booking als COMPLETED (Termin ist vorbei).
+     *
+     * Nur der Owner oder Sitter können diese Aktion durchführen.
+     * Das Booking muss den Status CREATED haben.
+     *
+     * @param bookingId ID des zu markierenden Bookings
+     * @param userId ID des Users (Owner oder Sitter)
+     * @throws NotFoundException wenn Booking nicht gefunden
+     * @throws ForbiddenOperationException wenn User kein Teilnehmer ist
+     * @throws BusinessRuleViolationException wenn Status ungültig ist
+     */
+    @Transactional
+    public Booking markBookingCompleted(UUID bookingId, UUID userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+
+        // Zugriffskontrolle: Nur Owner oder Sitter
+        if (!booking.getOwner().getId().equals(userId) && !booking.getSitter().getId().equals(userId)) {
+            throw new ForbiddenOperationException("Nur Teilnehmer dieser Buchung können den Status ändern.");
+        }
+
+        // Status-Validierung: Nur aus CREATED heraus möglich
+        if (booking.getStatus() != BookingStatus.CREATED) {
+            throw new BusinessRuleViolationException(
+                    "Eine Buchung kann nur im Status CREATED als abgeschlossen markiert werden.");
+        }
+
+        LocalDate today = LocalDate.now();
+        if (booking.getEndDate() == null || !today.isAfter(booking.getEndDate())) {
+            throw new BusinessRuleViolationException(
+                    "Eine Buchung kann erst nach dem Enddatum als abgeschlossen markiert werden.");
+        }
+
+        booking.setStatus(BookingStatus.COMPLETED);
+        Booking savedBooking = bookingRepository.save(booking);
+
+        // Publish event for listeners (e.g., Chat review reminder)
+        eventPublisher.publishEvent(new BookingCompletedEvent(this, savedBooking.getId()));
+
+        return savedBooking;
     }
 
     /**

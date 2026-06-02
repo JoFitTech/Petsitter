@@ -26,6 +26,7 @@ Das Projekt nutzt einen Monolithen mit Schichtenarchitektur. Es wurde bewusst ke
 | MongoDB für Chat | dokumentenorientierte Speicherung von Chatnachrichten und Konversationen |
 | Docker Compose | reproduzierbare lokale Infrastruktur für MySQL und MongoDB |
 | GitHub Actions | automatische Prüfung von Build und Tests |
+| Technische Admin-Schnittstelle ohne Admin-Bereich | Aktuell besteht kein fachlicher Nutzen für Admin-Funktionen. Die Rolle `ADMIN` bleibt als Erweiterungspunkt für eine mögliche spätere Umsetzung erhalten. |
 
 ## Systemübersicht
 
@@ -136,6 +137,8 @@ Technische Rollen:
 
 - `ADMIN`,
 - `SIGNED_IN_USER`.
+
+Reguläre Nutzer erhalten die Rolle `SIGNED_IN_USER`. Die Rolle `ADMIN` ist derzeit nur als technische Schnittstelle für mögliche spätere Erweiterungen vorhanden. Ein fachlicher Admin-Bereich und produktiv nutzbare Admin-Funktionen sind aktuell bewusst nicht implementiert, da sie für die Kernanforderungen keinen konkreten Nutzen bieten. Ein lokal vorhandener Seed-Account mit dieser Rolle stellt keine implementierte Admin-Funktionalität dar.
 
 ### Pet
 
@@ -343,7 +346,7 @@ Docker Compose wird in der CI deaktiviert. Dadurch ist die Pipeline unabhängige
 | Monolith skaliert organisatorisch nur begrenzt | Für Projektgröße sinnvoll |
 | Chat ohne produktive Ende-zu-Ende-Verschlüsselung | Für Uni-Demo ausreichend, produktiv zu ergänzen |
 | Demo-Konfiguration aktiv | Für Abgabe praktisch, produktiv zu deaktivieren |
-| Kein vollständiges Admin-Backend | Nicht Kernanforderung |
+| Kein Admin-Bereich und keine fachlichen Admin-Funktionen | Aktuell kein konkreter Nutzen für die Kernanforderungen; die technische Rolle `ADMIN` bleibt als zukünftiger Erweiterungspunkt erhalten |
 | Keine produktive Mail-Infrastruktur garantiert | Für lokale Demo über Logs lösbar |
 | Security-Scans nicht vollständig automatisiert | zukünftige Erweiterung |
 

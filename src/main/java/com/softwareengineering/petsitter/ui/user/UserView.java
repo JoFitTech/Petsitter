@@ -453,7 +453,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             Button cameraUploadButton = new Button(cameraIcon);
             cameraUploadButton.setAriaLabel("Profilbild hochladen");
             cameraUploadButton.getStyle()
-                .set("position", "absolute")
                 .set("width", "28px").set("height", "28px")
                 .set("min-width", "28px").set("padding", "0")
                 .set("border-radius", "50%")
@@ -473,6 +472,9 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
                 .set("position", "absolute")
                 .set("bottom", "2px").set("right", "2px")
                 .set("width", "28px").set("height", "28px")
+                .set("--vaadin-upload-border-width", "0px")
+                .set("--vaadin-upload-padding", "0px")
+                .set("background", "transparent")
                 .set("overflow", "visible");
             upload.addSucceededListener(event -> {
                 try {
@@ -511,7 +513,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
                     .set("width", "28px").set("height", "28px")
                     .set("min-width", "28px").set("padding", "0")
                     .set("border-radius", "50%")
-                    .set("background", "#9a4f36")
+                    .set("background", "#774f35")
                     .set("color", "white")
                     .set("box-shadow", "none")
                     .set("cursor", "pointer");

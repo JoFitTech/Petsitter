@@ -102,6 +102,12 @@ public class AddPetPopUp extends Dialog {
                 new AtomicReference<>(PendingImageChange.unchanged());
         Div imagePreview = new Div();
         renderImagePreview(imagePreview, existing, imageChange.get());
+        Div imagePreviewWrap = new Div(imagePreview);
+        imagePreviewWrap.getStyle()
+                .set("position", "relative")
+                .set("width", "112px")
+                .set("height", "112px")
+                .set("flex-shrink", "0");
 
         MemoryBuffer imageBuffer = new MemoryBuffer();
         Upload imageUpload = new Upload(imageBuffer);
@@ -109,15 +115,40 @@ public class AddPetPopUp extends Dialog {
         imageUpload.setMaxFiles(1);
         imageUpload.setMaxFileSize(5 * 1024 * 1024);
         imageUpload.setDropAllowed(false);
-        Button imageUploadButton = new Button(existing != null && existing.profileImage() != null
-                ? "Bild ersetzen" : "Bild hochladen", new Icon(VaadinIcon.CAMERA));
+        Icon cameraIcon = new Icon(VaadinIcon.CAMERA);
+        cameraIcon.setSize("13px");
+        Button imageUploadButton = new Button(cameraIcon);
+        imageUploadButton.setAriaLabel("Haustierbild hochladen");
+        imageUploadButton.getStyle()
+                .set("width", "28px").set("height", "28px")
+                .set("min-width", "28px").set("padding", "0")
+                .set("border-radius", "50%")
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
         imageUpload.setUploadButton(imageUploadButton);
-        imageUpload.setDropLabel(new Span(""));
-        imageUpload.setDropLabelIcon(new Span(""));
-        imageUpload.getStyle().set("flex-grow", "0");
+        imageUpload.getStyle()
+                .set("position", "absolute")
+                .set("bottom", "2px").set("right", "2px")
+                .set("width", "28px").set("height", "28px")
+                .set("--vaadin-upload-border-width", "0px")
+                .set("--vaadin-upload-padding", "0px")
+                .set("background", "transparent")
+                .set("overflow", "visible");
 
-        Button removeImage = new Button("Bild entfernen", new Icon(VaadinIcon.TRASH));
-        removeImage.getStyle().set("color", "#9a4f36");
+        Button removeImage = new Button(new Icon(VaadinIcon.TRASH));
+        removeImage.setAriaLabel("Haustierbild entfernen");
+        removeImage.getStyle()
+                .set("position", "absolute")
+                .set("bottom", "2px").set("left", "2px")
+                .set("width", "28px").set("height", "28px")
+                .set("min-width", "28px").set("padding", "0")
+                .set("border-radius", "50%")
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer");
         removeImage.setVisible(existing != null && existing.profileImage() != null);
         removeImage.addClickListener(event -> {
             imageChange.set(PendingImageChange.remove());
@@ -150,13 +181,10 @@ public class AddPetPopUp extends Dialog {
                     Notification.Position.TOP_CENTER);
         });
 
-        HorizontalLayout imageActions = new HorizontalLayout(imageUpload, removeImage);
-        imageActions.setAlignItems(FlexComponent.Alignment.CENTER);
-        imageActions.getStyle().set("gap", "8px");
-        VerticalLayout imageSection = new VerticalLayout(imagePreview, imageActions);
+        imagePreviewWrap.add(imageUpload, removeImage);
+        VerticalLayout imageSection = new VerticalLayout(imagePreviewWrap);
         imageSection.setPadding(false);
         imageSection.setSpacing(false);
-        imageSection.getStyle().set("gap", "8px");
 
         TextField nameField = new TextField("Name");
         nameField.setWidthFull();

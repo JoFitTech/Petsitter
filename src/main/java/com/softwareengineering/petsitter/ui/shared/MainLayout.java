@@ -306,8 +306,50 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
     private void openNotificationDialog() {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Benachrichtigungen");
         dialog.setWidth("480px");
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "16px")
+                .set("font-family", "Inter, Arial, sans-serif");
+
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "24px 28px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "16px")
+                .set("box-sizing", "border-box")
+                .set("color", DARK);
+
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+
+        H2 title = new H2("Benachrichtigungen");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("color", DARK)
+                .set("font-size", "20px")
+                .set("padding", "0")
+                .set("min-width", "auto")
+                .set("height", "auto")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        header.add(title, closeBtn);
 
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
@@ -318,15 +360,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .orElse(List.of());
 
         if (inbox.isEmpty()) {
-            content.add(new Paragraph("Keine Benachrichtigungen vorhanden."));
+            Paragraph emptyText = new Paragraph("Keine Benachrichtigungen vorhanden.");
+            emptyText.getStyle()
+                    .set("color", "#7A6050")
+                    .set("font-size", "15px")
+                    .set("margin", "0")
+                    .set("font-weight", "500");
+            content.add(emptyText);
         } else {
             Map<LocalDate, List<Notification>> grouped = groupNotificationsByDate(inbox);
             for (Map.Entry<LocalDate, List<Notification>> entry : grouped.entrySet()) {
                 Span groupHeader = new Span(toDateGroupLabel(entry.getKey()));
                 groupHeader.getStyle()
-                        .set("font-weight", "700")
-                        .set("font-size", "13px")
-                        .set("color", "#7a6050")
+                        .set("font-weight", "800")
+                        .set("font-size", "15px")
+                        .set("color", DARK)
                         .set("margin", "8px 0 2px 0");
                 content.add(groupHeader);
 
@@ -336,13 +384,8 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             }
         }
 
-        Button chatButton = new Button("Chat öffnen", e -> {
-            dialog.close();
-            UI.getCurrent().navigate("chat");
-        });
-
-        dialog.add(content);
-        dialog.getFooter().add(chatButton);
+        wrapper.add(header, content);
+        dialog.add(wrapper);
         dialog.open();
     }
 
@@ -352,22 +395,32 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         row.getStyle()
                 .set("text-align", "left")
                 .set("justify-content", "flex-start")
-                .set("background", notification.isRead() ? "#ffffff" : "#fff4de")
-                .set("border", notification.isRead() ? "1px solid #ead5ae" : "1px solid #e2b56b")
-                .set("border-left", notification.isRead() ? "1px solid #ead5ae" : "5px solid #e2b56b")
-                .set("border-radius", "10px")
-                .set("padding", "10px");
+                .set("background", notification.isRead() ? "#FCF9F2" : "#fff4de")
+                .set("border", notification.isRead() ? "1px solid #efe4d3" : "1px solid #e2b56b")
+                .set("border-left", notification.isRead() ? "1px solid #efe4d3" : "5px solid #e2b56b")
+                .set("border-radius", "12px")
+                .set("padding", "12px 16px")
+                .set("height", "auto")
+                .set("min-height", "60px")
+                .set("color", DARK)
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("box-sizing", "border-box");
 
         VerticalLayout layout = new VerticalLayout();
         layout.setPadding(false);
         layout.setSpacing(false);
+        layout.getStyle().set("gap", "4px");
 
         Span message = new Span(notification.getMessage());
-        message.getStyle().set("font-weight", notification.isRead() ? "500" : "700");
+        message.getStyle()
+                .set("font-size", "15px")
+                .set("color", DARK)
+                .set("white-space", "normal")
+                .set("font-weight", notification.isRead() ? "600" : "800");
 
         Span meta = new Span(notification.getType().name() + " • "
                 + notification.getCreatedAt().format(NOTIFICATION_TIME_FORMAT));
-        meta.getStyle().set("font-size", "12px").set("color", "#7a6050");
+        meta.getStyle().set("font-size", "13px").set("color", "#7A6050");
 
         if (!notification.isRead()) {
             Span unreadDot = new Span();
@@ -377,7 +430,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                     .set("border-radius", "50%")
                     .set("display", "inline-block")
                     .set("background", "#d98b2b")
-                    .set("margin-bottom", "6px");
+                    .set("margin-bottom", "4px");
             layout.add(unreadDot);
         }
 

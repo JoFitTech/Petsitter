@@ -53,11 +53,31 @@ public class AddPetPopUp extends Dialog {
         mainContainer.setPadding(true);
         mainContainer.setSpacing(false);
         mainContainer.getStyle()
+                .set("position", "relative")
                 .set("background-color", LIGHT_BG)
                 .set("padding", "32px 48px")
                 .set("border-radius", "16px")
                 .set("font-family", "'Inter', sans-serif")
                 .set("gap", "16px");
+
+        Button closeBtn = new Button(new com.vaadin.flow.component.icon.Icon(com.vaadin.flow.component.icon.VaadinIcon.CLOSE_SMALL));
+        closeBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "16px")
+                .set("right", "16px")
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", "#9a8070")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> this.close());
 
         H2 title = new H2(existing == null ? "Tier hinzufügen" : "Tier bearbeiten");
         title.getStyle()
@@ -121,19 +141,6 @@ public class AddPetPopUp extends Dialog {
         footerButtons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
         footerButtons.getStyle().set("margin-top", "16px").set("gap", "16px");
 
-        Button btnCancel = new Button("Abbrechen");
-        btnCancel.getStyle()
-                .set("background-color", CREAM)
-                .set("color", DARK)
-                .set("border-radius", "24px")
-                .set("padding", "0 24px")
-                .set("height", "44px")
-                .set("font-size", "15px")
-                .set("font-weight", "700")
-                .set("cursor", "pointer")
-                .set("border", "none");
-        btnCancel.addClickListener(e -> this.close());
-
         Button btnSave = new Button("Speichern");
         btnSave.getStyle()
                 .set("background-color", BROWN_BTN)
@@ -159,9 +166,9 @@ public class AddPetPopUp extends Dialog {
             }
         });
 
-        footerButtons.add(btnCancel, btnSave);
+        footerButtons.add(btnSave);
 
-        mainContainer.add(title, nameField, typeField, customTypeField, breedField, birthDateField,
+        mainContainer.add(closeBtn, title, nameField, typeField, customTypeField, breedField, birthDateField,
                 vaccinationStatusTags, petTagSelector, infoField, footerButtons);
         add(mainContainer);
     }

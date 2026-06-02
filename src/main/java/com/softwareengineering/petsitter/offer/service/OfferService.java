@@ -27,6 +27,7 @@ import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
+import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
@@ -595,6 +596,7 @@ public class OfferService {
                 petSpeciesLabels(pets),
                 petBreeds(pets),
                 petTags(pets),
+                petDtos(pets),
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
                 distanceKm,
@@ -622,6 +624,7 @@ public class OfferService {
                 petSpeciesLabels(pets),
                 petBreeds(pets),
                 petTags(pets),
+                petDtos(pets),
                 offer.getAnimalType()
         );
     }
@@ -654,6 +657,13 @@ public class OfferService {
 
     private String petNames(List<Pet> pets) {
         return petSummary(pets, Pet::getName);
+    }
+
+    private List<PetDto> petDtos(List<Pet> pets) {
+        return pets.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(PetDto::from)
+                .toList();
     }
 
     private String petSpeciesLabels(List<Pet> pets) {

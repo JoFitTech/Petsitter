@@ -449,9 +449,13 @@ class OfferServiceTest {
         ownerOpen.setFrequency(OfferFrequency.ONE_TIME);
         ownerOpen.setCareType(OfferCareType.PET_SITTING);
         Pet cat = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
+        cat.setBreed("Europaeisch Kurzhaar");
+        cat.setBirthDate(LocalDate.of(2020, 4, 5));
+        cat.setNotes("Braucht morgens ihr Spezialfutter.");
         cat.setVaccinationStatus(PetVaccinationStatus.GEIMPFT);
         cat.setTags(Set.of(PetTag.STUBENREIN, PetTag.VERSPIELT));
         Pet dog = pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG);
+        dog.setNotes("Mag lange Spaziergaenge.");
         dog.setTags(Set.of(PetTag.VERSPIELT));
         ownerOpen.setPets(List.of(cat, dog));
         Offer sitterBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
@@ -483,6 +487,17 @@ class OfferServiceTest {
         assertThat(result.get(0).petSpecies()).isEqualTo("Katze, Hund");
         assertThat(result.get(0).petTags())
                 .isEqualTo("Geimpft, Impfstatus unbekannt, Stubenrein, Verspielt");
+        assertThat(result.get(0).pets()).hasSize(2);
+        assertThat(result.get(0).pets().get(0).name()).isEqualTo("Mila");
+        assertThat(result.get(0).pets().get(0).breed()).isEqualTo("Europaeisch Kurzhaar");
+        assertThat(result.get(0).pets().get(0).birthDate()).isEqualTo(LocalDate.of(2020, 4, 5));
+        assertThat(result.get(0).pets().get(0).notes()).isEqualTo("Braucht morgens ihr Spezialfutter.");
+        assertThat(result.get(0).pets().get(0).vaccinationStatus()).isEqualTo(PetVaccinationStatus.GEIMPFT);
+        assertThat(result.get(0).pets().get(0).tags()).containsExactlyInAnyOrder(PetTag.STUBENREIN, PetTag.VERSPIELT);
+        assertThat(result.get(0).pets().get(1).name()).isEqualTo("Balu");
+        assertThat(result.get(0).pets().get(1).notes()).isEqualTo("Mag lange Spaziergaenge.");
+        assertThat(result.get(0).pets().get(1).vaccinationStatus()).isEqualTo(PetVaccinationStatus.UNBEKANNT);
+        assertThat(result.get(0).pets().get(1).tags()).containsExactly(PetTag.VERSPIELT);
         assertThat(result.get(1).animalType()).isEqualTo(OfferAnimalType.DOG);
         assertThat(result.get(2).title()).isEqualTo("Auftrag");
     }
@@ -764,6 +779,39 @@ class OfferServiceTest {
         assertThat(result.get(0).creatorDisplayName()).isEqualTo("Ben Betreuung");
         assertThat(requestedType).hasValue(OfferType.SITTER_OFFER);
         assertThat(requestedStatus).hasValue(OfferStatus.OPEN);
+    }
+
+    @Test
+    void getOpenOwnerOffersIncludesStructuredPetDetails() {
+        User owner = user(UUID.randomUUID());
+        Offer ownerOffer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 5, 12), LocalDate.of(2026, 5, 13), BigDecimal.valueOf(90));
+        ownerOffer.setCreateUser(owner);
+        Pet cat = pet(UUID.randomUUID(), owner, "Mila", PetSpecies.CAT);
+        cat.setNotes("Braucht Ruhe.");
+        cat.setVaccinationStatus(PetVaccinationStatus.GEIMPFT);
+        cat.setTags(Set.of(PetTag.STUBENREIN));
+        Pet dog = pet(UUID.randomUUID(), owner, "Balu", PetSpecies.DOG);
+        dog.setNotes("Ist sehr verspielt.");
+        dog.setTags(Set.of(PetTag.VERSPIELT));
+        ownerOffer.setPets(List.of(cat, dog));
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(ownerOffer), new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                fixedCreateOfferFormRules()
+        );
+
+        List<OfferCardDto> result = offerService.getOpenOffersByType(OfferType.OWNER_OFFER);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.getFirst().pets()).extracting(pet -> pet.name())
+                .containsExactly("Mila", "Balu");
+        assertThat(result.getFirst().pets().getFirst().notes()).isEqualTo("Braucht Ruhe.");
+        assertThat(result.getFirst().pets().getFirst().vaccinationStatus()).isEqualTo(PetVaccinationStatus.GEIMPFT);
+        assertThat(result.getFirst().pets().getFirst().tags()).containsExactly(PetTag.STUBENREIN);
+        assertThat(result.getFirst().pets().get(1).notes()).isEqualTo("Ist sehr verspielt.");
+        assertThat(result.getFirst().pets().get(1).tags()).containsExactly(PetTag.VERSPIELT);
     }
 
     @Test

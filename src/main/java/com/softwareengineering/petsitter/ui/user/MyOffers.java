@@ -603,11 +603,14 @@ public class MyOffers extends Div {
                 offer.petSpecies(),
                 offer.petBreed(),
                 offer.petTags(),
+                offer.pets(),
                 null,
                 null,
                 null,
                 false,
-                offer.offerType()
+                offer.offerType(),
+                null,
+                null
         );
     }
 

@@ -8,10 +8,17 @@ import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
+import com.softwareengineering.petsitter.pet.dto.PetDto;
+import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.chat.ProfilePopUp;
 import com.softwareengineering.petsitter.user.service.UserService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.Period;
+import java.util.List;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
@@ -197,8 +204,11 @@ public class PetsitterDetailPopUp extends Dialog {
         // ── Tier-Feld: dynamisch je nach OWNER_OFFER vs SITTER_OFFER ──────
         content.add(header, imageArea, titleLayout, factsRow, infoRow);
 
-        if (dto.petName() != null) {
-            // OWNER_OFFER: zeige konkretes Haustier
+        if (!dto.pets().isEmpty()) {
+            // OWNER_OFFER: zeige jedes Haustier mit seinen eigenen Details
+            content.add(petDetails(dto.pets()));
+        } else if (dto.petName() != null) {
+            // Legacy-Fallback fuer DTOs ohne strukturierte Tierdaten
             StringBuilder petValue = new StringBuilder(dto.petName());
             if (dto.petSpecies() != null || dto.petBreed() != null) {
                 petValue.append(" (");
@@ -221,18 +231,31 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         // ── Beschreibung ──────────────────────────────────────────────────
-        TextArea zusatzField = new TextArea("Beschreibung");
-        zusatzField.setWidthFull();
-        zusatzField.setMinHeight("90px");
-        zusatzField.setValue(dto.description() != null ? dto.description() : "");
-        zusatzField.setReadOnly(true);
-        zusatzField.getStyle()
-                .set("background", "#f3eada")
-                .set("font-family", "Inter, Arial, sans-serif")
-                .set("--lumo-secondary-text-color", "#7b5236")
-                .set("--lumo-body-text-color", "#7b5236")
-                .set("color", "#7b5236");
-        content.add(zusatzField);
+        if (!isBlank(dto.description())) {
+            Div descriptionSection = new Div();
+            descriptionSection.addClassName("offer-description-field");
+            descriptionSection.getStyle()
+                    .set("width", "100%")
+                    .set("box-sizing", "border-box")
+                    .set("font-family", "Inter, Arial, sans-serif")
+                    .set("color", "#7b5236");
+
+            Span descriptionLabel = new Span("Beschreibung");
+            descriptionLabel.getStyle()
+                    .set("display", "block")
+                    .set("color", DARK)
+                    .set("font-size", "14px");
+
+            Span description = new Span(dto.description());
+            description.getStyle()
+                    .set("display", "block")
+                    .set("font-size", "14px")
+                    .set("line-height", "1.4")
+                    .set("margin-top", "6px");
+
+            descriptionSection.add(descriptionLabel, description);
+            content.add(descriptionSection);
+        }
 
         Button actionButton = createActionButton(dto);
         content.add(actionButton);
@@ -310,26 +333,68 @@ public class PetsitterDetailPopUp extends Dialog {
             return null;
         }
 
-        Button nameButton = new Button(dto.creatorDisplayName());
-        nameButton.getStyle()
+        Button profileButton = new Button();
+        profileButton.addClassName("offer-creator-link");
+        profileButton.getElement().setAttribute("aria-label", "Profil von " + dto.creatorDisplayName() + " öffnen");
+        profileButton.getStyle()
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("box-shadow", "none")
                 .set("padding", "0")
                 .set("height", "auto")
+                .set("min-height", "0")
                 .set("min-width", "0")
-                .set("color", BROWN)
-                .set("font-family", "Inter, Arial, sans-serif")
-                .set("font-size", "14px")
-                .set("font-weight", "700")
-                .set("text-decoration", "underline")
                 .set("cursor", "pointer")
-                .set("margin", "0");
-        nameButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
+                .set("margin", "0")
+                .set("align-self", "flex-start");
+
+        Div profileContent = new Div();
+        profileContent.getStyle()
+                .set("display", "flex")
+                .set("flex-direction", "row")
+                .set("align-items", "center")
+                .set("gap", "7px");
+
+        Span creatorName = new Span(dto.creatorDisplayName());
+        creatorName.addClassName("offer-creator-name");
+        creatorName.getStyle()
+                .set("color", DARK)
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("line-height", "1.1");
+
+        profileContent.add(createCreatorAvatar(36), creatorName);
+        profileButton.getElement().appendChild(profileContent.getElement());
+        profileButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
                 .ifPresentOrElse(
                         profile -> new ProfilePopUp(profile).open(),
                         () -> Notification.show("Profil konnte nicht geladen werden.")
                 ));
-        return nameButton;
+        return profileButton;
+    }
+
+    private Div createCreatorAvatar(int size) {
+        Div avatar = new Div();
+        avatar.addClassName("offer-creator-avatar");
+        avatar.getStyle()
+                .set("width", size + "px")
+                .set("height", size + "px")
+                .set("min-width", size + "px")
+                .set("border-radius", "50%")
+                .set("background-color", "#e0c4a4")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("justify-content", "center")
+                .set("overflow", "hidden");
+
+        Div svgWrap = new Div();
+        svgWrap.getElement().setProperty("innerHTML",
+                "<svg width='" + (size * 0.7) + "' height='" + (size * 0.7) + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
+                        "<circle cx='12' cy='8' r='4' fill='white'/>" +
+                        "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='white'/></svg>");
+        avatar.add(svgWrap);
+        return avatar;
     }
 
     private Button styledButton(String label) {
@@ -534,6 +599,129 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("height", "32px")
                 .set("background", "#e0d5c8");
         return d;
+    }
+
+    private static Component petDetails(List<PetDto> pets) {
+        VerticalLayout section = new VerticalLayout();
+        section.addClassName("offer-pet-details");
+        section.setPadding(false);
+        section.setSpacing(false);
+        section.getStyle().set("gap", "10px");
+
+        Span label = new Span(pets.size() == 1 ? "Haustier" : "Haustiere");
+        label.getStyle()
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("color", BROWN);
+        section.add(label);
+        pets.stream()
+                .map(PetsitterDetailPopUp::petDetailCard)
+                .forEach(section::add);
+        return section;
+    }
+
+    private static Div petDetailCard(PetDto pet) {
+        Div card = new Div();
+        card.addClassName("offer-pet-detail-card");
+        card.getStyle()
+                .set("background", "white")
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "14px")
+                .set("padding", "14px 16px")
+                .set("box-sizing", "border-box")
+                .set("width", "100%");
+
+        H4 name = new H4(isBlank(pet.name()) ? "Haustier" : pet.name());
+        name.getStyle()
+                .set("color", DARK)
+                .set("font-size", "17px")
+                .set("font-weight", "800")
+                .set("margin", "0 0 10px 0");
+
+        Div attributes = new Div();
+        attributes.addClassName("offer-pet-attributes");
+        attributes.getStyle()
+                .set("display", "flex")
+                .set("flex-wrap", "wrap")
+                .set("gap", "7px");
+        addChipIfPresent(attributes, speciesLabel(pet));
+        addChipIfPresent(attributes, pet.breed());
+        if (pet.birthDate() != null) {
+            addChipIfPresent(attributes, formatAge(pet.birthDate()));
+        }
+        PetVaccinationStatus vaccinationStatus = pet.vaccinationStatus() == null
+                ? PetVaccinationStatus.UNBEKANNT
+                : pet.vaccinationStatus();
+        attributes.add(petAttributeChip(vaccinationStatus.label()));
+        if (pet.tags() != null) {
+            pet.tags().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(PetTag::label)
+                    .map(PetsitterDetailPopUp::petAttributeChip)
+                    .forEach(attributes::add);
+        }
+
+        Span descriptionLabel = new Span("Tierbeschreibung");
+        descriptionLabel.getStyle()
+                .set("display", "block")
+                .set("color", DARK)
+                .set("font-size", "13px")
+                .set("font-weight", "800")
+                .set("margin-top", "12px");
+
+        Span description = new Span(isBlank(pet.notes())
+                ? "Keine Tierbeschreibung hinterlegt."
+                : pet.notes());
+        description.addClassName("offer-pet-description");
+        description.getStyle()
+                .set("display", "block")
+                .set("color", BROWN)
+                .set("font-size", "14px")
+                .set("line-height", "1.5")
+                .set("margin-top", "4px");
+
+        card.add(name, attributes, descriptionLabel, description);
+        return card;
+    }
+
+    private static void addChipIfPresent(Div attributes, String value) {
+        if (!isBlank(value)) {
+            attributes.add(petAttributeChip(value));
+        }
+    }
+
+    private static Span petAttributeChip(String label) {
+        Span chip = new Span(label);
+        chip.getStyle()
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "999px")
+                .set("background", "#fbf8f1")
+                .set("color", "#7a6050")
+                .set("font-size", "12px")
+                .set("font-weight", "800")
+                .set("padding", "5px 10px")
+                .set("line-height", "1.2");
+        return chip;
+    }
+
+    private static String speciesLabel(PetDto pet) {
+        if (pet.species() == null) {
+            return null;
+        }
+        if (pet.species() == com.softwareengineering.petsitter.pet.domain.PetSpecies.OTHER
+                && !isBlank(pet.customSpecies())) {
+            return pet.customSpecies();
+        }
+        return PetService.speciesLabel(pet.species());
+    }
+
+    private static String formatAge(LocalDate birthDate) {
+        int years = Period.between(birthDate, LocalDate.now()).getYears();
+        if (years == 0) {
+            int months = Period.between(birthDate, LocalDate.now()).getMonths();
+            return months <= 1 ? "weniger als 1 Monat alt" : months + " Monate alt";
+        }
+        return years == 1 ? "1 Jahr alt" : years + " Jahre alt";
     }
 
     private static TextField readOnlyTextField(String label, String value) {

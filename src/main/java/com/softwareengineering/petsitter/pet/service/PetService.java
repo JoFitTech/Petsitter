@@ -182,10 +182,7 @@ public class PetService {
     }
 
     private PetDto toDto(Pet pet) {
-        return new PetDto(pet.getId(), pet.getName(), pet.getSpecies(),
-                pet.getCustomSpecies(), pet.getBreed(), pet.getBirthDate(), pet.getNotes(),
-                pet.getVaccinationStatus() == null ? PetVaccinationStatus.UNBEKANNT : pet.getVaccinationStatus(),
-                new LinkedHashSet<>(pet.getTags()));
+        return PetDto.from(pet);
     }
 
     private Set<PetTag> normalizeTags(Set<PetTag> tags) {

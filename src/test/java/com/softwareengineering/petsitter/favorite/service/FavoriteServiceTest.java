@@ -10,6 +10,10 @@ import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.pet.domain.Pet;
+import com.softwareengineering.petsitter.pet.domain.PetSpecies;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
@@ -113,6 +117,15 @@ class FavoriteServiceTest {
         User otherUser = user(UUID.randomUUID());
         Offer visible = offer(UUID.randomUUID(), otherUser, OfferStatus.OPEN, LocalDate.of(2026, 5, 10));
         visible.setTitle("Katzenbetreuung");
+        visible.setOfferType(OfferType.OWNER_OFFER);
+        Pet cat = pet(UUID.randomUUID(), otherUser, "Mila", PetSpecies.CAT);
+        cat.setNotes("Braucht morgens ihr Spezialfutter.");
+        cat.setVaccinationStatus(PetVaccinationStatus.GEIMPFT);
+        cat.setTags(Set.of(PetTag.STUBENREIN));
+        Pet dog = pet(UUID.randomUUID(), otherUser, "Balu", PetSpecies.DOG);
+        dog.setNotes("Mag lange Spaziergaenge.");
+        dog.setTags(Set.of(PetTag.VERSPIELT));
+        visible.setPets(List.of(cat, dog));
         Offer booked = offer(UUID.randomUUID(), otherUser, OfferStatus.BOOKED, LocalDate.of(2026, 5, 10));
         Offer cancelled = offer(UUID.randomUUID(), otherUser, OfferStatus.CANCELLED, LocalDate.of(2026, 5, 10));
         Offer expired = offer(UUID.randomUUID(), otherUser, OfferStatus.OPEN, LocalDate.of(2026, 5, 9));
@@ -131,6 +144,13 @@ class FavoriteServiceTest {
         assertThat(result).extracting(OfferCardDto::id).containsExactly(visible.getOfferId());
         assertThat(result.getFirst().title()).isEqualTo("Katzenbetreuung");
         assertThat(result.getFirst().favorited()).isTrue();
+        assertThat(result.getFirst().pets()).extracting(pet -> pet.name())
+                .containsExactly("Mila", "Balu");
+        assertThat(result.getFirst().pets().getFirst().notes()).isEqualTo("Braucht morgens ihr Spezialfutter.");
+        assertThat(result.getFirst().pets().getFirst().vaccinationStatus()).isEqualTo(PetVaccinationStatus.GEIMPFT);
+        assertThat(result.getFirst().pets().getFirst().tags()).containsExactly(PetTag.STUBENREIN);
+        assertThat(result.getFirst().pets().get(1).notes()).isEqualTo("Mag lange Spaziergaenge.");
+        assertThat(result.getFirst().pets().get(1).tags()).containsExactly(PetTag.VERSPIELT);
     }
 
     @Test
@@ -267,6 +287,15 @@ class FavoriteServiceTest {
         offer.setPrice(BigDecimal.TEN);
         offer.setTitle("Angebot");
         return offer;
+    }
+
+    private Pet pet(UUID petId, User owner, String name, PetSpecies species) {
+        Pet pet = new Pet();
+        pet.setId(petId);
+        pet.setOwner(owner);
+        pet.setName(name);
+        pet.setSpecies(species);
+        return pet;
     }
 
     private static final class FavoriteRepositoryState {

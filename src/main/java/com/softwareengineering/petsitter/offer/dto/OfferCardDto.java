@@ -4,9 +4,11 @@ import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.pet.dto.PetDto;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record OfferCardDto(
@@ -24,6 +26,7 @@ public record OfferCardDto(
         String petSpecies,
         String petBreed,
         String petTags,
+        List<PetDto> pets,
         String postalCode,
         String city,
         Integer distanceKm,
@@ -32,6 +35,10 @@ public record OfferCardDto(
         UUID creatorUserId,
         String creatorDisplayName
 ) {
+    public OfferCardDto {
+        pets = pets == null ? List.of() : List.copyOf(pets);
+    }
+
     public OfferCardDto(
             UUID id,
             String title,
@@ -54,7 +61,7 @@ public record OfferCardDto(
             OfferType offerType
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), postalCode, city, distanceKm,
                 favorited, offerType, null, null);
     }
 
@@ -79,7 +86,7 @@ public record OfferCardDto(
             boolean favorited
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), postalCode, city, distanceKm,
                 favorited, null, null, null);
     }
 
@@ -103,7 +110,7 @@ public record OfferCardDto(
             Integer distanceKm
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), postalCode, city, distanceKm,
                 false, null, null, null);
     }
 
@@ -124,13 +131,13 @@ public record OfferCardDto(
             String petTags
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, petTags, null, null, null, false,
+                frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), null, null, null, false,
                 null, null, null);
     }
 
     public OfferCardDto withFavorited(boolean favorited) {
         return new OfferCardDto(id, title, startDate, endDate, price, animalType, creatorVerified, description,
-                frequency, careType, petName, petSpecies, petBreed, petTags, postalCode, city, distanceKm,
+                frequency, careType, petName, petSpecies, petBreed, petTags, pets, postalCode, city, distanceKm,
                 favorited, offerType, creatorUserId, creatorDisplayName);
     }
 }

@@ -604,7 +604,7 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("background", "white")
                 .set("border", "1px solid #ead5ae")
                 .set("border-radius", "14px")
-                .set("padding", "14px 16px")
+                .set("padding", "12px 16px 14px")
                 .set("box-sizing", "border-box")
                 .set("width", "100%");
 
@@ -613,14 +613,15 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("color", DARK)
                 .set("font-size", "17px")
                 .set("font-weight", "800")
-                .set("margin", "0 0 10px 0");
+                .set("margin", "0");
 
         Div attributes = new Div();
         attributes.addClassName("offer-pet-attributes");
         attributes.getStyle()
                 .set("display", "flex")
                 .set("flex-wrap", "wrap")
-                .set("gap", "7px");
+                .set("gap", "7px")
+                .set("margin-top", "10px");
         addChipIfPresent(attributes, speciesLabel(pet));
         addChipIfPresent(attributes, pet.breed());
         if (pet.birthDate() != null) {

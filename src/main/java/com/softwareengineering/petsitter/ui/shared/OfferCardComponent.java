@@ -63,6 +63,7 @@ public class OfferCardComponent extends Div {
         Div imageArea = ImageComponents.offerCover(dto.coverTiles(), "148px", topColor);
         imageArea.getStyle()
                 .set("position", "relative")
+                .set("width", "calc(100% - 24px)")
                 .set("border-radius", "14px")
                 .set("margin", "12px 12px 0 12px")
                 .set("overflow", "hidden");

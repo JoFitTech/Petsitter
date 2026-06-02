@@ -23,6 +23,8 @@ public record OfferSearchCriteria(
         OfferFrequency frequency,
         Set<OfferAnimalType> animalTypes
 ) {
+    public static final int ANY_DISTANCE_KM = -1;
+
     public OfferSearchCriteria(OfferSearchMode mode, LocalDate from, LocalDate to,
             OfferDateFilterMode dateFilterMode, int dateFlexDays, BigDecimal earnings, int distanceKm,
             OfferCareType careType, OfferFrequency frequency, Set<OfferAnimalType> animalTypes) {
@@ -44,5 +46,9 @@ public record OfferSearchCriteria(
                 ? null
                 : originPostalCode.trim();
         animalTypes = animalTypes == null ? Set.of() : Set.copyOf(animalTypes);
+    }
+
+    public boolean hasUnlimitedDistance() {
+        return distanceKm == ANY_DISTANCE_KM;
     }
 }

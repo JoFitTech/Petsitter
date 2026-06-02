@@ -1,6 +1,7 @@
 package com.softwareengineering.petsitter.ui.shared;
 
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
+import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.component.button.Button;
@@ -48,7 +49,7 @@ public class FilterSearchBar extends Div {
     private static final List<Integer> DISTANCE_VALUES = List.of(
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
             15, 20, 25, 30, 35, 40, 45, 50, 55, 60,
-            65, 70, 75, 80, 85, 90, 95, 100
+            65, 70, 75, 80, 85, 90, 95, 100, OfferSearchCriteria.ANY_DISTANCE_KM
     );
     private static final List<Integer> DATE_FLEX_VALUES = List.of(0, 1, 2, 3, 7);
 
@@ -226,7 +227,7 @@ public class FilterSearchBar extends Div {
                 .set("font-weight", "700")
                 .set("letter-spacing", "0.3px");
 
-        Span valueSpan = new Span("bis " + selectedDistance + " km");
+        Span valueSpan = new Span(formatDistancePillValue(selectedDistance));
         valueSpan.getStyle()
                 .set("font-size", "15px")
                 .set("font-weight", "700")
@@ -818,7 +819,7 @@ public class FilterSearchBar extends Div {
             distancePostalCodeValue.setText(formatDistancePostalCode());
         });
 
-        Span currentValue = new Span(selectedDistance + " km");
+        Span currentValue = new Span(formatDistanceValue(selectedDistance));
         currentValue.getStyle()
                 .set("font-size", "24px")
                 .set("font-weight", "800")
@@ -838,11 +839,11 @@ public class FilterSearchBar extends Div {
         slider.addValueChangeListener(event -> {
             int index = Math.max(0, Math.min(DISTANCE_VALUES.size() - 1, (int) Math.round(event.getValue())));
             selectedDistance = DISTANCE_VALUES.get(index);
-            currentValue.setText(selectedDistance + " km");
-            distanceValue.setText("bis " + selectedDistance + " km");
+            currentValue.setText(formatDistanceValue(selectedDistance));
+            distanceValue.setText(formatDistancePillValue(selectedDistance));
         });
 
-        HorizontalLayout scale = new HorizontalLayout(new Span("1 km"), new Span("100 km"));
+        HorizontalLayout scale = new HorizontalLayout(new Span("1 km"), new Span("egal"));
         scale.setWidthFull();
         scale.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         scale.getStyle()
@@ -889,9 +890,21 @@ public class FilterSearchBar extends Div {
     }
 
     private static int normalizeDistance(int distance) {
+        if (distance == OfferSearchCriteria.ANY_DISTANCE_KM) {
+            return distance;
+        }
         return DISTANCE_VALUES.stream()
+                .filter(value -> value != OfferSearchCriteria.ANY_DISTANCE_KM)
                 .min((left, right) -> Integer.compare(Math.abs(left - distance), Math.abs(right - distance)))
                 .orElse(5);
+    }
+
+    private static String formatDistanceValue(int distance) {
+        return distance == OfferSearchCriteria.ANY_DISTANCE_KM ? "egal" : distance + " km";
+    }
+
+    private static String formatDistancePillValue(int distance) {
+        return distance == OfferSearchCriteria.ANY_DISTANCE_KM ? "egal" : "bis " + formatDistanceValue(distance);
     }
 
     private static int normalizeDateFlexDays(int dateFlexDays) {

@@ -1319,6 +1319,42 @@ class OfferServiceTest {
     }
 
     @Test
+    void searchOpenOffersWithUnlimitedDistanceIncludesAllResolvedLocationsAndSortsNearestFirst() {
+        LocalDate from = LocalDate.of(2026, 6, 15);
+        LocalDate to = LocalDate.of(2026, 6, 18);
+        User nearUser = user(UUID.randomUUID());
+        nearUser.setPostalCode("20000");
+        User farUser = user(UUID.randomUUID());
+        farUser.setPostalCode("30000");
+        UUID nearOfferId = UUID.randomUUID();
+        UUID farOfferId = UUID.randomUUID();
+        Offer farOffer = offer(farOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80));
+        farOffer.setCreateUser(farUser);
+        Offer nearOffer = offer(nearOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80));
+        nearOffer.setCreateUser(nearUser);
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryReturningOffers(List.of(farOffer, nearOffer),
+                        new AtomicReference<>(), new AtomicReference<>()),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.empty(),
+                new CreateOfferFormRules(),
+                postalCodeService(Map.of(
+                        "10000", location("10000", 0, 0),
+                        "20000", location("20000", 0, 0.05),
+                        "30000", location("30000", 0, 1.0)
+                ))
+        );
+
+        List<OfferCardDto> result = offerService.searchOpenOffers(
+                new OfferSearchCriteria(OfferSearchMode.TIERSITTER, from, to,
+                        OfferDateFilterMode.OVERLAP, 0, BigDecimal.valueOf(100),
+                        OfferSearchCriteria.ANY_DISTANCE_KM, "10000", null, null, Set.of()));
+
+        assertThat(result).extracting(OfferCardDto::id).containsExactly(nearOfferId, farOfferId);
+        assertThat(result).extracting(OfferCardDto::distanceKm).containsExactly(6, 111);
+    }
+
+    @Test
     void searchOpenOffersIgnoresDistanceWhenOriginPostalCodeIsMissing() {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 18);

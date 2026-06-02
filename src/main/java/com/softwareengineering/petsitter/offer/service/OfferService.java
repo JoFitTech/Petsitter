@@ -483,6 +483,7 @@ public class OfferService {
             return List.of();
         }
 
+        boolean unlimitedDistance = criteria.hasUnlimitedDistance();
         int maxDistanceKm = Math.max(0, criteria.distanceKm());
         PostalCodeLocation resolvedOrigin = originLocation.get();
         Set<String> targetPostalCodes = offers.stream()
@@ -493,12 +494,14 @@ public class OfferService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<String, PostalCodeLocation> targetLocations = postalCodeService.findCachedGermanLocations(targetPostalCodes);
         LOGGER.info("Distance filter active: originPostalCode={}, originPlace={}, originLat={}, originLon={}, "
-                        + "maxDistanceKm={}, candidates={}, uniqueTargetPostalCodes={}, cachedTargetPostalCodes={}",
+                        + "maxDistanceKm={}, unlimitedDistance={}, candidates={}, uniqueTargetPostalCodes={}, "
+                        + "cachedTargetPostalCodes={}",
                 criteria.originPostalCode(),
                 resolvedOrigin.getPrimaryPlaceName(),
                 resolvedOrigin.getLatitude(),
                 resolvedOrigin.getLongitude(),
                 maxDistanceKm,
+                unlimitedDistance,
                 offers.size(),
                 targetPostalCodes.size(),
                 targetLocations.size());
@@ -507,10 +510,11 @@ public class OfferService {
                 .map(offer -> offerDistance(offer, originLocation.get(), targetLocations))
                 .flatMap(Optional::stream)
                 .filter(offerDistance -> {
-                    boolean included = offerDistance.distanceKm() <= maxDistanceKm;
+                    boolean included = unlimitedDistance || offerDistance.distanceKm() <= maxDistanceKm;
                     LOGGER.info(
                             "Distance filter decision: offerId={}, targetPostalCode={}, targetCity={}, "
-                                    + "targetLat={}, targetLon={}, distanceKm={}, maxDistanceKm={}, included={}",
+                                    + "targetLat={}, targetLon={}, distanceKm={}, maxDistanceKm={}, "
+                                    + "unlimitedDistance={}, included={}",
                             offerDistance.offer().getOfferId(),
                             creatorPostalCode(offerDistance.offer()),
                             creatorCity(offerDistance.offer()),
@@ -518,6 +522,7 @@ public class OfferService {
                             offerDistance.targetLocation().getLongitude(),
                             postalCodeService.roundedDistanceKm(offerDistance.distanceKm()),
                             maxDistanceKm,
+                            unlimitedDistance,
                             included);
                     return included;
                 })

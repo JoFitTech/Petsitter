@@ -26,7 +26,6 @@ public class OfferCardComponent extends Div {
 
     private static final String DARK        = "#4a3428";
     private static final String CARD_SHADOW = "0 12px 30px rgba(74, 52, 40, 0.10)";
-    private static final int    PLACEHOLDER_STARS = 4;
 
     private static final Map<OfferAnimalType, String> ANIMAL_COLORS = Map.of(
             OfferAnimalType.DOG,          "#dec18d",
@@ -72,7 +71,7 @@ public class OfferCardComponent extends Div {
                 .set("margin", "12px 12px 0 12px")
                 .set("overflow", "hidden");
 
-        Span starsBadge = new Span(buildStars(PLACEHOLDER_STARS));
+        Span starsBadge = new Span(buildStars(starsForAverage(dto.creatorAverageRating())));
         starsBadge.getStyle()
                 .set("position", "absolute")
                 .set("top", "10px")
@@ -291,5 +290,13 @@ public class OfferCardComponent extends Div {
             sb.append(i < filled ? "★" : "☆");
         }
         return sb.toString();
+    }
+
+    public static int starsForAverage(Double averageRating) {
+        if (averageRating == null || averageRating <= 0.0d) {
+            return 0;
+        }
+        int rounded = Math.round(averageRating.floatValue());
+        return Math.max(0, Math.min(rounded, 5));
     }
 }

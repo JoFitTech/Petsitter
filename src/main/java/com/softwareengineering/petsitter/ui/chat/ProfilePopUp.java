@@ -112,10 +112,16 @@ public class ProfilePopUp extends Dialog {
         HorizontalLayout starsLayout = new HorizontalLayout();
         starsLayout.setSpacing(false);
         starsLayout.getStyle().set("gap", "4px").set("margin-bottom", "10px");
+
+        int starsCount = 0;
+        if (safeProfile.ratingSummary() != null && safeProfile.ratingSummary().averageRating() > 0) {
+            starsCount = Math.round((float) safeProfile.ratingSummary().averageRating());
+        }
+
         for (int i = 0; i < 5; i++) {
-            Icon star = new Icon(VaadinIcon.STAR);
+            Icon star = new Icon(i < starsCount ? VaadinIcon.STAR : VaadinIcon.STAR_O);
             star.setSize("20px");
-            star.getStyle().set("color", "#ffdf4a");
+            star.getStyle().set("color", i < starsCount ? "#ffdf4a" : "#d0d0d0");
             starsLayout.add(star);
         }
 
@@ -233,19 +239,20 @@ public class ProfilePopUp extends Dialog {
         reviewsList.setPadding(false);
         reviewsList.setSpacing(true);
 
-        // Review 1
-        reviewsList.add(createReviewItem(
-                5, 
-                "Sehr zuverlässig", 
-                "„Bruno war bestens betreut. Kommunikation und Übergabe waren super unkompliziert.“"
-        ));
-
-        // Review 2
-        reviewsList.add(createReviewItem(
-                4, 
-                "Freundlich und flexibel", 
-                "„Sehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgefühlt.“"
-        ));
+        // Add real reviews from profile
+        if (safeProfile.recentReviews() != null && !safeProfile.recentReviews().isEmpty()) {
+            for (var review : safeProfile.recentReviews()) {
+                reviewsList.add(createReviewItem(
+                        review.rating(),
+                        review.reviewerName(),
+                        valueOrDefault(review.comment(), "Keine Bemerkung")
+                ));
+            }
+        } else {
+            Paragraph noReviews = new Paragraph("Keine Bewertungen vorhanden");
+            noReviews.getStyle().set("color", "#999").set("font-style", "italic");
+            reviewsList.add(noReviews);
+        }
 
         reviewsCard.add(reviewsTitle, reviewsList);
 
@@ -281,7 +288,7 @@ public class ProfilePopUp extends Dialog {
         return value == null ? "" : value;
     }
 
-    private Div createReviewItem(int starsCount, String titleText, String reviewText) {
+    private Div createReviewItem(int starsCount, String reviewerName, String reviewText) {
         Div reviewItem = new Div();
         reviewItem.getStyle()
                 .set("background-color", REVIEW_BG)
@@ -307,7 +314,7 @@ public class ProfilePopUp extends Dialog {
             starsLayout.add(star);
         }
 
-        Span title = new Span(titleText);
+        Span title = new Span(valueOrDefault(reviewerName, "Anonym"));
         title.getStyle()
                 .set("color", DARK)
                 .set("font-weight", "700")

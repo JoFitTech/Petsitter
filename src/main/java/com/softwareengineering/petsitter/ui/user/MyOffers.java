@@ -10,6 +10,7 @@ import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
@@ -590,7 +591,9 @@ public class MyOffers extends Div {
     }
 
     private void openOfferDialog(MyOfferCardDto offer) {
-        new PetsitterDetailPopUp(toOfferCardDto(offer), "–", 4,
+        OfferCardDto dto = toOfferCardDto(offer);
+        new PetsitterDetailPopUp(dto, "–",
+                OfferCardComponent.starsForAverage(dto.creatorAverageRating()),
                 offerService, requestService, chatService, authenticatedUser, userService, bookingService).open();
     }
 
@@ -628,6 +631,8 @@ public class MyOffers extends Div {
                 null,
                 null,
                 offer.coverTiles(),
+                null,
+                null,
                 null
         );
     }

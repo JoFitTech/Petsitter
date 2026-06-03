@@ -32,6 +32,8 @@ import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
@@ -107,6 +109,8 @@ public class OfferService {
     private final CreateOfferFormRules createOfferFormRules;
     private final PostalCodeService postalCodeService;
     private final OfferImagePresentationMapper imagePresentationMapper;
+    @Autowired(required = false)
+    private UserReviewService userReviewService;
 
     @Autowired
     public OfferService(OfferRepository offerRepository, PetRepository petRepository,
@@ -691,6 +695,7 @@ public class OfferService {
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
         List<Pet> pets = offerPets(offer);
         User createUser = offer.getCreateUser();
+        UserRatingSummary ratingSummary = ratingSummary(createUser);
         return new OfferCardDto(
                 offer.getOfferId(),
                 offer.getTitle() != null ? offer.getTitle() : "Angebot",
@@ -717,8 +722,17 @@ public class OfferService {
                 createUser != null ? createUser.getId() : null,
                 creatorDisplayName(createUser),
                 coverTiles,
-                creatorProfileImage
+                creatorProfileImage,
+                ratingSummary != null ? ratingSummary.averageRating() : null,
+                ratingSummary != null ? ratingSummary.ratingCount() : null
         );
+    }
+
+    private UserRatingSummary ratingSummary(User createUser) {
+        if (createUser == null || userReviewService == null) {
+            return null;
+        }
+        return userReviewService.getUserRatingSummary(createUser.getId());
     }
 
     private MyOfferCardDto toMyOfferCardDto(Offer offer) {

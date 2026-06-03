@@ -1,10 +1,14 @@
 package com.softwareengineering.petsitter.booking.domain;
 
 import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.user.domain.User;
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -17,8 +21,12 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -106,15 +114,34 @@ public class Booking {
      * Start-Datum der Betreuung (einschließlich).
      * Wird vom Offer übernommen.
      */
-    @Column(nullable = false)
+    @Column
     private LocalDate startDate;
 
     /**
      * End-Datum der Betreuung (einschließlich).
      * Wird vom Offer übernommen.
      */
-    @Column(nullable = false)
+    @Column
     private LocalDate endDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 32)
+    private OfferFrequency frequency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "time_slot", length = 32)
+    private OfferTimeSlot timeSlot;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "booking_weekday",
+            joinColumns = @JoinColumn(name = "booking_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "weekday", nullable = false, length = 16)
+    private Set<DayOfWeek> recurringWeekdays = new LinkedHashSet<>();
+
+    @Column(name = "recurring_ended_on")
+    private LocalDate recurringEndedOn;
 
     /**
      * Preis pro Tag für die Betreuung in EUR.
@@ -212,6 +239,46 @@ public class Booking {
         this.endDate = endDate;
     }
 
+    public OfferFrequency getFrequency() {
+        return frequency;
+    }
+
+    public void setFrequency(OfferFrequency frequency) {
+        this.frequency = frequency;
+    }
+
+    public OfferTimeSlot getTimeSlot() {
+        return timeSlot;
+    }
+
+    public void setTimeSlot(OfferTimeSlot timeSlot) {
+        this.timeSlot = timeSlot;
+    }
+
+    public Set<DayOfWeek> getRecurringWeekdays() {
+        if (recurringWeekdays == null) {
+            recurringWeekdays = new LinkedHashSet<>();
+        }
+        return recurringWeekdays;
+    }
+
+    public void setRecurringWeekdays(Collection<DayOfWeek> recurringWeekdays) {
+        getRecurringWeekdays().clear();
+        if (recurringWeekdays != null) {
+            recurringWeekdays.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(this.recurringWeekdays::add);
+        }
+    }
+
+    public LocalDate getRecurringEndedOn() {
+        return recurringEndedOn;
+    }
+
+    public void setRecurringEndedOn(LocalDate recurringEndedOn) {
+        this.recurringEndedOn = recurringEndedOn;
+    }
+
     public BigDecimal getPricePerDay() {
         return pricePerDay;
     }
@@ -246,6 +313,9 @@ public class Booking {
 
     @PrePersist
     void onCreate() {
+        if (frequency == null) {
+            frequency = OfferFrequency.ONE_TIME;
+        }
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }

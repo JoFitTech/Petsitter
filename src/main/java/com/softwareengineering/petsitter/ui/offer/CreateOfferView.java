@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.offer;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
@@ -57,6 +58,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Route(value = "auftrag-erstellen", layout = MainLayout.class)
@@ -95,16 +97,20 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private Select<OfferAnimalType> animalTypeSelect;
     private MultiSelectComboBox<OfferPetOptionDto> petSelect;
     private RadioButtonGroup<OfferFrequency> frequencyGroup;
+    private RadioButtonGroup<OfferTimeSlot> timeSlotGroup;
     private TextField dateRangeField;
     private Popover whenPopover;
+    private Div recurringWeekdayGrid;
     private Div dateCalendar;
     private Span dateRangeStatus;
     private YearMonth displayedMonth;
     private LocalDate selectedFrom;
     private LocalDate selectedTo;
+    private final LinkedHashSet<DayOfWeek> selectedRecurringWeekdays = new LinkedHashSet<>();
     private boolean selectingRangeEnd;
     private Span dateSummary;
     private RadioButtonGroup<OfferCareType> careTypeGroup;
+    private NativeLabel priceLabel;
     private BigDecimalField priceField;
     private Span priceSummary;
     private TextArea additionalInfoArea;
@@ -458,6 +464,27 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         frequencyGroup.getStyle()
                 .set("color", DARK)
                 .set("font-size", "14px");
+        frequencyGroup.addValueChangeListener(event -> updateScheduleModeVisibility());
+
+        timeSlotGroup = new RadioButtonGroup<>();
+        timeSlotGroup.setItems(formData.timeSlots());
+        timeSlotGroup.setItemLabelGenerator(OfferTimeSlot::label);
+        timeSlotGroup.getStyle()
+                .set("color", DARK)
+                .set("font-size", "14px");
+        timeSlotGroup.addValueChangeListener(event -> {
+            if (dateSummary != null && isRegularSelected()) {
+                dateSummary.setText(recurringSummary());
+            }
+            updatePriceSummary();
+        });
+
+        HorizontalLayout scheduleTypeRow = new HorizontalLayout(frequencyGroup, timeSlotGroup);
+        scheduleTypeRow.setWidthFull();
+        scheduleTypeRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        scheduleTypeRow.getStyle()
+                .set("gap", "28px")
+                .set("flex-wrap", "wrap");
 
         dateRangeField = new TextField();
         dateRangeField.setPlaceholder("Wann?");
@@ -484,6 +511,14 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
 
         dateRangeField.addFocusListener(event -> whenPopover.open());
 
+        recurringWeekdayGrid = new Div();
+        recurringWeekdayGrid.getStyle()
+                .set("display", "flex")
+                .set("flex-wrap", "wrap")
+                .set("gap", "8px")
+                .set("margin-top", "10px");
+        renderRecurringWeekdayChips();
+
         dateSummary = new Span();
         dateSummary.getStyle()
                 .set("display", "block")
@@ -493,9 +528,107 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("font-weight", "600");
 
         applyDateSelection(formData.dateSelection());
+        updateScheduleModeVisibility();
 
-        section.add(label, frequencyGroup, dateRangeField, whenPopover, dateSummary);
+        section.add(label, scheduleTypeRow, dateRangeField, whenPopover, recurringWeekdayGrid, dateSummary);
         return section;
+    }
+
+    private void updateScheduleModeVisibility() {
+        boolean regular = isRegularSelected();
+        if (timeSlotGroup != null) {
+            timeSlotGroup.setVisible(regular);
+            if (!regular) {
+                timeSlotGroup.clear();
+            } else if (timeSlotGroup.getValue() == null) {
+                timeSlotGroup.setValue(OfferTimeSlot.AFTERNOON);
+            }
+        }
+        if (dateRangeField != null) {
+            dateRangeField.setVisible(!regular);
+            dateRangeField.setInvalid(false);
+        }
+        if (recurringWeekdayGrid != null) {
+            recurringWeekdayGrid.setVisible(regular);
+        }
+        if (!regular) {
+            selectedRecurringWeekdays.clear();
+            renderRecurringWeekdayChips();
+            applyDateSelection(offerService.updateCreateOfferDateSelection(selectedFrom, selectedTo));
+        } else {
+            dateSummary.setText(recurringSummary());
+        }
+        if (priceLabel != null) {
+            priceLabel.setText(regular ? "Preis pro Termin" : "Preis pro Tag");
+        }
+        updatePriceSummary();
+    }
+
+    private boolean isRegularSelected() {
+        return frequencyGroup != null && frequencyGroup.getValue() == OfferFrequency.REGULAR;
+    }
+
+    private void renderRecurringWeekdayChips() {
+        if (recurringWeekdayGrid == null) {
+            return;
+        }
+        recurringWeekdayGrid.removeAll();
+        for (DayOfWeek day : DayOfWeek.values()) {
+            Button chip = new Button(shortDayLabel(day));
+            boolean selected = selectedRecurringWeekdays.contains(day);
+            chip.getStyle()
+                    .set("height", "34px")
+                    .set("min-width", "44px")
+                    .set("border-radius", "999px")
+                    .set("padding", "0 14px")
+                    .set("font-size", "13px")
+                    .set("font-weight", "800")
+                    .set("box-shadow", "none")
+                    .set("cursor", "pointer")
+                    .set("background", selected ? BROWN : "#fbf8f1")
+                    .set("color", selected ? "white" : "#7a6050")
+                    .set("border", "1px solid " + (selected ? BROWN : BORDER));
+            chip.addClickListener(event -> {
+                if (selectedRecurringWeekdays.contains(day)) {
+                    selectedRecurringWeekdays.remove(day);
+                } else {
+                    selectedRecurringWeekdays.add(day);
+                }
+                renderRecurringWeekdayChips();
+                dateSummary.setText(recurringSummary());
+                updatePriceSummary();
+            });
+            recurringWeekdayGrid.add(chip);
+        }
+    }
+
+    private String recurringSummary() {
+        if (selectedRecurringWeekdays.isEmpty()) {
+            return "Bitte mindestens einen Wochentag auswaehlen.";
+        }
+        return "Woechentlich: " + formatWeekdays(selectedRecurringWeekdays)
+                + (timeSlotGroup != null && timeSlotGroup.getValue() != null
+                ? " · " + timeSlotGroup.getValue().label()
+                : "");
+    }
+
+    private String formatWeekdays(Set<DayOfWeek> weekdays) {
+        return weekdays.stream()
+                .sorted(Comparator.comparingInt(DayOfWeek::getValue))
+                .map(this::shortDayLabel)
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private String shortDayLabel(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> "Mo";
+            case TUESDAY -> "Di";
+            case WEDNESDAY -> "Mi";
+            case THURSDAY -> "Do";
+            case FRIDAY -> "Fr";
+            case SATURDAY -> "Sa";
+            case SUNDAY -> "So";
+        };
     }
 
     // ── 6. Care type (Tiersitting / Tiersitting + Haussitting) ───────────
@@ -529,8 +662,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         section.setPadding(false);
         section.setSpacing(false);
 
-        NativeLabel label = new NativeLabel("Preis pro Tag");
-        label.getStyle()
+        priceLabel = new NativeLabel("Preis pro Tag");
+        priceLabel.getStyle()
                 .set("font-size", "15px")
                 .set("font-weight", "700")
                 .set("color", BROWN)
@@ -559,7 +692,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 .set("font-weight", "600");
         updatePriceSummary();
 
-        section.add(label, priceField, priceSummary);
+        section.add(priceLabel, priceField, priceSummary);
         return section;
     }
 
@@ -874,19 +1007,29 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             valid = false;
         }
 
-        LocalDate startDate = selectedFrom;
-        LocalDate endDate = selectedTo;
-
-        if (startDate == null) {
-            dateRangeField.setInvalid(true);
-            dateRangeField.setErrorMessage("Bitte wähle einen Zeitraum aus");
-            valid = false;
-        } else if (endDate == null) {
-            dateRangeField.setInvalid(true);
-            dateRangeField.setErrorMessage("Bitte wähle ein Enddatum aus");
-            valid = false;
+        if (isRegularSelected()) {
+            if (selectedRecurringWeekdays.isEmpty()) {
+                dateSummary.setText("Bitte mindestens einen Wochentag auswaehlen.");
+                valid = false;
+            }
+            if (timeSlotGroup.getValue() == null) {
+                valid = false;
+            }
         } else {
-            dateRangeField.setInvalid(false);
+            LocalDate startDate = selectedFrom;
+            LocalDate endDate = selectedTo;
+
+            if (startDate == null) {
+                dateRangeField.setInvalid(true);
+                dateRangeField.setErrorMessage("Bitte wähle einen Zeitraum aus");
+                valid = false;
+            } else if (endDate == null) {
+                dateRangeField.setInvalid(true);
+                dateRangeField.setErrorMessage("Bitte wähle ein Enddatum aus");
+                valid = false;
+            } else {
+                dateRangeField.setInvalid(false);
+            }
         }
 
         if (priceField.getValue() == null) {
@@ -901,8 +1044,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
     private CreateOfferRequest buildRequest(List<OfferPetOptionDto> selectedPets, OfferAnimalType selectedAnimalType) {
         return new CreateOfferRequest(
                 currentOfferType,
-                selectedFrom,
-                selectedTo,
+                isRegularSelected() ? null : selectedFrom,
+                isRegularSelected() ? null : selectedTo,
                 null,
                 selectedPets.stream().map(OfferPetOptionDto::id).toList(),
                 priceField.getValue(),
@@ -910,7 +1053,9 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
                 frequencyGroup.getValue(),
                 careTypeGroup.getValue(),
                 selectedAnimalType,
-                additionalInfoArea.getValue());
+                additionalInfoArea.getValue(),
+                isRegularSelected() ? Set.copyOf(selectedRecurringWeekdays) : Set.of(),
+                isRegularSelected() ? timeSlotGroup.getValue() : null);
     }
 
     private void applyDateSelection(CreateOfferDateSelection dateSelection) {
@@ -927,6 +1072,17 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             return;
         }
         BigDecimal price = priceField == null ? null : priceField.getValue();
+        if (isRegularSelected()) {
+            if (price == null || selectedRecurringWeekdays.isEmpty()) {
+                priceSummary.setText("Wochenpreis: - EUR");
+                return;
+            }
+            BigDecimal weeklyPrice = price.multiply(BigDecimal.valueOf(selectedRecurringWeekdays.size()));
+            priceSummary.setText(selectedRecurringWeekdays.size() + " Termin(e) pro Woche · "
+                    + weeklyPrice.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                    + " EUR/Woche");
+            return;
+        }
         priceSummary.setText(offerService.summarizeCreateOfferTotalPrice(
                 selectedFrom,
                 selectedTo,
@@ -944,6 +1100,8 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             petSelect.setInvalid(false);
         }
         frequencyGroup.setValue(OfferFrequency.ONE_TIME);
+        timeSlotGroup.clear();
+        selectedRecurringWeekdays.clear();
         selectedFrom = null;
         selectedTo = null;
         if (dateRangeField != null) {
@@ -958,6 +1116,7 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
         priceField.setInvalid(false);
         additionalInfoArea.clear();
         updateImagePreview();
+        updateScheduleModeVisibility();
     }
 
     private boolean isOwnerOffer() {
@@ -1008,11 +1167,18 @@ public class CreateOfferView extends VerticalLayout implements BeforeEnterObserv
             petSelect.setValue(findPetOptions(editOfferData.petIds()));
         }
         frequencyGroup.setValue(editOfferData.frequency() != null ? editOfferData.frequency() : OfferFrequency.ONE_TIME);
+        selectedRecurringWeekdays.clear();
+        selectedRecurringWeekdays.addAll(editOfferData.recurringWeekdays());
+        if (timeSlotGroup != null) {
+            timeSlotGroup.setValue(editOfferData.timeSlot());
+        }
         selectedFrom = editableDateOrNull(editOfferData.startDate());
         selectedTo = editableDateOrNull(editOfferData.endDate());
         displayedMonth = initialDisplayedMonth();
         updateDateFilter();
         applyDateSelection(offerService.updateCreateOfferDateSelection(selectedFrom, selectedTo));
+        renderRecurringWeekdayChips();
+        updateScheduleModeVisibility();
         careTypeGroup.setValue(editOfferData.careType() != null ? editOfferData.careType() : OfferCareType.PET_SITTING);
         priceField.setValue(editOfferData.price());
         additionalInfoArea.setValue(valueOrEmpty(editOfferData.description()));

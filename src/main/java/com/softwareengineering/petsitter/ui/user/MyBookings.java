@@ -4,9 +4,12 @@ import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.dto.BookingDto;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
+import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.wallet.domain.PaymentStatus;
+import com.softwareengineering.petsitter.wallet.domain.RecurringPaymentStatus;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
@@ -25,6 +28,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.datepicker.DatePicker;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.server.VaadinSession;
@@ -132,9 +136,15 @@ public class MyBookings extends Div {
 
     private List<BookingDto> applyFilter(List<BookingDto> list) {
         return switch (activeFilter) {
-            case "AKTIV"     -> list.stream().filter(b -> b.status() == BookingStatus.CREATED && !isPast(b)).toList();
+            case "AKTIV"     -> list.stream()
+                    .filter(b -> b.status() == BookingStatus.CREATED && (isRecurring(b) || !isPast(b)))
+                    .toList();
             case "STORNIERT" -> list.stream().filter(b -> b.status() == BookingStatus.CANCELLED).toList();
-            case "VERGANGEN" -> list.stream().filter(b -> b.status() == BookingStatus.COMPLETED || (b.status() == BookingStatus.CREATED && isPast(b))).toList();
+            case "VERGANGEN" -> list.stream()
+                    .filter(b -> b.status() == BookingStatus.COMPLETED
+                            || b.status() == BookingStatus.ENDED
+                            || (b.status() == BookingStatus.CREATED && !isRecurring(b) && isPast(b)))
+                    .toList();
             default          -> list; // ALLE
         };
     }
@@ -147,10 +157,17 @@ public class MyBookings extends Div {
     }
 
     private boolean isPast(BookingDto b) {
-        return b.startDate() != null && b.startDate().isBefore(LocalDate.now());
+        if (isRecurring(b)) {
+            return false;
+        }
+        LocalDate reference = b.endDate() != null ? b.endDate() : b.startDate();
+        return reference != null && reference.isBefore(LocalDate.now());
     }
 
     private boolean hasStarted(BookingDto b) {
+        if (isRecurring(b)) {
+            return true;
+        }
         return b.startDate() != null && !b.startDate().isAfter(LocalDate.now());
     }
 
@@ -291,20 +308,30 @@ public class MyBookings extends Div {
         detailsRow.setWidthFull();
         detailsRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         detailsRow.getStyle().set("gap", "12px");
+        boolean recurring = isRecurring(dto);
         detailsRow.add(
-                buildDetailColumn("Zeitraum",    formatDateRange(dto.startDate(), dto.endDate()), DARK),
-                buildDetailColumn("Preis/Tag",   formatPrice(dto.pricePerDay()), "#a5663b"),
-                buildDetailColumn("Status",      statusLabel(dto), DARK)
+                buildDetailColumn(recurring ? "Rhythmus" : "Zeitraum", formatBookingSchedule(dto), DARK),
+                buildDetailColumn(recurring ? "Preis/Termin" : "Preis/Tag", formatPrice(dto.pricePerDay()), "#a5663b"),
+                buildDetailColumn("Status", statusLabel(dto), DARK)
         );
 
         HorizontalLayout paymentRow = new HorizontalLayout();
         paymentRow.setWidthFull();
         paymentRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         paymentRow.getStyle().set("gap", "12px").set("margin-top", "14px");
-        paymentRow.add(
-                buildDetailColumn("Gesamtpreis", formatPrice(dto.totalPrice()), DARK),
-                buildDetailColumn("Zahlung", paymentStatusLabel(dto.paymentStatus()), paymentStatusColor(dto.paymentStatus()))
-        );
+        if (recurring) {
+            paymentRow.add(
+                    buildDetailColumn("Auszahlbar", recurringPayableLabel(dto), DARK),
+                    buildDetailColumn("Wochenstatus",
+                            recurringPaymentStatusLabel(dto.recurringPaymentStatus()),
+                            recurringPaymentStatusColor(dto.recurringPaymentStatus()))
+            );
+        } else {
+            paymentRow.add(
+                    buildDetailColumn("Gesamtpreis", formatPrice(dto.totalPrice()), DARK),
+                    buildDetailColumn("Zahlung", paymentStatusLabel(dto.paymentStatus()), paymentStatusColor(dto.paymentStatus()))
+            );
+        }
 
         Button chatBtn = new Button("Zum Chat", new Icon(VaadinIcon.CHAT));
         chatBtn.setWidthFull();
@@ -333,10 +360,14 @@ public class MyBookings extends Div {
 
         if (dto.status() == BookingStatus.CREATED) {
             card.add(chatBtn);
-            addCompletionAction(card, dto, currentUserId);
-            addPaymentActions(card, dto, currentUserId, isOwner);
-            if (!hasStarted(dto)) {
-                card.add(buildCancelLink(dto));
+            if (recurring) {
+                addRecurringActions(card, dto, currentUserId, isOwner);
+            } else {
+                addCompletionAction(card, dto, currentUserId);
+                addPaymentActions(card, dto, currentUserId, isOwner);
+                if (!hasStarted(dto)) {
+                    card.add(buildCancelLink(dto));
+                }
             }
         } else {
             card.add(chatBtn);
@@ -375,6 +406,157 @@ public class MyBookings extends Div {
                         "Während der Entwicklungsphase noch nicht implementiert.")));
             }
         }
+    }
+
+    private void addRecurringActions(Div card, BookingDto dto, UUID currentUserId, boolean isOwner) {
+        card.add(actionButton("Pause eintragen", () -> openPauseDialog(dto, currentUserId)));
+        addRecurringPaymentActions(card, dto, currentUserId, isOwner);
+        card.add(buildEndRecurringLink(dto));
+    }
+
+    private void addRecurringPaymentActions(Div card, BookingDto dto, UUID currentUserId, boolean isOwner) {
+        RecurringPaymentStatus status = dto.recurringPaymentStatus();
+        if (status == RecurringPaymentStatus.AWAITING_FUNDS) {
+            addStatusNote(card, "Fuer mindestens eine Woche fehlt noch Guthaben im Wallet.", "#9a4f36");
+        }
+        if (dto.payableRecurringOccurrences() <= 0) {
+            return;
+        }
+        if (status == RecurringPaymentStatus.HELD) {
+            if (isOwner) {
+                card.add(actionButton("Auszahlung freigeben",
+                        () -> releaseRecurringPayments(dto.id(), currentUserId)));
+            } else {
+                card.add(actionButton("Auszahlung anfordern",
+                        () -> requestRecurringPayment(dto.id(), currentUserId)));
+            }
+            return;
+        }
+        if (status == RecurringPaymentStatus.RELEASE_REQUESTED) {
+            addStatusNote(card, "Auszahlung angefordert · automatische Freigabe am "
+                    + formatDateTime(dto.recurringAutomaticReleaseAt()), "#a5663b");
+            if (isOwner) {
+                card.add(actionButton("Auszahlung freigeben",
+                        () -> releaseRecurringPayments(dto.id(), currentUserId)));
+            }
+        }
+    }
+
+    private void openPauseDialog(BookingDto dto, UUID currentUserId) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Pause eintragen");
+        dialog.setWidth("420px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(false);
+        content.getStyle().set("gap", "12px");
+
+        DatePicker start = new DatePicker("Von");
+        DatePicker end = new DatePicker("Bis");
+        LocalDate today = LocalDate.now();
+        start.setMin(today);
+        end.setMin(today);
+        start.setValue(today);
+        end.setValue(today);
+        start.setWidthFull();
+        end.setWidthFull();
+        start.addValueChangeListener(event -> {
+            LocalDate value = event.getValue();
+            if (value == null) {
+                return;
+            }
+            end.setMin(value);
+            if (end.getValue() == null || end.getValue().isBefore(value)) {
+                end.setValue(value);
+            }
+        });
+
+        Button submit = new Button("Pause speichern", event ->
+                addRecurringPause(dto.id(), currentUserId, start.getValue(), end.getValue(), dialog));
+        submit.setWidthFull();
+        submit.getStyle()
+                .set("border-radius", "24px")
+                .set("background", DARK)
+                .set("color", "white")
+                .set("font-weight", "700");
+
+        content.add(start, end, submit);
+        dialog.add(content);
+        dialog.open();
+    }
+
+    private void addRecurringPause(
+            UUID bookingId,
+            UUID currentUserId,
+            LocalDate start,
+            LocalDate end,
+            Dialog dialog
+    ) {
+        try {
+            bookingService.addRecurringPause(bookingId, currentUserId, start, end);
+            dialog.close();
+            Notification.show("Pause wurde eingetragen.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+
+    private Span buildEndRecurringLink(BookingDto dto) {
+        Span link = new Span("Regelmaessige Buchung beenden");
+        styleActionLink(link, "#9a4f36");
+        link.addClickListener(e -> {
+            UUID userId = authenticatedUser.get().map(u -> u.getId()).orElse(null);
+            if (userId == null) return;
+            try {
+                bookingService.endRecurringBooking(dto.id(), userId);
+                Notification.show("Regelmaessige Buchung beendet.")
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                renderBookings();
+            } catch (Exception ex) {
+                Notification.show("Fehler: " + ex.getMessage())
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        return link;
+    }
+
+    private void releaseRecurringPayments(UUID bookingId, UUID currentUserId) {
+        try {
+            bookingService.releaseRecurringPayments(bookingId, currentUserId);
+            Notification.show("Auszahlung wurde freigegeben.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+
+    private void requestRecurringPayment(UUID bookingId, UUID currentUserId) {
+        try {
+            bookingService.requestRecurringPaymentRelease(bookingId, currentUserId);
+            Notification.show("Auszahlung wurde angefordert.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+
+    private void addStatusNote(Div card, String text, String color) {
+        Span note = new Span(text);
+        note.getStyle()
+                .set("display", "block")
+                .set("margin-top", "14px")
+                .set("font-size", "12px")
+                .set("font-weight", "700")
+                .set("color", color);
+        card.add(note);
     }
 
     private void addCompletionAction(Div card, BookingDto dto, UUID currentUserId) {
@@ -626,12 +808,14 @@ public class MyBookings extends Div {
             case CREATED   -> isPast(dto) ? "Vergangen" : "Aktiv";
             case CANCELLED -> "Storniert";
             case COMPLETED -> "Abgeschlossen";
+            case ENDED     -> "Beendet";
         };
     }
 
     private String statusBackground(BookingDto dto) {
         if (dto.status() == BookingStatus.CANCELLED) return "#f4e0d8";
         if (dto.status() == BookingStatus.COMPLETED) return "#e0e7ff";
+        if (dto.status() == BookingStatus.ENDED) return "#e8e8e8";
         if (isPast(dto)) return "#e8e8e8";
         return "#edf7e8";
     }
@@ -639,6 +823,7 @@ public class MyBookings extends Div {
     private String statusColor(BookingDto dto) {
         if (dto.status() == BookingStatus.CANCELLED) return "#9a4f36";
         if (dto.status() == BookingStatus.COMPLETED) return "#3730a3";
+        if (dto.status() == BookingStatus.ENDED) return "#666666";
         if (isPast(dto)) return "#666666";
         return "#4f7f45";
     }
@@ -646,7 +831,27 @@ public class MyBookings extends Div {
     private String cardColor(BookingStatus status) {
         if (status == BookingStatus.CANCELLED) return "#f1dfb9";
         if (status == BookingStatus.COMPLETED) return "#c8dde6";
+        if (status == BookingStatus.ENDED) return "#e5e0d8";
         return "#d8ecd8";
+    }
+
+    private boolean isRecurring(BookingDto dto) {
+        return dto != null && dto.frequency() == OfferFrequency.REGULAR;
+    }
+
+    private String formatBookingSchedule(BookingDto dto) {
+        return OfferCardComponent.formatSchedule(
+                dto.frequency(),
+                dto.startDate(),
+                dto.endDate(),
+                dto.recurringWeekdays(),
+                dto.timeSlot());
+    }
+
+    private String recurringPayableLabel(BookingDto dto) {
+        int count = dto.payableRecurringOccurrences();
+        String unit = count == 1 ? "Termin" : "Termine";
+        return count + " " + unit + " · " + formatPrice(dto.payableRecurringAmount());
     }
 
     private String formatDateRange(LocalDate start, LocalDate end) {
@@ -682,6 +887,27 @@ public class MyBookings extends Div {
     private String paymentStatusColor(PaymentStatus status) {
         if (status == PaymentStatus.RELEASED) return "#4f7f45";
         if (status == PaymentStatus.REFUNDED) return "#9a4f36";
+        return "#a5663b";
+    }
+
+    private String recurringPaymentStatusLabel(RecurringPaymentStatus status) {
+        if (status == null) return "Noch offen";
+        return switch (status) {
+            case AWAITING_FUNDS -> "Guthaben fehlt";
+            case HELD -> "In Treuhand";
+            case RELEASE_REQUESTED -> "Auszahlung angefordert";
+            case RELEASED -> "Ausgezahlt";
+            case REFUNDED -> "Erstattet";
+            case SKIPPED -> "Pausiert";
+        };
+    }
+
+    private String recurringPaymentStatusColor(RecurringPaymentStatus status) {
+        if (status == RecurringPaymentStatus.RELEASED) return "#4f7f45";
+        if (status == RecurringPaymentStatus.REFUNDED || status == RecurringPaymentStatus.AWAITING_FUNDS) {
+            return "#9a4f36";
+        }
+        if (status == RecurringPaymentStatus.SKIPPED) return MUTED;
         return "#a5663b";
     }
 

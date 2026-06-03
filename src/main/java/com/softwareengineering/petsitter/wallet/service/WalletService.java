@@ -1,9 +1,12 @@
 package com.softwareengineering.petsitter.wallet.service;
 
 import com.softwareengineering.petsitter.booking.domain.Booking;
+import com.softwareengineering.petsitter.booking.domain.BookingPause;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
+import com.softwareengineering.petsitter.booking.repository.BookingPauseRepository;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
 import com.softwareengineering.petsitter.notification.service.NotificationService;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
@@ -11,19 +14,26 @@ import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.wallet.domain.BookingPayment;
 import com.softwareengineering.petsitter.wallet.domain.PaymentStatus;
+import com.softwareengineering.petsitter.wallet.domain.RecurringBookingPayment;
+import com.softwareengineering.petsitter.wallet.domain.RecurringPaymentStatus;
 import com.softwareengineering.petsitter.wallet.domain.WalletAccount;
 import com.softwareengineering.petsitter.wallet.domain.WalletTransaction;
 import com.softwareengineering.petsitter.wallet.domain.WalletTransactionType;
 import com.softwareengineering.petsitter.wallet.dto.BookingPaymentDto;
+import com.softwareengineering.petsitter.wallet.dto.RecurringBookingPaymentSummaryDto;
 import com.softwareengineering.petsitter.wallet.dto.WalletSummaryDto;
 import com.softwareengineering.petsitter.wallet.dto.WalletTransactionDto;
 import com.softwareengineering.petsitter.wallet.repository.BookingPaymentRepository;
+import com.softwareengineering.petsitter.wallet.repository.RecurringBookingPaymentRepository;
 import com.softwareengineering.petsitter.wallet.repository.WalletAccountRepository;
 import com.softwareengineering.petsitter.wallet.repository.WalletTransactionRepository;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.TemporalAdjusters;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -45,8 +55,10 @@ public class WalletService {
 
     private final WalletAccountRepository walletAccountRepository;
     private final BookingPaymentRepository bookingPaymentRepository;
+    private final RecurringBookingPaymentRepository recurringBookingPaymentRepository;
     private final WalletTransactionRepository walletTransactionRepository;
     private final BookingRepository bookingRepository;
+    private final BookingPauseRepository bookingPauseRepository;
     private final NotificationService notificationService;
     private final Clock clock;
 
@@ -54,12 +66,15 @@ public class WalletService {
     public WalletService(
             WalletAccountRepository walletAccountRepository,
             BookingPaymentRepository bookingPaymentRepository,
+            RecurringBookingPaymentRepository recurringBookingPaymentRepository,
             WalletTransactionRepository walletTransactionRepository,
             BookingRepository bookingRepository,
+            BookingPauseRepository bookingPauseRepository,
             NotificationService notificationService
     ) {
-        this(walletAccountRepository, bookingPaymentRepository, walletTransactionRepository,
-                bookingRepository, notificationService, Clock.systemDefaultZone());
+        this(walletAccountRepository, bookingPaymentRepository, recurringBookingPaymentRepository,
+                walletTransactionRepository, bookingRepository, bookingPauseRepository, notificationService,
+                Clock.systemDefaultZone());
     }
 
     WalletService(
@@ -70,10 +85,26 @@ public class WalletService {
             NotificationService notificationService,
             Clock clock
     ) {
+        this(walletAccountRepository, bookingPaymentRepository, null, walletTransactionRepository,
+                bookingRepository, null, notificationService, clock);
+    }
+
+    WalletService(
+            WalletAccountRepository walletAccountRepository,
+            BookingPaymentRepository bookingPaymentRepository,
+            RecurringBookingPaymentRepository recurringBookingPaymentRepository,
+            WalletTransactionRepository walletTransactionRepository,
+            BookingRepository bookingRepository,
+            BookingPauseRepository bookingPauseRepository,
+            NotificationService notificationService,
+            Clock clock
+    ) {
         this.walletAccountRepository = walletAccountRepository;
         this.bookingPaymentRepository = bookingPaymentRepository;
+        this.recurringBookingPaymentRepository = recurringBookingPaymentRepository;
         this.walletTransactionRepository = walletTransactionRepository;
         this.bookingRepository = bookingRepository;
+        this.bookingPauseRepository = bookingPauseRepository;
         this.notificationService = notificationService;
         this.clock = clock;
     }
@@ -109,11 +140,27 @@ public class WalletService {
                 .stream()
                 .map(BookingPayment::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (recurringBookingPaymentRepository != null) {
+            heldOutgoing = heldOutgoing.add(recurringBookingPaymentRepository
+                    .findAllByOwnerIdAndStatusIn(userId,
+                            List.of(RecurringPaymentStatus.HELD, RecurringPaymentStatus.RELEASE_REQUESTED))
+                    .stream()
+                    .map(RecurringBookingPayment::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+        }
         BigDecimal expectedIncoming = bookingPaymentRepository
                 .findAllBySitterIdAndStatusIn(userId, HELD_STATUSES)
                 .stream()
                 .map(BookingPayment::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (recurringBookingPaymentRepository != null) {
+            expectedIncoming = expectedIncoming.add(recurringBookingPaymentRepository
+                    .findAllBySitterIdAndStatusIn(userId,
+                            List.of(RecurringPaymentStatus.HELD, RecurringPaymentStatus.RELEASE_REQUESTED))
+                    .stream()
+                    .map(RecurringBookingPayment::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add));
+        }
         List<WalletTransactionDto> transactions = walletTransactionRepository
                 .findTop50ByWalletAccountUserIdOrderByCreatedAtDesc(userId)
                 .stream()
@@ -142,7 +189,7 @@ public class WalletService {
         WalletAccount account = lockedAccount(userId);
         account.setAvailableBalance(account.getAvailableBalance().add(normalized));
         walletAccountRepository.save(account);
-        saveTransaction(account, null, WalletTransactionType.DEV_TOP_UP, normalized,
+        saveTransaction(account, (BookingPayment) null, WalletTransactionType.DEV_TOP_UP, normalized,
                 "Demo-Guthaben aufgeladen");
     }
 
@@ -179,6 +226,158 @@ public class WalletService {
         saveTransaction(ownerAccount, payment, WalletTransactionType.ESCROW_HOLD,
                 totalPrice.negate(), "Treuhandzahlung fuer " + bookingTitle(booking));
         return payment;
+    }
+
+    @Transactional
+    public void fundCurrentRecurringWeek(Booking booking) {
+        requireRecurringInfrastructure();
+        if (!isRecurringBooking(booking)) {
+            return;
+        }
+        LocalDate today = LocalDate.now(clock);
+        LocalDate periodStart = weekStart(today);
+        LocalDate periodEnd = periodStart.plusDays(6);
+        fundRecurringPeriod(booking, periodStart, periodEnd, today);
+    }
+
+    @Transactional
+    @Scheduled(cron = "${petsitter.wallet.recurring-funding-cron:0 0 3 * * MON}")
+    public int fundWeeklyRecurringBookings() {
+        requireRecurringInfrastructure();
+        LocalDate today = LocalDate.now(clock);
+        LocalDate periodStart = weekStart(today);
+        LocalDate periodEnd = periodStart.plusDays(6);
+        int processed = 0;
+        for (Booking booking : bookingRepository.findAllActiveRecurring(
+                BookingStatus.CREATED,
+                OfferFrequency.REGULAR)) {
+            fundRecurringPeriod(booking, periodStart, periodEnd, periodStart);
+            processed++;
+        }
+        return processed;
+    }
+
+    @Transactional
+    public void recalculateHeldRecurringPaymentsForPause(Booking booking, LocalDate pauseStart, LocalDate pauseEnd) {
+        requireRecurringInfrastructure();
+        if (!isRecurringBooking(booking) || pauseStart == null || pauseEnd == null) {
+            return;
+        }
+        List<RecurringBookingPayment> payments = recurringBookingPaymentRepository
+                .findAllByBookingIdAndStatusInOrderByPeriodStartAsc(
+                        booking.getId(),
+                        List.of(RecurringPaymentStatus.HELD, RecurringPaymentStatus.RELEASE_REQUESTED))
+                .stream()
+                .filter(payment -> !payment.getPeriodEnd().isBefore(pauseStart)
+                        && !payment.getPeriodStart().isAfter(pauseEnd))
+                .toList();
+        for (RecurringBookingPayment payment : payments) {
+            adjustHeldRecurringPayment(payment);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public RecurringBookingPaymentSummaryDto getRecurringPaymentSummary(UUID bookingId) {
+        if (recurringBookingPaymentRepository == null || bookingId == null) {
+            return RecurringBookingPaymentSummaryDto.empty();
+        }
+        LocalDate today = LocalDate.now(clock);
+        List<RecurringBookingPayment> payable = recurringBookingPaymentRepository
+                .findAllByBookingIdAndStatusInOrderByPeriodStartAsc(
+                        bookingId,
+                        List.of(RecurringPaymentStatus.HELD, RecurringPaymentStatus.RELEASE_REQUESTED))
+                .stream()
+                .filter(payment -> payment.getPeriodEnd().isBefore(today))
+                .toList();
+        if (payable.isEmpty()) {
+            return RecurringBookingPaymentSummaryDto.empty();
+        }
+        int occurrences = payable.stream()
+                .mapToInt(RecurringBookingPayment::getOccurrenceCount)
+                .sum();
+        BigDecimal amount = payable.stream()
+                .map(RecurringBookingPayment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        RecurringPaymentStatus status = payable.stream()
+                .anyMatch(payment -> payment.getStatus() == RecurringPaymentStatus.RELEASE_REQUESTED)
+                ? RecurringPaymentStatus.RELEASE_REQUESTED
+                : RecurringPaymentStatus.HELD;
+        LocalDateTime requestedAt = payable.stream()
+                .map(RecurringBookingPayment::getReleaseRequestedAt)
+                .filter(java.util.Objects::nonNull)
+                .min(LocalDateTime::compareTo)
+                .orElse(null);
+        return new RecurringBookingPaymentSummaryDto(
+                status,
+                occurrences,
+                amount,
+                requestedAt,
+                requestedAt == null ? null : requestedAt.plusDays(7));
+    }
+
+    @Transactional
+    public void releaseRecurringPayments(UUID bookingId, UUID currentUserId) {
+        requireRecurringInfrastructure();
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+        if (!booking.getOwner().getId().equals(currentUserId)) {
+            throw new ForbiddenOperationException("Nur der Tierhalter darf die Auszahlung freigeben.");
+        }
+        payoutRecurringPayments(payableRecurringPayments(bookingId));
+    }
+
+    @Transactional
+    public void requestRecurringRelease(UUID bookingId, UUID currentUserId) {
+        requireRecurringInfrastructure();
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+        if (!booking.getSitter().getId().equals(currentUserId)) {
+            throw new ForbiddenOperationException("Nur der Tiersitter darf die Auszahlung anfordern.");
+        }
+        List<RecurringBookingPayment> payable = payableRecurringPayments(bookingId).stream()
+                .filter(payment -> payment.getStatus() == RecurringPaymentStatus.HELD)
+                .toList();
+        if (payable.isEmpty()) {
+            throw new BusinessRuleViolationException("Es gibt keine abgeschlossenen regelmaessigen Termine zur Auszahlung.");
+        }
+        LocalDateTime requestedAt = now();
+        for (RecurringBookingPayment payment : payable) {
+            payment.setStatus(RecurringPaymentStatus.RELEASE_REQUESTED);
+            payment.setReleaseRequestedAt(requestedAt);
+            recurringBookingPaymentRepository.save(payment);
+        }
+        notificationService.createPayoutRequestedNotification(booking.getOwner(), booking);
+    }
+
+    @Transactional
+    @Scheduled(
+            initialDelayString = "${petsitter.wallet.recurring-payout-check-initial-delay-ms:3600000}",
+            fixedDelayString = "${petsitter.wallet.recurring-payout-check-interval-ms:3600000}")
+    public int releaseExpiredRecurringRequests() {
+        if (recurringBookingPaymentRepository == null) {
+            return 0;
+        }
+        LocalDateTime threshold = now().minusDays(7);
+        List<RecurringBookingPayment> expired = recurringBookingPaymentRepository
+                .findAllByStatusAndReleaseRequestedAtLessThanEqual(
+                        RecurringPaymentStatus.RELEASE_REQUESTED,
+                        threshold);
+        int released = 0;
+        for (RecurringBookingPayment payment : expired) {
+            RecurringBookingPayment locked = recurringBookingPaymentRepository
+                    .findByBookingIdAndPeriodStartForUpdate(
+                            payment.getBooking().getId(),
+                            payment.getPeriodStart())
+                    .orElse(null);
+            if (locked != null
+                    && locked.getStatus() == RecurringPaymentStatus.RELEASE_REQUESTED
+                    && locked.getReleaseRequestedAt() != null
+                    && !locked.getReleaseRequestedAt().isAfter(threshold)) {
+                payoutRecurringPayments(List.of(locked));
+                released++;
+            }
+        }
+        return released;
     }
 
     @Transactional
@@ -264,6 +463,217 @@ public class WalletService {
                 .orElse(null);
     }
 
+    private void fundRecurringPeriod(
+            Booking booking,
+            LocalDate periodStart,
+            LocalDate periodEnd,
+            LocalDate effectiveFrom
+    ) {
+        RecurringBookingPayment existing = recurringBookingPaymentRepository
+                .findByBookingIdAndPeriodStartForUpdate(booking.getId(), periodStart)
+                .orElse(null);
+        if (existing != null
+                && existing.getStatus() != RecurringPaymentStatus.AWAITING_FUNDS
+                && existing.getStatus() != RecurringPaymentStatus.SKIPPED) {
+            return;
+        }
+
+        int occurrenceCount = countBillableOccurrences(booking, periodStart, periodEnd, effectiveFrom);
+        BigDecimal price = normalizeMoney(booking.getPricePerDay());
+        BigDecimal amount = normalizeMoney(price.multiply(BigDecimal.valueOf(occurrenceCount)));
+        RecurringBookingPayment payment = existing != null
+                ? existing
+                : newRecurringPayment(booking, periodStart, periodEnd, price);
+        payment.setOccurrenceCount(occurrenceCount);
+        payment.setAmount(amount);
+
+        if (occurrenceCount == 0) {
+            payment.setStatus(RecurringPaymentStatus.SKIPPED);
+            recurringBookingPaymentRepository.save(payment);
+            return;
+        }
+
+        WalletAccount ownerAccount = lockedAccount(booking.getOwner().getId());
+        if (ownerAccount.getAvailableBalance().compareTo(amount) < 0) {
+            payment.setStatus(RecurringPaymentStatus.AWAITING_FUNDS);
+            recurringBookingPaymentRepository.save(payment);
+            notificationService.createWalletTopUpRequiredNotification(booking.getOwner().getId());
+            return;
+        }
+
+        ownerAccount.setAvailableBalance(ownerAccount.getAvailableBalance().subtract(amount));
+        walletAccountRepository.save(ownerAccount);
+        payment.setStatus(RecurringPaymentStatus.HELD);
+        payment.setHeldAt(now());
+        payment = recurringBookingPaymentRepository.save(payment);
+        saveTransaction(ownerAccount, payment, WalletTransactionType.ESCROW_HOLD,
+                amount.negate(), "Woechentliche Treuhandzahlung fuer " + bookingTitle(booking));
+    }
+
+    private RecurringBookingPayment newRecurringPayment(
+            Booking booking,
+            LocalDate periodStart,
+            LocalDate periodEnd,
+            BigDecimal price
+    ) {
+        RecurringBookingPayment payment = new RecurringBookingPayment();
+        payment.setBooking(booking);
+        payment.setOwner(booking.getOwner());
+        payment.setSitter(booking.getSitter());
+        payment.setPeriodStart(periodStart);
+        payment.setPeriodEnd(periodEnd);
+        payment.setPricePerOccurrence(price);
+        return payment;
+    }
+
+    private List<RecurringBookingPayment> payableRecurringPayments(UUID bookingId) {
+        LocalDate today = LocalDate.now(clock);
+        List<RecurringBookingPayment> payable = recurringBookingPaymentRepository
+                .findAllByBookingIdAndStatusInOrderByPeriodStartAsc(
+                        bookingId,
+                        List.of(RecurringPaymentStatus.HELD, RecurringPaymentStatus.RELEASE_REQUESTED))
+                .stream()
+                .filter(payment -> payment.getPeriodEnd().isBefore(today))
+                .toList();
+        if (payable.isEmpty()) {
+            throw new BusinessRuleViolationException("Es gibt keine abgeschlossenen regelmaessigen Termine zur Auszahlung.");
+        }
+        return payable;
+    }
+
+    private void payoutRecurringPayments(List<RecurringBookingPayment> payments) {
+        if (payments == null || payments.isEmpty()) {
+            throw new BusinessRuleViolationException("Es gibt keine abgeschlossenen regelmaessigen Termine zur Auszahlung.");
+        }
+        for (RecurringBookingPayment payment : payments) {
+            if (payment.getStatus() != RecurringPaymentStatus.HELD
+                    && payment.getStatus() != RecurringPaymentStatus.RELEASE_REQUESTED) {
+                throw new BusinessRuleViolationException("Die Zahlung kann in diesem Status nicht ausgezahlt werden.");
+            }
+        }
+
+        RecurringBookingPayment first = payments.getFirst();
+        WalletAccount sitterAccount = lockedAccount(first.getSitter().getId());
+        BigDecimal totalAmount = payments.stream()
+                .map(RecurringBookingPayment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        sitterAccount.setAvailableBalance(sitterAccount.getAvailableBalance().add(totalAmount));
+        walletAccountRepository.save(sitterAccount);
+
+        for (RecurringBookingPayment payment : payments) {
+            payment.setStatus(RecurringPaymentStatus.RELEASED);
+            payment.setReleasedAt(now());
+            recurringBookingPaymentRepository.save(payment);
+            saveTransaction(sitterAccount, payment, WalletTransactionType.PAYOUT,
+                    payment.getAmount(), "Auszahlung regelmaessiger Termine fuer " + bookingTitle(payment.getBooking()));
+        }
+        notificationService.createPayoutReleasedNotification(first.getSitter(), first.getBooking());
+    }
+
+    private void adjustHeldRecurringPayment(RecurringBookingPayment payment) {
+        int updatedCount = countBillableOccurrences(
+                payment.getBooking(),
+                payment.getPeriodStart(),
+                payment.getPeriodEnd(),
+                payment.getPeriodStart());
+        BigDecimal updatedAmount = normalizeMoney(
+                payment.getPricePerOccurrence().multiply(BigDecimal.valueOf(updatedCount)));
+        BigDecimal refund = payment.getAmount().subtract(updatedAmount);
+        if (refund.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        WalletAccount ownerAccount = lockedAccount(payment.getOwner().getId());
+        ownerAccount.setAvailableBalance(ownerAccount.getAvailableBalance().add(refund));
+        walletAccountRepository.save(ownerAccount);
+
+        payment.setOccurrenceCount(updatedCount);
+        payment.setAmount(updatedAmount);
+        if (updatedCount == 0) {
+            payment.setStatus(RecurringPaymentStatus.REFUNDED);
+            payment.setRefundedAt(now());
+        }
+        recurringBookingPaymentRepository.save(payment);
+        saveTransaction(ownerAccount, payment, WalletTransactionType.REFUND,
+                refund, "Erstattung pausierter Termine fuer " + bookingTitle(payment.getBooking()));
+    }
+
+    private int countBillableOccurrences(
+            Booking booking,
+            LocalDate periodStart,
+            LocalDate periodEnd,
+            LocalDate effectiveFrom
+    ) {
+        if (!isRecurringBooking(booking) || booking.getPricePerDay() == null) {
+            return 0;
+        }
+        LocalDate from = maxDate(periodStart, effectiveFrom);
+        LocalDate end = booking.getRecurringEndedOn() == null
+                ? periodEnd
+                : minDate(periodEnd, booking.getRecurringEndedOn());
+        if (from == null || end == null || end.isBefore(from)) {
+            return 0;
+        }
+        Set<DayOfWeek> weekdays = booking.getRecurringWeekdays();
+        if (weekdays.isEmpty()) {
+            return 0;
+        }
+        List<BookingPause> pauses = bookingPauseRepository == null
+                ? List.of()
+                : bookingPauseRepository.findAllOverlapping(booking.getId(), periodStart, periodEnd);
+
+        int count = 0;
+        LocalDate cursor = from;
+        while (!cursor.isAfter(end)) {
+            if (weekdays.contains(cursor.getDayOfWeek()) && !isPaused(cursor, pauses)) {
+                count++;
+            }
+            cursor = cursor.plusDays(1);
+        }
+        return count;
+    }
+
+    private boolean isPaused(LocalDate date, Collection<BookingPause> pauses) {
+        return pauses != null && pauses.stream()
+                .anyMatch(pause -> !date.isBefore(pause.getStartDate()) && !date.isAfter(pause.getEndDate()));
+    }
+
+    private boolean isRecurringBooking(Booking booking) {
+        return booking != null
+                && booking.getFrequency() == OfferFrequency.REGULAR
+                && booking.getStatus() == BookingStatus.CREATED;
+    }
+
+    private LocalDate weekStart(LocalDate date) {
+        return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+    }
+
+    private LocalDate maxDate(LocalDate first, LocalDate second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        return first.isAfter(second) ? first : second;
+    }
+
+    private LocalDate minDate(LocalDate first, LocalDate second) {
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        return first.isBefore(second) ? first : second;
+    }
+
+    private void requireRecurringInfrastructure() {
+        if (recurringBookingPaymentRepository == null || bookingPauseRepository == null) {
+            throw new BusinessRuleViolationException("Regelmaessige Zahlungen sind nicht konfiguriert.");
+        }
+    }
+
     public void notifyTopUpRequired(UUID ownerId) {
         notificationService.createWalletTopUpRequiredNotification(ownerId);
     }
@@ -313,9 +723,31 @@ public class WalletService {
             BigDecimal amount,
             String description
     ) {
+        saveTransaction(account, payment, null, type, amount, description);
+    }
+
+    private void saveTransaction(
+            WalletAccount account,
+            RecurringBookingPayment payment,
+            WalletTransactionType type,
+            BigDecimal amount,
+            String description
+    ) {
+        saveTransaction(account, null, payment, type, amount, description);
+    }
+
+    private void saveTransaction(
+            WalletAccount account,
+            BookingPayment payment,
+            RecurringBookingPayment recurringPayment,
+            WalletTransactionType type,
+            BigDecimal amount,
+            String description
+    ) {
         WalletTransaction transaction = new WalletTransaction();
         transaction.setWalletAccount(account);
         transaction.setBookingPayment(payment);
+        transaction.setRecurringBookingPayment(recurringPayment);
         transaction.setType(type);
         transaction.setAmount(normalizeMoney(amount));
         transaction.setBalanceAfter(normalizeMoney(account.getAvailableBalance()));

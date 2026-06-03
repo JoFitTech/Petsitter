@@ -176,6 +176,19 @@ public class FilterPopUp extends Dialog {
         }
         timeSlotSection.add(timeSlotLabel, timeSlotBox);
 
+        updateRecurringFilterVisibility(
+                dienstleistungBox,
+                weekdaySection,
+                timeSlotSection,
+                weekdayRow,
+                timeSlotBox);
+        dienstleistungBox.addValueChangeListener(event -> updateRecurringFilterVisibility(
+                dienstleistungBox,
+                weekdaySection,
+                timeSlotSection,
+                weekdayRow,
+                timeSlotBox));
+
         // ── Section 6: Bewertung (min.) ───────────────────────────────────
         Div bewertungSection = buildCard();
 
@@ -301,6 +314,23 @@ public class FilterPopUp extends Dialog {
             case SATURDAY -> "Sa";
             case SUNDAY -> "So";
         };
+    }
+
+    private void updateRecurringFilterVisibility(
+            ComboBox<OfferFrequency> frequencyBox,
+            Div weekdaySection,
+            Div timeSlotSection,
+            HorizontalLayout weekdayRow,
+            ComboBox<OfferTimeSlot> timeSlotBox
+    ) {
+        boolean regular = frequencyBox.getValue() == OfferFrequency.REGULAR;
+        weekdaySection.setVisible(regular);
+        timeSlotSection.setVisible(regular);
+        if (!regular) {
+            selectedWeekdays.clear();
+            refreshWeekdayRow(weekdayRow);
+            timeSlotBox.clear();
+        }
     }
 
     /**

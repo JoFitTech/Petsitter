@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.pet.service.PetService;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
@@ -47,6 +48,9 @@ public class UserService {
     private final PasswordPolicyService passwordPolicyService;
     private final WalletService walletService;
     private final ImageAssetService imageAssetService;
+
+    @Autowired(required = false)
+    private UserReviewService userReviewService;
 
     @Autowired
     public UserService(
@@ -353,6 +357,10 @@ public class UserService {
     }
 
     private PublicUserProfileDto toPublicProfileDto(User user) {
+        // Load rating data if service is available
+        var ratingSummary = userReviewService != null ? userReviewService.getUserRatingSummary(user.getId()) : null;
+        var recentReviews = userReviewService != null ? userReviewService.getRecentReviews(user.getId(), 3) : null;
+
         return new PublicUserProfileDto(
                 user.getId(),
                 defaultIfBlank(user.getDisplayName(), user.getFirstName()),
@@ -363,7 +371,9 @@ public class UserService {
                 user.getCity(),
                 petService.getPetSummaryForOwner(user.getId()),
                 user.getAccountStatus(),
-                profileImage(user)
+                profileImage(user),
+                ratingSummary,
+                recentReviews
         );
     }
 

@@ -254,10 +254,13 @@ class ChatViewIntegrationTest {
                 new Class<?>[]{ChatMessageDto.class},
                 requestCard);
 
-        assertThat(containsTextPart(bubble, "Angebot: Urlaubsbetreuung")).isTrue();
-        assertThat(containsTextPart(bubble, "Zeitraum: 10")).isTrue();
+        assertThat(containsText(bubble, "Angebot")).isTrue();
+        assertThat(containsText(bubble, "Urlaubsbetreuung")).isTrue();
+        assertThat(containsText(bubble, "Zeitraum")).isTrue();
+        assertThat(containsTextPart(bubble, "10")).isTrue();
         assertThat(containsTextPart(bubble, "15. Juli")).isTrue();
-        assertThat(containsTextPart(bubble, "Tiere: Balu, Minka")).isTrue();
+        assertThat(containsText(bubble, "Tiere")).isTrue();
+        assertThat(containsText(bubble, "Balu, Minka")).isTrue();
         assertThat(containsText(bubble, "Annehmen")).isTrue();
         assertThat(containsText(bubble, "Ablehnen")).isTrue();
     }
@@ -301,8 +304,8 @@ class ChatViewIntegrationTest {
                 new Class<?>[]{ChatMessageDto.class},
                 requestCard);
 
-        assertThat(containsTextPart(bubble, "Angebot: Alter gespeicherter Titel")).isTrue();
-        assertThat(containsTextPart(bubble, "Status: Unbekannt")).isTrue();
+        assertThat(containsText(bubble, "Alter gespeicherter Titel")).isTrue();
+        assertThat(containsText(bubble, "Unbekannter Status")).isTrue();
     }
 
     private boolean containsText(Component root, String text) {

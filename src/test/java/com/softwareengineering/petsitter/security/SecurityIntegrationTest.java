@@ -2,9 +2,15 @@ package com.softwareengineering.petsitter.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.softwareengineering.petsitter.user.repository.UserRepository;
+import java.lang.reflect.Proxy;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -94,5 +100,35 @@ class SecurityIntegrationTest {
         MockHttpServletResponse response = new MockHttpServletResponse();
         springSecurityFilterChain.doFilter(request, response, new MockFilterChain());
         return response;
+    }
+
+    @TestConfiguration
+    static class UserRepositoryTestConfig {
+
+        @Bean
+        @Primary
+        UserRepository userRepositoryTestDouble() {
+            return (UserRepository) Proxy.newProxyInstance(
+                    UserRepository.class.getClassLoader(),
+                    new Class<?>[] {UserRepository.class},
+                    (proxy, method, args) -> {
+                        if ("findByEmail".equals(method.getName())) {
+                            return Optional.empty();
+                        }
+                        if ("equals".equals(method.getName())) {
+                            return proxy == args[0];
+                        }
+                        if ("hashCode".equals(method.getName())) {
+                            return System.identityHashCode(proxy);
+                        }
+                        if ("toString".equals(method.getName())) {
+                            return "SecurityIntegrationUserRepositoryTestDouble";
+                        }
+                        throw new UnsupportedOperationException(
+                                "Unsupported repository method in security integration test: "
+                                        + method.getName());
+                    }
+            );
+        }
     }
 }

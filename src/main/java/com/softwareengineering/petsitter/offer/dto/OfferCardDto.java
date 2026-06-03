@@ -36,7 +36,9 @@ public record OfferCardDto(
         UUID creatorUserId,
         String creatorDisplayName,
         List<OfferCoverTileDto> coverTiles,
-        ImageRefDto creatorProfileImage
+        ImageRefDto creatorProfileImage,
+        Double creatorAverageRating,
+        Long creatorRatingCount
 ) {
     public OfferCardDto {
         pets = pets == null ? List.of() : List.copyOf(pets);
@@ -69,7 +71,7 @@ public record OfferCardDto(
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
                 frequency, careType, petName, petSpecies, petBreed, petTags, pets, postalCode, city, distanceKm,
-                favorited, offerType, creatorUserId, creatorDisplayName, List.of(), null);
+                favorited, offerType, creatorUserId, creatorDisplayName, List.of(), null, null, null);
     }
 
     public OfferCardDto(
@@ -95,7 +97,7 @@ public record OfferCardDto(
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
                 frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), postalCode, city, distanceKm,
-                favorited, offerType, null, null, List.of(), null);
+                favorited, offerType, null, null, List.of(), null, null, null);
     }
 
     public OfferCardDto(
@@ -120,7 +122,7 @@ public record OfferCardDto(
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
                 frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), postalCode, city, distanceKm,
-                favorited, null, null, null, List.of(), null);
+                favorited, null, null, null, List.of(), null, null, null);
     }
 
     public OfferCardDto(
@@ -144,7 +146,7 @@ public record OfferCardDto(
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
                 frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), postalCode, city, distanceKm,
-                false, null, null, null, List.of(), null);
+                false, null, null, null, List.of(), null, null, null);
     }
 
     public OfferCardDto(
@@ -165,12 +167,13 @@ public record OfferCardDto(
     ) {
         this(id, title, startDate, endDate, price, animalType, creatorVerified, description,
                 frequency, careType, petName, petSpecies, petBreed, petTags, List.of(), null, null, null, false,
-                null, null, null, List.of(), null);
+                null, null, null, List.of(), null, null, null);
     }
 
     public OfferCardDto withFavorited(boolean favorited) {
         return new OfferCardDto(id, title, startDate, endDate, price, animalType, creatorVerified, description,
                 frequency, careType, petName, petSpecies, petBreed, petTags, pets, postalCode, city, distanceKm,
-                favorited, offerType, creatorUserId, creatorDisplayName, coverTiles, creatorProfileImage);
+                favorited, offerType, creatorUserId, creatorDisplayName, coverTiles, creatorProfileImage,
+                creatorAverageRating, creatorRatingCount);
     }
 }

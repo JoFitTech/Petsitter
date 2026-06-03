@@ -660,7 +660,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     }
 
     private void openOfferDialog(OfferCardDto dto) {
-        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()), 4,
+        new PetsitterDetailPopUp(dto, OfferCardComponent.formatDistance(dto.distanceKm()),
+                OfferCardComponent.starsForAverage(dto.creatorAverageRating()),
                 offerService, requestService, chatService, authenticatedUser, userService, bookingService).open();
     }
 

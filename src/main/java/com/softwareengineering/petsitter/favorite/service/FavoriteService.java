@@ -15,6 +15,8 @@ import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
@@ -40,6 +42,8 @@ public class FavoriteService {
     private final AuthenticatedUser authenticatedUser;
     private final Clock clock;
     private final OfferImagePresentationMapper imagePresentationMapper;
+    @Autowired(required = false)
+    private UserReviewService userReviewService;
 
     @Autowired
     public FavoriteService(
@@ -182,6 +186,7 @@ public class FavoriteService {
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
         List<Pet> pets = offerPets(offer);
         User createUser = offer.getCreateUser();
+        UserRatingSummary ratingSummary = ratingSummary(createUser);
         return new OfferCardDto(
                 offer.getOfferId(),
                 titleOrFallback(offer),
@@ -206,8 +211,17 @@ public class FavoriteService {
                 createUser != null ? createUser.getId() : null,
                 creatorDisplayName(createUser),
                 coverTiles,
-                creatorProfileImage
+                creatorProfileImage,
+                ratingSummary != null ? ratingSummary.averageRating() : null,
+                ratingSummary != null ? ratingSummary.ratingCount() : null
         );
+    }
+
+    private UserRatingSummary ratingSummary(User createUser) {
+        if (createUser == null || userReviewService == null) {
+            return null;
+        }
+        return userReviewService.getUserRatingSummary(createUser.getId());
     }
 
     private List<OfferCardDto> toCardDtos(List<Offer> offers) {

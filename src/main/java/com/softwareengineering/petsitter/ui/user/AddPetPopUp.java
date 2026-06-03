@@ -72,21 +72,18 @@ public class AddPetPopUp extends Dialog {
                 .set("font-family", "'Inter', sans-serif")
                 .set("gap", "16px");
 
-        Button closeBtn = new Button(new com.vaadin.flow.component.icon.Icon(com.vaadin.flow.component.icon.VaadinIcon.CLOSE_SMALL));
+        Button closeBtn = new Button(new com.vaadin.flow.component.icon.Icon(com.vaadin.flow.component.icon.VaadinIcon.CLOSE));
         closeBtn.addThemeVariants(com.vaadin.flow.component.button.ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("position", "absolute")
-                .set("top", "16px")
-                .set("right", "16px")
-                .set("width", "28px")
-                .set("height", "28px")
-                .set("min-width", "28px")
-                .set("border-radius", "50%")
+                .set("top", "24px")
+                .set("right", "24px")
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
                 .set("background", "transparent")
                 .set("border", "none")
-                .set("color", "#9a8070")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer")
                 .set("padding", "0")
                 .set("z-index", "10");
         closeBtn.addClickListener(e -> this.close());
@@ -247,7 +244,7 @@ public class AddPetPopUp extends Dialog {
                 .set("color", "white")
                 .set("border-radius", "24px")
                 .set("padding", "0 28px")
-                .set("height", "44px")
+                .set("height", "48px")
                 .set("font-size", "15px")
                 .set("font-weight", "700")
                 .set("cursor", "pointer")

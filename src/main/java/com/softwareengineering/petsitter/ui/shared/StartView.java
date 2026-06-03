@@ -138,7 +138,8 @@ public class StartView extends VerticalLayout {
         VerticalLayout copy = new VerticalLayout();
         copy.setPadding(false);
         copy.setSpacing(false);
-        copy.setWidth("720px");
+        copy.setWidth("100%");
+        copy.getStyle().set("max-width", "720px");
 
         H1 title = new H1("Finde liebevolle Tierhalter in deiner Nähe");
         title.getStyle()

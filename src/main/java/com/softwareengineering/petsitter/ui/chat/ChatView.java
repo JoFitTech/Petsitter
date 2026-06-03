@@ -33,6 +33,7 @@ import com.vaadin.flow.component.Key;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -93,6 +94,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private Span chatTitle;
     private Span typingIndicator;
     private Div chatHeaderAvatar;
+    private HorizontalLayout chatContainer;
 
     // State
     private String activeConversationId;
@@ -159,7 +161,8 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         add(subtitle);
 
         // Main container card with fixed height
-        HorizontalLayout chatContainer = new HorizontalLayout();
+        this.chatContainer = new HorizontalLayout();
+        chatContainer.addClassName("chat-main-container");
         chatContainer.setWidthFull();
         chatContainer.setHeight("600px");
         chatContainer.setPadding(false);
@@ -206,6 +209,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private Component buildConversationList() {
         VerticalLayout layout = new VerticalLayout();
+        layout.addClassName("chat-conversation-sidebar");
         layout.setWidth("280px");
         layout.setHeightFull();
         layout.setPadding(true);
@@ -231,6 +235,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private Component buildChatWindow() {
         VerticalLayout layout = new VerticalLayout();
+        layout.addClassName("chat-window-pane");
         layout.setWidthFull();
         layout.setHeightFull();
         layout.setPadding(false);
@@ -283,13 +288,37 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             .set("gap", "14px")
             .set("flex-shrink", "0");
 
+        Button backBtn = new Button(new Icon(VaadinIcon.ARROW_LEFT));
+        backBtn.addClassName("chat-back-button");
+        backBtn.getStyle()
+                .set("background", "transparent")
+                .set("color", DARK)
+                .set("border", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("margin-right", "8px")
+                .set("min-width", "unset")
+                .set("width", "36px")
+                .set("height", "36px");
+        backBtn.addClickListener(e -> {
+            activeConversationId = null;
+            if (chatContainer != null) {
+                chatContainer.removeClassName("conversation-selected");
+            }
+            messageList.removeAll();
+            messageList.add(new Paragraph("Wähle ein Gespräch aus der Liste, um den Chat zu starten."));
+            chatTitle.setText("Wähle ein Gespräch");
+            chatHeaderAvatar.getStyle().set("display", "none");
+            refreshConversationList();
+        });
+
         // Avatar in header
         chatHeaderAvatar = createChatAvatar(38);
         chatHeaderAvatar.getStyle()
             .set("display", "none")
             .set("cursor", "pointer");
         chatHeaderAvatar.addClickListener(event -> openProfilePopUp());
-        header.add(chatHeaderAvatar);
+        header.add(backBtn, chatHeaderAvatar);
 
         VerticalLayout titleWrap = new VerticalLayout();
         titleWrap.setPadding(false);
@@ -540,6 +569,9 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private void selectConversation(String conversationId) {
         this.activeConversationId = conversationId;
+        if (chatContainer != null) {
+            chatContainer.addClassName("conversation-selected");
+        }
         ChatConversationDto selected = conversationsById.get(conversationId);
         if (selected != null) {
             boolean currentUserIsOwner = currentUserId.equals(selected.ownerId());
@@ -1026,38 +1058,104 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private void openPaymentConfirmation(UUID requestId, BookingAcceptancePreview preview) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Buchung bestätigen");
         dialog.setWidth("460px");
+        dialog.setMaxWidth("95vw");
+        dialog.getElement().getThemeList().add("no-padding");
 
         VerticalLayout content = new VerticalLayout();
-        content.setPadding(false);
+        content.setPadding(true);
         content.setSpacing(false);
-        content.getStyle().set("gap", "12px");
+        content.getStyle()
+                .set("background-color", "#f3eada")
+                .set("padding", "32px 36px")
+                .set("border-radius", "16px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("gap", "12px")
+                .set("position", "relative");
 
+        // ── Header: title + X close button ───────────────────────────────
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        header.getStyle().set("margin-bottom", "4px");
+
+        H2 dialogTitle = new H2("Buchung bestätigen");
+        dialogTitle.getStyle()
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("margin", "0")
+                .set("color", DARK);
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("min-width", "0")
+                .set("width", "36px")
+                .set("height", "36px");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        header.add(dialogTitle, closeBtn);
+
+        // ── Explanation text ──────────────────────────────────────────────
         Paragraph explanation = new Paragraph(
                 "Der Gesamtpreis wird jetzt von deinem Guthaben abgezogen und bis zur Auszahlung sicher in Treuhand gehalten.");
-        explanation.getStyle().set("margin", "0").set("font-size", "14px").set("color", "#7a6050");
+        explanation.getStyle()
+                .set("margin", "0")
+                .set("font-size", "14px")
+                .set("color", "#7a6050")
+                .set("line-height", "1.5");
 
-        content.add(
-                explanation,
+        content.add(header, explanation,
                 paymentLine("Preis pro Tag", preview.pricePerDay()),
                 paymentLine("Gesamtpreis", preview.totalPrice()),
                 paymentLine("Dein Guthaben", preview.availableBalance()));
 
         if (!preview.sufficientBalance()) {
             Paragraph warning = new Paragraph("Dein Guthaben reicht für diese Buchung noch nicht aus.");
-            warning.getStyle().set("margin", "0").set("color", "#9a4f36").set("font-weight", "700");
+            warning.getStyle()
+                    .set("margin", "4px 0 0 0")
+                    .set("color", "#9a4f36")
+                    .set("font-weight", "700")
+                    .set("font-size", "14px");
+
             Button walletButton = new Button("Guthaben aufladen", event -> {
                 dialog.close();
                 UI.getCurrent().navigate("profile", QueryParameters.of("tab", "wallet"));
             });
-            walletButton.getStyle().set("background", DARK).set("color", "white").set("border-radius", "22px");
+            walletButton.setWidthFull();
+            walletButton.getStyle()
+                    .set("background-color", "#5c3d1e")
+                    .set("color", "white")
+                    .set("border-radius", "24px")
+                    .set("height", "48px")
+                    .set("font-size", "15px")
+                    .set("font-weight", "700")
+                    .set("cursor", "pointer")
+                    .set("border", "none")
+                    .set("margin-top", "4px");
             content.add(warning, walletButton);
         } else {
             Button confirm = new Button("Mit Guthaben bezahlen und annehmen",
                     event -> acceptRequest(requestId, dialog));
             confirm.setWidthFull();
-            confirm.getStyle().set("background", DARK).set("color", "white").set("border-radius", "22px");
+            confirm.getStyle()
+                    .set("background-color", "#5c3d1e")
+                    .set("color", "white")
+                    .set("border-radius", "24px")
+                    .set("height", "48px")
+                    .set("font-size", "15px")
+                    .set("font-weight", "700")
+                    .set("cursor", "pointer")
+                    .set("border", "none")
+                    .set("margin-top", "4px");
             content.add(confirm);
         }
 
@@ -1071,9 +1169,14 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         row.setWidthFull();
         row.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         Span key = new Span(label);
-        key.getStyle().set("color", "#7a6050");
+        key.getStyle()
+                .set("color", "#7a6050")
+                .set("font-size", "15px");
         Span value = new Span(amount.setScale(2) + " EUR");
-        value.getStyle().set("font-weight", "800").set("color", DARK);
+        value.getStyle()
+                .set("font-weight", "800")
+                .set("color", DARK)
+                .set("font-size", "15px");
         row.add(key, value);
         return row;
     }

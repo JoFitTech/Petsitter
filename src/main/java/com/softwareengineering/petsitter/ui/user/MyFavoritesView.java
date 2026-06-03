@@ -13,11 +13,14 @@ import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.Paragraph;
+import com.vaadin.flow.component.icon.Icon;
+import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
@@ -181,52 +184,71 @@ public class MyFavoritesView extends Div {
 
     private void openRemoveFavoriteDialog(OfferCardDto dto) {
         Dialog dialog = new Dialog();
+        dialog.setWidth("400px");
+        dialog.setMaxWidth("95vw");
+        dialog.setCloseOnEsc(true);
         dialog.setCloseOnOutsideClick(true);
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "Inter, Arial, sans-serif");
 
-        VerticalLayout content = new VerticalLayout();
-        content.setPadding(false);
-        content.setSpacing(false);
-        content.getStyle()
-                .set("padding", "28px")
-                .set("gap", "18px")
-                .set("font-family", "Inter, Arial, sans-serif")
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "32px 48px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("box-sizing", "border-box");
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "24px")
+                .set("right", "24px")
                 .set("color", DARK)
-                .set("width", "360px")
-                .set("max-width", "calc(100vw - 48px)");
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> dialog.close());
 
         H3 title = new H3("Favorit entfernen?");
         title.getStyle()
                 .set("margin", "0")
-                .set("font-size", "20px")
-                .set("font-weight", "800");
+                .set("font-size", "21px")
+                .set("font-weight", "800")
+                .set("line-height", "1.2")
+                .set("padding-right", "32px")
+                .set("color", DARK);
 
         Paragraph text = new Paragraph("Dieses Offer wird aus deiner Favoritenliste entfernt.");
         text.getStyle()
                 .set("margin", "0")
                 .set("font-size", "14px")
-                .set("color", "#7b7069");
-
-        HorizontalLayout actions = new HorizontalLayout();
-        actions.setWidthFull();
-        actions.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        actions.getStyle().set("gap", "10px");
-
-        Button cancel = new Button("Abbrechen");
-        cancel.getStyle()
-                .set("background", "#f3eadf")
-                .set("color", DARK)
-                .set("border-radius", "22px")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
-        cancel.addClickListener(event -> dialog.close());
+                .set("line-height", "1.5")
+                .set("color", "#9a8070");
 
         Button confirm = new Button("Entfernen");
+        confirm.setWidthFull();
         confirm.getStyle()
-                .set("background", "#774f35")
+                .set("height", "48px")
+                .set("border-radius", "24px")
+                .set("background", "#5c3d1e")
                 .set("color", "white")
-                .set("border-radius", "22px")
-                .set("box-shadow", "none")
-                .set("cursor", "pointer");
+                .set("font-weight", "700")
+                .set("font-size", "15px")
+                .set("box-shadow", "0 2px 8px rgba(74,52,40,0.1)")
+                .set("cursor", "pointer")
+                .set("border", "none")
+                .set("font-family", "Inter, Arial, sans-serif");
         confirm.addClickListener(event -> {
             try {
                 favoriteService.removeCurrentUserFavorite(dto.id());
@@ -238,9 +260,8 @@ public class MyFavoritesView extends Div {
             }
         });
 
-        actions.add(cancel, confirm);
-        content.add(title, text, actions);
-        dialog.add(content);
+        wrapper.add(closeBtn, title, text, confirm);
+        dialog.add(wrapper);
         dialog.open();
     }
 }

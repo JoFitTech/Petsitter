@@ -226,7 +226,29 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         if (!location.isBlank()) {
-            content.add(readOnlyTextField("Standort", location));
+            Div locationSection = new Div();
+            locationSection.addClassName("offer-location-field");
+            locationSection.getStyle()
+                    .set("width", "100%")
+                    .set("box-sizing", "border-box")
+                    .set("font-family", "Inter, Arial, sans-serif")
+                    .set("color", "#7b5236");
+
+            Span locationLabel = new Span("Standort");
+            locationLabel.getStyle()
+                    .set("display", "block")
+                    .set("color", DARK)
+                    .set("font-size", "14px");
+
+            Span locationText = new Span(location);
+            locationText.getStyle()
+                    .set("display", "block")
+                    .set("font-size", "14px")
+                    .set("line-height", "1.4")
+                    .set("margin-top", "6px");
+
+            locationSection.add(locationLabel, locationText);
+            content.add(locationSection);
         }
 
         // ── Beschreibung ──────────────────────────────────────────────────
@@ -504,32 +526,90 @@ public class PetsitterDetailPopUp extends Dialog {
 
     private void openInsufficientBalanceDialog(BookingAcceptancePreview preview) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Buchung bestätigen");
         dialog.setWidth("460px");
+        dialog.setMaxWidth("95vw");
+        dialog.getElement().getThemeList().add("no-padding");
 
         VerticalLayout content = new VerticalLayout();
-        content.setPadding(false);
+        content.setPadding(true);
         content.setSpacing(false);
-        content.getStyle().set("gap", "12px");
+        content.getStyle()
+                .set("background-color", "#f3eada")
+                .set("padding", "32px 36px")
+                .set("border-radius", "16px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("gap", "12px")
+                .set("position", "relative");
 
+        // ── Header: title + X close button ───────────────────────────────
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        header.getStyle().set("margin-bottom", "4px");
+
+        H2 dialogTitle = new H2("Buchung bestätigen");
+        dialogTitle.getStyle()
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("margin", "0")
+                .set("color", DARK);
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("min-width", "0")
+                .set("width", "36px")
+                .set("height", "36px");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        header.add(dialogTitle, closeBtn);
+
+        // ── Explanation text ──────────────────────────────────────────────
         Paragraph explanation = new Paragraph(
                 "Der Gesamtpreis wird von deinem Guthaben abgezogen und bis zur Auszahlung sicher in Treuhand gehalten.");
-        explanation.getStyle().set("margin", "0").set("font-size", "14px").set("color", "#7a6050");
+        explanation.getStyle()
+                .set("margin", "0")
+                .set("font-size", "14px")
+                .set("color", "#7a6050")
+                .set("line-height", "1.5");
 
-        content.add(
-                explanation,
+        content.add(header, explanation,
                 paymentLine("Preis pro Tag", preview.pricePerDay()),
                 paymentLine("Gesamtpreis", preview.totalPrice()),
                 paymentLine("Dein Guthaben", preview.availableBalance()));
 
+        // ── Warning + wallet button ───────────────────────────────────────
         Paragraph warning = new Paragraph("Dein Guthaben reicht für diese Buchung noch nicht aus.");
-        warning.getStyle().set("margin", "0").set("color", "#9a4f36").set("font-weight", "700");
+        warning.getStyle()
+                .set("margin", "4px 0 0 0")
+                .set("color", "#9a4f36")
+                .set("font-weight", "700")
+                .set("font-size", "14px");
+
         Button walletButton = new Button("Guthaben aufladen", event -> {
             dialog.close();
             close();
             UI.getCurrent().navigate("profile", QueryParameters.of("tab", "wallet"));
         });
-        walletButton.getStyle().set("background", DARK).set("color", "white").set("border-radius", "22px");
+        walletButton.setWidthFull();
+        walletButton.getStyle()
+                .set("background", "#5c3d1e")
+                .set("color", "white")
+                .set("border-radius", "24px")
+                .set("height", "48px")
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("cursor", "pointer")
+                .set("border", "none")
+                .set("margin-top", "4px");
         content.add(warning, walletButton);
         content.add(new ExternalPaymentMethods());
 

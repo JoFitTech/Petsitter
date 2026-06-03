@@ -1,0 +1,210 @@
+/* Ensure the AppLayout navbar container is stacked above the main page content */
+vaadin-app-layout::part(navbar) {
+    z-index: 100000 !important;
+}
+
+/* Ensure our inner header layout is stacked above the main page content */
+.main-header-layout {
+    z-index: 100000 !important;
+}
+
+/* Media query breakpoints for header actions */
+@media (max-width: 1100px) {
+    .desktop-center-group {
+        display: none !important;
+    }
+    .desktop-header-actions {
+        display: none !important;
+    }
+    .mobile-header-actions {
+        display: flex !important;
+    }
+}
+
+@media (min-width: 1101px) {
+    .desktop-center-group {
+        display: flex !important;
+    }
+    .desktop-header-actions {
+        display: flex !important;
+    }
+    .mobile-header-actions {
+        display: none !important;
+    }
+}
+
+/* Dropdown styling */
+.burger-dropdown-menu {
+    animation: fadeInSlide 0.2s ease forwards;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Hover effects for mobile menu dropdown items */
+.menu-item-row {
+    transition: background-color 0.2s ease, transform 0.15s ease !important;
+}
+
+.menu-item-row:hover {
+    background-color: #efe4d3 !important;
+    transform: translateY(-1px);
+}
+
+.menu-item-row:active {
+    transform: translateY(0);
+}
+
+/* Profile Page Responsiveness */
+.profile-main-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+@media (max-width: 960px) {
+    .profile-main-layout {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .desktop-sidebar {
+        display: none !important;
+    }
+    .mobile-sidebar {
+        display: flex !important;
+    }
+}
+
+@media (min-width: 961px) {
+    .profile-main-layout {
+        flex-direction: row;
+    }
+    .desktop-sidebar {
+        display: flex !important;
+    }
+    .mobile-sidebar {
+        display: none !important;
+    }
+}
+
+/* Responsive adjustments for Profile Cards padding */
+@media (max-width: 600px) {
+    .profile-card-panel {
+        padding: 20px !important;
+    }
+    .personal-details-card {
+        padding: 20px !important;
+    }
+}
+
+/* MyPetView Card Responsiveness */
+.pet-card {
+    box-sizing: border-box !important;
+}
+
+.pet-card-infos-box {
+    box-sizing: border-box !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+.pet-edit-btn-text {
+    margin-left: 8px !important;
+}
+
+@media (max-width: 600px) {
+    .pet-card {
+        padding: 16px !important;
+    }
+    
+    .pet-card-top-row {
+        flex-wrap: wrap !important;
+        gap: 12px !important;
+    }
+    
+    .pet-card-btn-row {
+        margin-left: auto !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .pet-edit-btn-text {
+        display: none !important;
+    }
+    
+    .pet-edit-btn {
+        min-width: 40px !important;
+        width: 40px !important;
+        padding: 0 !important;
+        border-radius: 50% !important;
+    }
+}
+
+/* Personal Details Responsiveness */
+.personal-data-value-layout span {
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+}
+
+@media (max-width: 600px) {
+    .personal-data-row {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+    }
+    
+    .personal-data-label {
+        width: 100% !important;
+        font-size: 16px !important;
+        margin-bottom: 2px !important;
+    }
+    
+    .personal-data-value-layout {
+        width: 100% !important;
+    }
+    
+    .personal-data-value-layout span {
+        font-size: 16px !important;
+    }
+}
+
+/* Chat View Responsiveness */
+@media (min-width: 769px) {
+    .chat-back-button {
+        display: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .chat-back-button {
+        display: inline-flex !important;
+    }
+    
+    .chat-conversation-sidebar {
+        width: 100% !important;
+        display: flex !important;
+    }
+    
+    .chat-window-pane {
+        width: 100% !important;
+        display: none !important;
+    }
+    
+    .chat-main-container.conversation-selected .chat-conversation-sidebar {
+        display: none !important;
+    }
+    
+    .chat-main-container.conversation-selected .chat-window-pane {
+        display: flex !important;
+    }
+}
+
+

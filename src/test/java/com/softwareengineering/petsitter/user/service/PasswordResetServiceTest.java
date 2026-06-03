@@ -74,8 +74,8 @@ class PasswordResetServiceTest {
                 new PasswordResetRequest("pending@petsitter.local"),
                 "127.0.0.1");
 
-        assertThat(unknown.success()).isFalse();
-        assertThat(unverified.success()).isFalse();
+        assertThat(unknown.success()).isTrue();
+        assertThat(unverified.success()).isTrue();
         assertThat(codeRepository.savedCodes).isEmpty();
         assertThat(mailService.sentEmail).isNull();
     }

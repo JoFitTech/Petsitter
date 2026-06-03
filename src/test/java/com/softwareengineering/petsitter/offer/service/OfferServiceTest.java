@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
@@ -40,6 +41,7 @@ import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.math.BigDecimal;
 import java.lang.reflect.Proxy;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -238,19 +240,20 @@ class OfferServiceTest {
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.of(sitter)
         );
-        LocalDate startDate = LocalDate.now();
-        LocalDate endDate = startDate.plusDays(2);
         CreateOfferRequest request = new CreateOfferRequest(
                 OfferType.SITTER_OFFER,
-                startDate,
-                endDate,
                 null,
+                null,
+                null,
+                List.of(),
                 BigDecimal.valueOf(30),
                 "Ich betreue Hunde",
                 OfferFrequency.REGULAR,
                 OfferCareType.PET_AND_HOUSE_SITTING,
                 OfferAnimalType.DOG,
-                "Erfahrung mit großen Hunden"
+                "Erfahrung mit großen Hunden",
+                Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY),
+                OfferTimeSlot.AFTERNOON
         );
 
         CreateOfferResult result = offerService.createOffer(request);
@@ -263,6 +266,10 @@ class OfferServiceTest {
         assertThat(savedOffer.getPets()).isEmpty();
         assertThat(savedOffer.getTitle()).isEqualTo("Ich betreue Hunde");
         assertThat(savedOffer.getFrequency()).isEqualTo(OfferFrequency.REGULAR);
+        assertThat(savedOffer.getStartDate()).isNull();
+        assertThat(savedOffer.getEndDate()).isNull();
+        assertThat(savedOffer.getRecurringWeekdays()).containsExactlyInAnyOrder(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY);
+        assertThat(savedOffer.getTimeSlot()).isEqualTo(OfferTimeSlot.AFTERNOON);
         assertThat(savedOffer.getCareType()).isEqualTo(OfferCareType.PET_AND_HOUSE_SITTING);
         assertThat(savedOffer.getAnimalType()).isEqualTo(OfferAnimalType.DOG);
         assertThat(savedOffer.getDescription()).isEqualTo("Erfahrung mit großen Hunden");
@@ -554,11 +561,13 @@ class OfferServiceTest {
         Pet selectedPet = pet(UUID.randomUUID(), currentUser, "Mila", PetSpecies.CAT);
         Pet secondPet = pet(UUID.randomUUID(), currentUser, "Balu", PetSpecies.DOG);
         Offer offer = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.OPEN,
-                LocalDate.now(), LocalDate.now().plusDays(2), BigDecimal.valueOf(42));
+                null, null, BigDecimal.valueOf(42));
         offer.setCreateUser(currentUser);
         offer.setPets(List.of(selectedPet, secondPet));
         offer.setTitle("Katzenbetreuung");
         offer.setFrequency(OfferFrequency.REGULAR);
+        offer.setRecurringWeekdays(Set.of(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY));
+        offer.setTimeSlot(OfferTimeSlot.MORNING);
         offer.setCareType(OfferCareType.PET_AND_HOUSE_SITTING);
         offer.setDescription("Bitte viel spielen");
         OfferService offerService = serviceWithEditableOffer(offer, Optional.of(currentUser));
@@ -573,6 +582,8 @@ class OfferServiceTest {
         assertThat(result.price()).isEqualByComparingTo("42");
         assertThat(result.title()).isEqualTo("Katzenbetreuung");
         assertThat(result.frequency()).isEqualTo(OfferFrequency.REGULAR);
+        assertThat(result.recurringWeekdays()).containsExactlyInAnyOrder(DayOfWeek.TUESDAY, DayOfWeek.THURSDAY);
+        assertThat(result.timeSlot()).isEqualTo(OfferTimeSlot.MORNING);
         assertThat(result.careType()).isEqualTo(OfferCareType.PET_AND_HOUSE_SITTING);
         assertThat(result.animalType()).isNull();
         assertThat(result.description()).isEqualTo("Bitte viel spielen");
@@ -1237,6 +1248,10 @@ class OfferServiceTest {
         LocalDate from = LocalDate.of(2026, 6, 15);
         LocalDate to = LocalDate.of(2026, 6, 18);
         UUID matchingOfferId = UUID.randomUUID();
+        Offer outsideDateOffer = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
+                LocalDate.of(2026, 6, 19), LocalDate.of(2026, 6, 20), BigDecimal.valueOf(80),
+                OfferFrequency.REGULAR, OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG);
+        outsideDateOffer.setRecurringWeekdays(Set.of(DayOfWeek.FRIDAY));
         OfferService offerService = serviceWithAuthenticatedUser(
                 offerRepositoryReturningOffers(List.of(
                         offer(matchingOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN,
@@ -1254,9 +1269,7 @@ class OfferServiceTest {
                         offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
                                 from, to, BigDecimal.valueOf(130), OfferFrequency.REGULAR,
                                 OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG),
-                        offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
-                                LocalDate.of(2026, 6, 19), LocalDate.of(2026, 6, 20), BigDecimal.valueOf(80),
-                                OfferFrequency.REGULAR, OfferCareType.PET_AND_HOUSE_SITTING, OfferAnimalType.DOG)
+                        outsideDateOffer
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.empty()
@@ -1704,6 +1717,12 @@ class OfferServiceTest {
         offer.setFrequency(frequency);
         offer.setCareType(careType);
         offer.setAnimalType(animalType);
+        if (frequency == OfferFrequency.REGULAR) {
+            offer.setStartDate(null);
+            offer.setEndDate(null);
+            offer.setRecurringWeekdays(Set.of(DayOfWeek.MONDAY, DayOfWeek.WEDNESDAY));
+            offer.setTimeSlot(OfferTimeSlot.AFTERNOON);
+        }
         return offer;
     }
 

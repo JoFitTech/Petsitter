@@ -1,29 +1,27 @@
 package com.softwareengineering.petsitter.chat.service;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.times;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.softwareengineering.petsitter.booking.service.BookingCompletedEvent;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
+import org.slf4j.LoggerFactory;
 
 /**
  * Unit-Tests für ChatBookingListener Review-Reminder-Funktionalität.
  */
 class ChatBookingListenerReviewReminderTest {
 
-    private ChatService chatService;
+    private TestChatService chatService;
     private ChatBookingListener listener;
 
     @BeforeEach
     void setUp() {
-        chatService = mock(ChatService.class);
+        chatService = new TestChatService();
         listener = new ChatBookingListener(chatService);
     }
 
@@ -32,8 +30,7 @@ class ChatBookingListenerReviewReminderTest {
         // Given
         UUID bookingId = UUID.randomUUID();
         String conversationId = "conv-123";
-        when(chatService.getConversationIdForBooking(bookingId))
-            .thenReturn(Optional.of(conversationId));
+        chatService.conversationId = Optional.of(conversationId);
 
         BookingCompletedEvent event = new BookingCompletedEvent(this, bookingId);
 
@@ -41,16 +38,18 @@ class ChatBookingListenerReviewReminderTest {
         listener.onBookingCompleted(event);
 
         // Then
-        verify(chatService, times(1)).getConversationIdForBooking(bookingId);
-        verify(chatService, times(1)).postReviewReminderCard(conversationId, bookingId);
+        assertEquals(1, chatService.getConversationCalls);
+        assertEquals(1, chatService.postReminderCalls);
+        assertEquals(bookingId, chatService.requestedBookingId);
+        assertEquals(conversationId, chatService.postedConversationId);
+        assertEquals(bookingId, chatService.postedBookingId);
     }
 
     @Test
     void onBookingCompleted_skipsPostingReminder_whenNoConversationExists() {
         // Given
         UUID bookingId = UUID.randomUUID();
-        when(chatService.getConversationIdForBooking(bookingId))
-            .thenReturn(Optional.empty());
+        chatService.conversationId = Optional.empty();
 
         BookingCompletedEvent event = new BookingCompletedEvent(this, bookingId);
 
@@ -58,8 +57,9 @@ class ChatBookingListenerReviewReminderTest {
         listener.onBookingCompleted(event);
 
         // Then
-        verify(chatService, times(1)).getConversationIdForBooking(bookingId);
-        verify(chatService, times(0)).postReviewReminderCard(any(), any());
+        assertEquals(1, chatService.getConversationCalls);
+        assertEquals(0, chatService.postReminderCalls);
+        assertEquals(bookingId, chatService.requestedBookingId);
     }
 
     @Test
@@ -67,23 +67,63 @@ class ChatBookingListenerReviewReminderTest {
         // Given
         UUID bookingId = UUID.randomUUID();
         String conversationId = "conv-123";
-        when(chatService.getConversationIdForBooking(bookingId))
-            .thenReturn(Optional.of(conversationId));
-
-        // Mocking a void method to throw an exception
-        Mockito.doThrow(new RuntimeException("Chat service error"))
-            .when(chatService).postReviewReminderCard(conversationId, bookingId);
+        chatService.conversationId = Optional.of(conversationId);
+        chatService.postReminderException = new RuntimeException("Chat service error");
 
         BookingCompletedEvent event = new BookingCompletedEvent(this, bookingId);
 
         // When - should not throw
-        listener.onBookingCompleted(event);
+        runWithListenerLoggingDisabled(() -> listener.onBookingCompleted(event));
 
         // Then - both calls were attempted
-        verify(chatService, times(1)).getConversationIdForBooking(bookingId);
-        verify(chatService, times(1)).postReviewReminderCard(conversationId, bookingId);
+        assertEquals(1, chatService.getConversationCalls);
+        assertEquals(1, chatService.postReminderCalls);
+        assertEquals(bookingId, chatService.requestedBookingId);
+        assertEquals(conversationId, chatService.postedConversationId);
+        assertEquals(bookingId, chatService.postedBookingId);
+    }
+
+    private void runWithListenerLoggingDisabled(Runnable action) {
+        Logger logger = (Logger) LoggerFactory.getLogger(ChatBookingListener.class);
+        Level previousLevel = logger.getLevel();
+        try {
+            logger.setLevel(Level.OFF);
+            action.run();
+        } finally {
+            logger.setLevel(previousLevel);
+        }
+    }
+
+    private static final class TestChatService extends ChatService {
+
+        private Optional<String> conversationId = Optional.empty();
+        private RuntimeException postReminderException;
+        private int getConversationCalls;
+        private int postReminderCalls;
+        private UUID requestedBookingId;
+        private String postedConversationId;
+        private UUID postedBookingId;
+
+        private TestChatService() {
+            super(null, null, null, null, null, null, null, null, null);
+        }
+
+        @Override
+        public Optional<String> getConversationIdForBooking(UUID bookingId) {
+            getConversationCalls++;
+            requestedBookingId = bookingId;
+            return conversationId;
+        }
+
+        @Override
+        public void postReviewReminderCard(String conversationId, UUID bookingId) {
+            postReminderCalls++;
+            postedConversationId = conversationId;
+            postedBookingId = bookingId;
+            if (postReminderException != null) {
+                throw postReminderException;
+            }
+        }
     }
 }
-
-
 

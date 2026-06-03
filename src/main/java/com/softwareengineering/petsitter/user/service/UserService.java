@@ -176,6 +176,12 @@ public class UserService {
         return UserAuthResult.success("Registrierungs-Code wurde versendet.", toProfileDto(user));
     }
 
+    public boolean isEmailVerified(String email) {
+        return userRepository.findByEmail(normalizeEmail(email))
+                .filter(u -> u.getAccountStatus() == AccountStatus.VERIFIED)
+                .isPresent();
+    }
+
     @Transactional
     public UserAuthResult completeRegistration(UserRegistrationConfirmationRequest request) {
         String email = normalizeEmail(request.email());

@@ -197,6 +197,8 @@ public class FavoriteService {
                 verified,
                 offer.getDescription(),
                 offer.getFrequency(),
+                offer.getRecurringWeekdays(),
+                offer.getTimeSlot(),
                 offer.getCareType(),
                 petNames(pets),
                 petSpeciesLabels(pets),

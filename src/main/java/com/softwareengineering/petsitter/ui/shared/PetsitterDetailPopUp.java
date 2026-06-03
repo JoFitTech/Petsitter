@@ -69,7 +69,8 @@ public class PetsitterDetailPopUp extends Dialog {
         this.getElement().getThemeList().add("no-padding");
 
         String topColor = OfferCardComponent.colorFor(dto.animalType());
-        String date     = OfferCardComponent.formatDateRange(dto.startDate(), dto.endDate());
+        String date     = OfferCardComponent.formatSchedule(dto.frequency(), dto.startDate(), dto.endDate(),
+                dto.recurringWeekdays(), dto.timeSlot());
         String price    = OfferCardComponent.formatPrice(dto.price());
         String location = OfferCardComponent.formatLocation(dto.postalCode(), dto.city());
 

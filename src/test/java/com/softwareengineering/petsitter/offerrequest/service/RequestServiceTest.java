@@ -3,12 +3,18 @@ package com.softwareengineering.petsitter.offerrequest.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
+import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.DuplicateRequestException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
@@ -17,9 +23,12 @@ import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.user.repository.UserRepository;
 import java.lang.reflect.Proxy;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -162,6 +171,69 @@ class RequestServiceTest {
     }
 
     @Test
+    void findChatCardDetails_mapsOwnerOfferWithPetsAndSchedule() {
+        UUID requestId = UUID.randomUUID();
+        UUID offerId = UUID.randomUUID();
+        UUID creatorId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        Offer offer = offer(offerId, creatorId, OfferStatus.OPEN);
+        offer.setTitle("Urlaubsbetreuung");
+        offer.setOfferType(OfferType.OWNER_OFFER);
+        offer.setFrequency(OfferFrequency.ONE_TIME);
+        offer.setStartDate(LocalDate.of(2026, 7, 10));
+        offer.setEndDate(LocalDate.of(2026, 7, 15));
+        offer.setPets(List.of(pet("Balu"), pet("Minka")));
+
+        OfferRequest request = request(requestId, offer, requesterId, RequestStatus.PENDING);
+        RequestService requestService = new RequestService(
+                offerRequestRepository(new AtomicReference<>(), Optional.empty(), List.of(request), new ArrayList<>()),
+                offerRepository(Optional.empty()),
+                userRepository(Optional.empty())
+        );
+
+        OfferRequestChatCardDto details = requestService.findChatCardDetails(requestId);
+
+        assertThat(details.requestId()).isEqualTo(requestId);
+        assertThat(details.status()).isEqualTo(RequestStatus.PENDING);
+        assertThat(details.offerTitle()).isEqualTo("Urlaubsbetreuung");
+        assertThat(details.offerType()).isEqualTo(OfferType.OWNER_OFFER);
+        assertThat(details.startDate()).isEqualTo(LocalDate.of(2026, 7, 10));
+        assertThat(details.endDate()).isEqualTo(LocalDate.of(2026, 7, 15));
+        assertThat(details.frequency()).isEqualTo(OfferFrequency.ONE_TIME);
+        assertThat(details.petSummary()).isEqualTo("Balu, Minka");
+    }
+
+    @Test
+    void findChatCardDetails_mapsSitterOfferAnimalTypeFallback() {
+        UUID requestId = UUID.randomUUID();
+        UUID offerId = UUID.randomUUID();
+        UUID creatorId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        Offer offer = offer(offerId, creatorId, OfferStatus.OPEN);
+        offer.setTitle("Hundebetreuung am Wochenende");
+        offer.setOfferType(OfferType.SITTER_OFFER);
+        offer.setFrequency(OfferFrequency.REGULAR);
+        offer.setRecurringWeekdays(Set.of(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY));
+        offer.setTimeSlot(OfferTimeSlot.MORNING);
+        offer.setAnimalType(OfferAnimalType.DOG);
+
+        OfferRequest request = request(requestId, offer, requesterId, RequestStatus.PENDING);
+        RequestService requestService = new RequestService(
+                offerRequestRepository(new AtomicReference<>(), Optional.empty(), List.of(request), new ArrayList<>()),
+                offerRepository(Optional.empty()),
+                userRepository(Optional.empty())
+        );
+
+        OfferRequestChatCardDto details = requestService.findChatCardDetails(requestId);
+
+        assertThat(details.offerType()).isEqualTo(OfferType.SITTER_OFFER);
+        assertThat(details.petSummary()).isNull();
+        assertThat(details.animalType()).isEqualTo(OfferAnimalType.DOG);
+        assertThat(details.recurringWeekdays()).containsExactlyInAnyOrder(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY);
+        assertThat(details.timeSlot()).isEqualTo(OfferTimeSlot.MORNING);
+    }
+
+    @Test
     void createRequest_throwsNotFoundWhenOfferMissing() {
         UUID offerId = UUID.randomUUID();
         UUID requesterId = UUID.randomUUID();
@@ -174,6 +246,22 @@ class RequestServiceTest {
 
         assertThatThrownBy(() -> requestService.createRequest(offerId, requesterId, "test"))
                 .isInstanceOf(NotFoundException.class);
+    }
+
+    private OfferRequest request(UUID requestId, Offer offer, UUID requesterId, RequestStatus status) {
+        OfferRequest request = new OfferRequest();
+        request.setId(requestId);
+        request.setOffer(offer);
+        request.setRequester(user(requesterId));
+        request.setStatus(status);
+        return request;
+    }
+
+    private Pet pet(String name) {
+        Pet pet = new Pet();
+        pet.setId(UUID.randomUUID());
+        pet.setName(name);
+        return pet;
     }
 
     private Offer offer(UUID offerId, UUID creatorId, OfferStatus status) {
@@ -277,4 +365,3 @@ class RequestServiceTest {
         );
     }
 }
-

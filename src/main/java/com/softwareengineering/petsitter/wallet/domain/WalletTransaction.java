@@ -32,6 +32,10 @@ public class WalletTransaction {
     @JoinColumn(name = "booking_payment_id")
     private BookingPayment bookingPayment;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_booking_payment_id")
+    private RecurringBookingPayment recurringBookingPayment;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private WalletTransactionType type;
@@ -66,6 +70,14 @@ public class WalletTransaction {
 
     public void setBookingPayment(BookingPayment bookingPayment) {
         this.bookingPayment = bookingPayment;
+    }
+
+    public RecurringBookingPayment getRecurringBookingPayment() {
+        return recurringBookingPayment;
+    }
+
+    public void setRecurringBookingPayment(RecurringBookingPayment recurringBookingPayment) {
+        this.recurringBookingPayment = recurringBookingPayment;
     }
 
     public WalletTransactionType getType() {

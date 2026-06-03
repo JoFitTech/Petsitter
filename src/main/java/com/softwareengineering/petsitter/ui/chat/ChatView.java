@@ -10,13 +10,14 @@ import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.image.dto.ImageRefDto;
-import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
@@ -766,58 +767,64 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         Div card = new Div();
         card.getStyle()
-            .set("border-radius", "12px")
-            .set("padding", "14px 16px")
-            .set("max-width", "60%")
-            .set("width", "fit-content");
+            .set("border-radius", "20px")
+            .set("padding", "0")
+            .set("max-width", "380px")
+            .set("width", "min(380px, 100%)")
+            .set("background", "#ffffff")
+            .set("box-shadow", "0 10px 26px rgba(74, 52, 40, 0.12)")
+            .set("overflow", "hidden");
 
-        String offerTitle = msg.offerTitle() != null ? msg.offerTitle() : "Angebot";
         String requestId = msg.requestId();
-
-        // Determine current request status
-        RequestStatus status = null;
-        if (requestId != null) {
-            try {
-                status = requestService.findById(UUID.fromString(requestId)).getStatus();
-            } catch (Exception e) {
-                log.warn("Could not load request status for card: {}", e.getMessage());
-            }
-        }
+        UUID reqId = parseRequestId(requestId);
+        OfferRequestChatCardDto details = loadRequestCardDetails(reqId);
+        RequestStatus status = details != null ? details.status() : null;
+        String offerTitle = details != null && !isBlank(details.offerTitle())
+                ? details.offerTitle()
+                : fallbackOfferTitle(msg.offerTitle());
 
         // Styling and content based on status
         if (status == RequestStatus.ACCEPTED) {
             boolean cancelled = false;
-            if (requestId != null) {
+            if (reqId != null) {
                 try {
-                    cancelled = bookingService.isBookingCancelledForRequest(UUID.fromString(requestId));
+                    cancelled = bookingService.isBookingCancelledForRequest(reqId);
                 } catch (Exception e) {
                     log.warn("Could not check booking cancellation: {}", e.getMessage());
                 }
             }
             if (cancelled) {
-                card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
-                card.add(makeCardTitle("🚫 Buchung storniert", "#7a6050"));
-                card.add(makeCardOfferSpan(offerTitle));
+                addRequestOfferCard(card, requestCardStyle("Buchung storniert", "#d0c8c0", "#f5f0ea", "#7a6050"),
+                        offerTitle, details);
             } else {
-                card.getStyle().set("background", "#edf7ed").set("border", "1px solid #b8ddb8");
-                card.add(makeCardTitle("✅ Anfrage angenommen", "#2e7d32"));
-                card.add(makeCardOfferSpan(offerTitle));
+                addRequestOfferCard(card, requestCardStyle("Anfrage angenommen", "#b8ddb8", "#edf7ed", "#2e7d32"),
+                        offerTitle, details);
             }
         } else if (status == RequestStatus.DENIED) {
-            card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
-            card.add(makeCardTitle("❌ Anfrage abgelehnt", "#7a6050"));
-            card.add(makeCardOfferSpan(offerTitle));
+            addRequestOfferCard(card, requestCardStyle("Anfrage abgelehnt", "#d0c8c0", "#f5f0ea", "#7a6050"),
+                    offerTitle, details);
         } else if (status == RequestStatus.PENDING && isRecipient) {
-            card.getStyle().set("background", "#fff8ec").set("border", "1px solid #f0d8a8");
-            card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
-            card.add(makeCardOfferSpan(offerTitle));
+            addRequestOfferCard(card, requestCardStyle("Neue Anfrage", "#f0d8a8", "#fff3d6", "#4a3428"),
+                    offerTitle, details);
 
             HorizontalLayout buttons = new HorizontalLayout();
-            buttons.getStyle().set("margin-top", "10px");
+            buttons.setWidthFull();
+            buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+            buttons.getStyle()
+                .set("margin", "0")
+                .set("padding", "0 16px 16px 16px")
+                .set("gap", "8px")
+                .set("box-sizing", "border-box");
 
-            UUID reqId = UUID.fromString(requestId);
             Button acceptBtn = new Button("Annehmen", e -> handleAcceptRequest(reqId));
-            acceptBtn.getStyle().set("background", "#774f35").set("color", "white").set("border-radius", "8px");
+            acceptBtn.getStyle()
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("border-radius", "20px")
+                .set("height", "36px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("padding", "0 18px");
 
             Button denyBtn = new Button("Ablehnen", e -> {
                 try {
@@ -828,18 +835,23 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                     Notification.show("Fehler: " + ex.getMessage());
                 }
             });
-            denyBtn.getStyle().set("border-radius", "8px");
+            denyBtn.getStyle()
+                .set("background", "#f7efe4")
+                .set("color", "#4a3428")
+                .set("border", "1px solid #e7d8c4")
+                .set("border-radius", "20px")
+                .set("height", "36px")
+                .set("font-weight", "700")
+                .set("box-shadow", "none")
+                .set("padding", "0 18px");
 
             buttons.add(acceptBtn, denyBtn);
             card.add(buttons);
         } else {
             // PENDING as sender, or unknown status
-            card.getStyle().set("background", "#f0f4ff").set("border", "1px solid #c5d0e8");
-            card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
-            card.add(makeCardOfferSpan(offerTitle));
-            Span statusSpan = new Span(status == RequestStatus.PENDING ? "Status: Ausstehend" : "Status: Unbekannt");
-            statusSpan.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic").set("display", "block").set("margin-top", "4px");
-            card.add(statusSpan);
+            String statusText = status == RequestStatus.PENDING ? "Ausstehend" : "Unbekannter Status";
+            addRequestOfferCard(card, requestCardStyle(statusText, "#c5d0e8", "#eef3ff", "#445b8a"),
+                    offerTitle, details);
         }
 
         HorizontalLayout row = new HorizontalLayout();
@@ -858,18 +870,178 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         return row;
     }
 
-    private Span makeCardTitle(String text, String color) {
-        Span s = new Span(text);
-        s.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", color)
-            .set("display", "block").set("margin-bottom", "4px");
-        return s;
+    private OfferRequestChatCardDto loadRequestCardDetails(UUID requestId) {
+        if (requestId == null) {
+            return null;
+        }
+        try {
+            return requestService.findChatCardDetails(requestId);
+        } catch (Exception e) {
+            log.warn("Could not load request card details: {}", e.getMessage());
+            return null;
+        }
     }
 
-    private Span makeCardOfferSpan(String offerTitle) {
-        Span s = new Span("Angebot: " + offerTitle);
-        s.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block");
-        return s;
+    private UUID parseRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(requestId);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request id on chat card: {}", requestId);
+            return null;
+        }
     }
+
+    private void addRequestOfferCard(
+            Div card,
+            RequestCardStyle style,
+            String offerTitle,
+            OfferRequestChatCardDto details
+    ) {
+        card.getStyle().set("border", "1px solid " + style.borderColor());
+
+        Div header = new Div();
+        header.getStyle()
+            .set("height", "54px")
+            .set("position", "relative")
+            .set("background", offerAccentColor(details));
+
+        Span badge = new Span(style.label());
+        badge.getStyle()
+            .set("position", "absolute")
+            .set("top", "12px")
+            .set("right", "12px")
+            .set("background", style.badgeBackground())
+            .set("color", style.badgeColor())
+            .set("font-size", "12px")
+            .set("font-weight", "800")
+            .set("border-radius", "14px")
+            .set("padding", "5px 11px")
+            .set("box-shadow", "0 4px 12px rgba(74, 52, 40, 0.10)");
+        header.add(badge);
+
+        Div body = new Div();
+        body.getStyle()
+            .set("padding", "14px 16px 16px 16px")
+            .set("box-sizing", "border-box");
+
+        Span eyebrow = new Span("Angebot");
+        eyebrow.getStyle()
+            .set("display", "block")
+            .set("font-size", "11px")
+            .set("font-weight", "800")
+            .set("color", "#9e8c7b")
+            .set("text-transform", "uppercase")
+            .set("letter-spacing", "0");
+
+        H3 title = new H3(offerTitle);
+        title.getStyle()
+            .set("font-size", "16px")
+            .set("font-weight", "800")
+            .set("line-height", "1.2")
+            .set("margin", "2px 0 0 0")
+            .set("color", DARK);
+
+        body.add(eyebrow, title);
+
+        if (details != null) {
+            HorizontalLayout facts = new HorizontalLayout();
+            facts.setWidthFull();
+            facts.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+            facts.setAlignItems(FlexComponent.Alignment.START);
+            facts.getStyle()
+                .set("gap", "10px")
+                .set("margin-top", "14px")
+                .set("flex-wrap", "wrap");
+
+            facts.add(
+                requestFactItem("Zeitraum", OfferCardComponent.formatSchedule(
+                    details.frequency(),
+                    details.startDate(),
+                    details.endDate(),
+                    details.recurringWeekdays(),
+                    details.timeSlot())),
+                requestFactItem(petFactLabel(details), petFactValue(details))
+            );
+            body.add(facts);
+        }
+
+        card.add(header, body);
+    }
+
+    private VerticalLayout requestFactItem(String label, String value) {
+        VerticalLayout box = new VerticalLayout();
+        box.setPadding(false);
+        box.setSpacing(false);
+        box.getStyle()
+            .set("min-width", "128px")
+            .set("flex", "1 1 128px");
+
+        Span labelSpan = new Span(label);
+        labelSpan.getStyle()
+            .set("font-size", "11px")
+            .set("color", "#9e8c7b");
+
+        Span valueSpan = new Span(isBlank(value) ? "–" : value);
+        valueSpan.getStyle()
+            .set("font-size", "14px")
+            .set("font-weight", "800")
+            .set("line-height", "1.25")
+            .set("color", DARK);
+
+        box.add(labelSpan, valueSpan);
+        return box;
+    }
+
+    private String petFactLabel(OfferRequestChatCardDto details) {
+        return isBlank(details.petSummary()) && details.animalType() != null ? "Tierart" : "Tiere";
+    }
+
+    private String petFactValue(OfferRequestChatCardDto details) {
+        if (!isBlank(details.petSummary())) {
+            return details.petSummary();
+        }
+        if (details.animalType() != null) {
+            return details.animalType().label();
+        }
+        return "Nicht angegeben";
+    }
+
+    private String offerAccentColor(OfferRequestChatCardDto details) {
+        if (details == null || details.animalType() == null) {
+            return "#f1dfb9";
+        }
+        return switch (details.animalType()) {
+            case DOG -> "#dec18d";
+            case CAT -> "#f1b47a";
+            case BIRD -> "#93b8c9";
+            case SMALL_ANIMAL -> "#94b883";
+            case REPTILE -> "#a8c89b";
+            case FISH -> "#bad6df";
+            case OTHER -> "#f1dfb9";
+        };
+    }
+
+    private RequestCardStyle requestCardStyle(String label, String borderColor, String badgeBackground, String badgeColor) {
+        return new RequestCardStyle(label, borderColor, badgeBackground, badgeColor);
+    }
+
+    private String fallbackOfferTitle(String offerTitle) {
+        return isBlank(offerTitle) ? "Angebot" : offerTitle;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private record RequestCardStyle(
+        String label,
+        String borderColor,
+        String badgeBackground,
+        String badgeColor
+    ) { }
 
     private void handleAcceptRequest(UUID requestId) {
         try {

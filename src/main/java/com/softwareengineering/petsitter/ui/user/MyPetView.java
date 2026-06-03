@@ -13,6 +13,7 @@ import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.PendingImageChange;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.icon.Icon;
@@ -112,14 +113,17 @@ public class MyPetView extends Div {
 
     private Div buildPetCard(PetDto pet) {
         Div card = new Div();
+        card.addClassName("pet-card");
         card.getStyle()
                 .set("border", "1px solid #ead5ae")
                 .set("border-radius", "16px")
                 .set("padding", "28px")
                 .set("margin-bottom", "20px")
-                .set("background", "#ffffff");
+                .set("background", "#ffffff")
+                .set("box-sizing", "border-box");
 
         HorizontalLayout topRow = new HorizontalLayout();
+        topRow.addClassName("pet-card-top-row");
         topRow.setWidthFull();
         topRow.setAlignItems(FlexComponent.Alignment.START);
         topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
@@ -157,10 +161,15 @@ public class MyPetView extends Div {
         leftSection.add(avatar, info);
 
         HorizontalLayout btnRow = new HorizontalLayout();
+        btnRow.addClassName("pet-card-btn-row");
         btnRow.setSpacing(false);
         btnRow.getStyle().set("gap", "10px");
 
-        Button editBtn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
+        Button editBtn = new Button(new Icon(VaadinIcon.PENCIL));
+        Span editBtnText = new Span("Bearbeiten");
+        editBtnText.addClassName("pet-edit-btn-text");
+        editBtn.getElement().appendChild(editBtnText.getElement());
+        editBtn.addClassName("pet-edit-btn");
         editBtn.getStyle()
                 .set("border-radius", "24px")
                 .set("background", "#774f35")
@@ -198,6 +207,7 @@ public class MyPetView extends Div {
                 "10px");
 
         Div infosBox = new Div();
+        infosBox.addClassName("pet-card-infos-box");
         infosBox.getStyle()
                 .set("border", "1px solid #ead5ae")
                 .set("border-radius", "12px")
@@ -207,7 +217,8 @@ public class MyPetView extends Div {
                 .set("background", "#fbf8f1")
                 .set("font-size", "14px")
                 .set("color", "#7a6050")
-                .set("line-height", "1.6");
+                .set("line-height", "1.6")
+                .set("box-sizing", "border-box");
 
         if (pet.notes() != null && !pet.notes().isBlank()) {
             infosBox.add(new Span(pet.notes()));
@@ -266,32 +277,67 @@ public class MyPetView extends Div {
 
     private void openDeleteDecisionDialog(PetDto pet, PetDeletionImpact impact) {
         Dialog confirm = new Dialog();
-        confirm.setWidth(impact.hasAffectedOffers() ? "560px" : "360px");
-        confirm.setCloseOnEsc(true);
+        confirm.setWidth(impact.hasAffectedOffers() ? "560px" : "400px");
+        confirm.setMaxWidth("95vw");
+        confirm.setCloseOnEsc(false);
         confirm.setCloseOnOutsideClick(false);
+        confirm.getElement().getThemeList().add("no-padding");
+        confirm.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "'Inter', sans-serif");
 
-        VerticalLayout layout = new VerticalLayout();
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle().set("gap", "20px");
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("padding", "32px 48px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "20px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("position", "relative")
+                .set("box-sizing", "border-box");
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "24px")
+                .set("right", "24px")
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> confirm.close());
 
         H3 title = new H3("Tier löschen?");
-        title.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("padding-right", "32px")
+                .set("color", DARK);
 
         Paragraph msg = new Paragraph(deleteDialogMessage(pet, impact));
-        msg.getStyle().set("margin", "0").set("font-size", "15px").set("color", DARK).set("font-weight", "600")
+        msg.getStyle()
+                .set("margin", "0")
+                .set("font-size", "15px")
+                .set("color", DARK)
+                .set("font-weight", "600")
                 .set("line-height", "1.5");
 
         Map<UUID, RadioButtonGroup<PetDeletionAction>> decisionGroups = new LinkedHashMap<>();
         if (impact.hasAffectedOffers()) {
-            layout.add(title, msg, buildAffectedOffersSection(impact, decisionGroups));
+            wrapper.add(closeBtn, title, msg, buildAffectedOffersSection(impact, decisionGroups));
         } else {
-            layout.add(title, msg);
+            wrapper.add(closeBtn, title, msg);
         }
 
         Button yes = styledSaveBtn("Löschen");
-        Button no = styledCancelBtn("Abbrechen");
-        no.addClickListener(e -> confirm.close());
         yes.addClickListener(e -> {
             try {
                 petService.deleteCurrentUserPet(pet.id(), selectedDecisions(impact, decisionGroups));
@@ -303,33 +349,69 @@ public class MyPetView extends Div {
             }
         });
 
-        HorizontalLayout btns = new HorizontalLayout(no, yes);
+        HorizontalLayout btns = new HorizontalLayout(yes);
         btns.setWidthFull();
         btns.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        btns.getStyle().set("gap", "10px");
 
-        layout.add(btns);
-        confirm.add(layout);
+        wrapper.add(btns);
+        confirm.add(wrapper);
         confirm.open();
     }
 
     private void openBlockedDeleteDialog(PetDto pet, PetDeletionImpact impact) {
         Dialog dialog = new Dialog();
         dialog.setWidth("560px");
-        dialog.setCloseOnEsc(true);
+        dialog.setMaxWidth("95vw");
+        dialog.setCloseOnEsc(false);
         dialog.setCloseOnOutsideClick(false);
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "'Inter', sans-serif");
 
-        VerticalLayout layout = new VerticalLayout();
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle().set("gap", "18px");
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("padding", "32px 48px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "18px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("position", "relative")
+                .set("box-sizing", "border-box");
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "24px")
+                .set("right", "24px")
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> dialog.close());
 
         H3 title = new H3("Tier kann noch nicht gelöscht werden");
-        title.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("padding-right", "32px")
+                .set("color", DARK);
 
         Paragraph msg = new Paragraph(pet.name()
                 + " ist noch in gebuchten oder stornierten Angeboten hinterlegt. Diese Fälle werden später über die Buchungslogik bereinigt, damit beteiligte Sitter informiert werden können.");
-        msg.getStyle().set("margin", "0").set("font-size", "15px").set("color", DARK).set("line-height", "1.5");
+        msg.getStyle()
+                .set("margin", "0")
+                .set("font-size", "15px")
+                .set("color", DARK)
+                .set("line-height", "1.5");
 
         Button ok = styledSaveBtn("Verstanden");
         ok.addClickListener(event -> dialog.close());
@@ -337,8 +419,8 @@ public class MyPetView extends Div {
         btns.setWidthFull();
         btns.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
 
-        layout.add(title, msg, buildBlockingOffersSection(impact), btns);
-        dialog.add(layout);
+        wrapper.add(closeBtn, title, msg, buildBlockingOffersSection(impact), btns);
+        dialog.add(wrapper);
         dialog.open();
     }
 
@@ -494,12 +576,15 @@ public class MyPetView extends Div {
         Button btn = new Button(label);
         btn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", "#774f35")
+                .set("background", "#5c3d1e")
                 .set("color", "white")
                 .set("box-shadow", "none")
-                .set("font-weight", "600")
-                .set("height", "38px")
-                .set("cursor", "pointer");
+                .set("font-weight", "700")
+                .set("font-size", "15px")
+                .set("height", "48px")
+                .set("cursor", "pointer")
+                .set("border", "none")
+                .set("font-family", "'Inter', sans-serif");
         return btn;
     }
 

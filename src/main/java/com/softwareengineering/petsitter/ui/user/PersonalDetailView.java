@@ -62,6 +62,7 @@ public class PersonalDetailView extends Div {
         this.profileChanged = profileChanged;
 
         setWidthFull();
+        addClassName("personal-details-card");
         getStyle()
             .set("background", CARD_BG)
             .set("border-radius", "20px")
@@ -307,11 +308,13 @@ public class PersonalDetailView extends Div {
         wrapper.setSpacing(false);
 
         HorizontalLayout row = new HorizontalLayout();
+        row.addClassName("personal-data-row");
         row.setWidthFull();
         row.setAlignItems(FlexComponent.Alignment.START);
         row.getStyle().set("padding", "20px 0").set("gap", "24px");
 
         Span labelSpan = new Span(label);
+        labelSpan.addClassName("personal-data-label");
         labelSpan.getStyle()
             .set("font-weight", "800")
             .set("font-size", "18px")
@@ -324,6 +327,7 @@ public class PersonalDetailView extends Div {
             row.add(labelSpan, editField);
         } else {
             VerticalLayout valLayout = new VerticalLayout();
+            valLayout.addClassName("personal-data-value-layout");
             valLayout.setPadding(false);
             valLayout.setSpacing(false);
             valLayout.getStyle().set("gap", "6px").set("flex", "1");

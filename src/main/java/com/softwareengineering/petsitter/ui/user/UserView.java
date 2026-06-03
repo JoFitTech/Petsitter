@@ -80,6 +80,10 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     private Button btnPersAngaben;
     private Button btnLogout;
     private Div contentPanel;
+    private Div mobileSidebar;
+    private Div mobileDropdown;
+    private Span mobileActiveLabel;
+    private Icon mobileActiveIcon;
 
     public UserView(
             UserService userService,
@@ -197,26 +201,24 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             .set("z-index", "0");
         outer.add(deco);
 
-        HorizontalLayout main = new HorizontalLayout();
+        Div main = new Div();
+        main.addClassName("profile-main-layout");
         main.setWidthFull();
-        main.setPadding(false);
-        main.setSpacing(false);
         main.getStyle()
-            .set("gap", "24px")
-            .set("align-items", "flex-start")
             .set("position", "relative")
             .set("z-index", "1");
 
         contentPanel = new Div();
         contentPanel.setWidthFull();
 
-        main.add(buildSidebar(), contentPanel);
+        main.add(buildSidebar(), buildMobileSidebar(), contentPanel);
         outer.add(main);
         return outer;
     }
 
     private Component buildSidebar() {
         VerticalLayout sidebar = new VerticalLayout();
+        sidebar.addClassName("desktop-sidebar");
         sidebar.setPadding(false);
         sidebar.setSpacing(false);
         sidebar.setWidth("240px");
@@ -274,10 +276,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
             b.getStyle().set("background", "transparent").set("color", DARK);
         }
         active.getStyle().set("background", "#774f35").set("color", "white");
+        updateMobileActiveLabel(active.getText());
     }
 
     private Div cardPanel() {
         Div panel = new Div();
+        panel.addClassName("profile-card-panel");
         panel.setWidthFull();
         panel.getStyle()
             .set("background", CARD_BG)
@@ -887,5 +891,162 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         ta.setWidthFull();
         ta.setMinHeight("100px");
         return ta;
+    }
+
+    private Component buildMobileSidebar() {
+        mobileSidebar = new Div();
+        mobileSidebar.addClassName("mobile-sidebar");
+        mobileSidebar.getStyle()
+                .set("position", "relative")
+                .set("width", "100%")
+                .set("margin-bottom", "16px")
+                .set("box-sizing", "border-box");
+
+        Div trigger = new Div();
+        trigger.setWidthFull();
+        trigger.getStyle()
+                .set("height", "54px")
+                .set("border-radius", "16px")
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("font-weight", "700")
+                .set("font-size", "16px")
+                .set("cursor", "pointer")
+                .set("display", "flex")
+                .set("justify-content", "space-between")
+                .set("align-items", "center")
+                .set("padding", "0 24px")
+                .set("box-sizing", "border-box")
+                .set("box-shadow", "0 4px 12px rgba(119, 79, 53, 0.15)");
+
+        mobileActiveIcon = new Icon(VaadinIcon.USER);
+        mobileActiveIcon.getStyle().set("color", "white").set("margin-right", "12px");
+        mobileActiveLabel = new Span("Über mich");
+
+        HorizontalLayout labelLayout = new HorizontalLayout(mobileActiveIcon, mobileActiveLabel);
+        labelLayout.setAlignItems(FlexComponent.Alignment.CENTER);
+        labelLayout.setSpacing(false);
+
+        Icon dropdownIcon = new Icon(VaadinIcon.CHEVRON_DOWN);
+        dropdownIcon.getStyle().set("color", "white");
+        trigger.add(labelLayout, dropdownIcon);
+
+        mobileDropdown = new Div();
+        mobileDropdown.getStyle()
+                .set("position", "absolute")
+                .set("top", "62px")
+                .set("left", "0")
+                .set("width", "100%")
+                .set("background-color", "#fdf6ec")
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "16px")
+                .set("padding", "8px")
+                .set("box-shadow", "0 6px 24px rgba(74, 52, 40, 0.12)")
+                .set("z-index", "1000")
+                .set("display", "none")
+                .set("flex-direction", "column")
+                .set("gap", "4px")
+                .set("box-sizing", "border-box");
+
+        populateMobileDropdown();
+
+        boolean[] isOpen = {false};
+        trigger.addClickListener(e -> {
+            isOpen[0] = !isOpen[0];
+            mobileDropdown.getStyle().set("display", isOpen[0] ? "flex" : "none");
+        });
+
+        mobileSidebar.add(trigger, mobileDropdown);
+        return mobileSidebar;
+    }
+
+    private void populateMobileDropdown() {
+        if (mobileDropdown == null) return;
+        mobileDropdown.removeAll();
+
+        mobileDropdown.add(createMobileDropdownItem("Über mich", VaadinIcon.USER, () -> {
+            setActiveStyle(btnUeberMich);
+            showUeberMich();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Meine Tiere", VaadinIcon.HEART, () -> {
+            setActiveStyle(btnMeineTiere);
+            showMeineTiere();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Meine Aufträge", VaadinIcon.CLIPBOARD_TEXT, () -> {
+            setActiveStyle(btnMeineAuftraege);
+            showMeineAuftraege();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Meine Buchungen", VaadinIcon.CALENDAR, () -> {
+            setActiveStyle(btnMeineBuchungen);
+            showMeineBuchungen();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Meine Favoriten", VaadinIcon.STAR, () -> {
+            setActiveStyle(btnMeineFavoriten);
+            showMeineFavoriten();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Guthaben", VaadinIcon.WALLET, () -> {
+            setActiveStyle(btnGuthaben);
+            showGuthaben();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Persönliche Angaben", VaadinIcon.INFO_CIRCLE, () -> {
+            setActiveStyle(btnPersAngaben);
+            showPersAngaben();
+        }));
+        mobileDropdown.add(createMobileDropdownItem("Log out", VaadinIcon.SIGN_OUT, this::handleLogout));
+    }
+
+    private Component createMobileDropdownItem(String text, VaadinIcon iconType, Runnable clickAction) {
+        Div item = new Div();
+        item.setWidthFull();
+        item.getStyle()
+                .set("padding", "12px 18px")
+                .set("border-radius", "10px")
+                .set("cursor", "pointer")
+                .set("color", DARK)
+                .set("font-weight", "600")
+                .set("font-size", "15px")
+                .set("box-sizing", "border-box")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("gap", "12px")
+                .set("transition", "background-color 0.2s");
+
+        item.addClassName("menu-item-row");
+
+        Icon icon = new Icon(iconType);
+        icon.getStyle().set("color", DARK).set("font-size", "18px");
+
+        Span label = new Span(text);
+        item.add(icon, label);
+
+        item.addClickListener(e -> {
+            mobileDropdown.getStyle().set("display", "none");
+            clickAction.run();
+        });
+        return item;
+    }
+
+    private VaadinIcon iconForTab(String tabText) {
+        return switch (tabText) {
+            case "Über mich" -> VaadinIcon.USER;
+            case "Meine Tiere" -> VaadinIcon.HEART;
+            case "Meine Aufträge" -> VaadinIcon.CLIPBOARD_TEXT;
+            case "Meine Buchungen" -> VaadinIcon.CALENDAR;
+            case "Meine Favoriten" -> VaadinIcon.STAR;
+            case "Guthaben" -> VaadinIcon.WALLET;
+            case "Persönliche Angaben" -> VaadinIcon.INFO_CIRCLE;
+            case "Log out" -> VaadinIcon.SIGN_OUT;
+            default -> VaadinIcon.USER;
+        };
+    }
+
+    private void updateMobileActiveLabel(String labelText) {
+        if (mobileActiveLabel != null) {
+            mobileActiveLabel.setText(labelText);
+        }
+        if (mobileActiveIcon != null) {
+            String iconName = iconForTab(labelText).name().toLowerCase().replace("_", "-");
+            mobileActiveIcon.getElement().setAttribute("icon", "vaadin:" + iconName);
+        }
     }
 }

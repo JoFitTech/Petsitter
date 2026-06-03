@@ -38,6 +38,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import com.vaadin.flow.component.dependency.CssImport;
+
+@CssImport("./styles/responsive-header.css")
 public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
     private static final String DARK      = "#4a3428";
@@ -56,6 +59,10 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private Button profileBtn;
     private Span mailBadge;
     private Span mailTypingIndicator;
+    private Span burgerBadge;
+    private Span mobileMailTypingIndicator;
+    private Span mobileNotificationBadge;
+    private Div dropdownMenu;
     private Registration badgeRegistration;
     private Registration typingHeaderRegistration;
     private final ScheduledExecutorService typingHeaderScheduler = Executors.newSingleThreadScheduledExecutor();
@@ -117,19 +124,22 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         header.setWidthFull();
         header.setAlignItems(FlexComponent.Alignment.CENTER);
         header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+        header.addClassName("main-header-layout");
 
         header.getStyle()
                 .set("background", "rgba(255,255,255,0.92)")
                 .set("backdrop-filter", "blur(8px)")
-                .set("padding", "0 28px")
+                .set("padding", "0 clamp(12px, 3vw, 28px)")
                 .set("height", "72px")
                 .set("box-shadow", "0 2px 18px rgba(74, 52, 40, 0.07)")
-                .set("box-sizing", "border-box");
+                .set("box-sizing", "border-box")
+                .set("flex-wrap", "nowrap")
+                .set("gap", "8px");
 
         // Left: Logo (PNG image – rahmenlos via Div)
         Image logoImg = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
         logoImg.getStyle()
-                .set("height", "52px")
+                .set("height", "clamp(36px, 5vw, 52px)")
                 .set("width", "auto")
                 .set("display", "block");
 
@@ -137,14 +147,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         logoWrapper.getStyle()
                 .set("cursor", "pointer")
                 .set("display", "flex")
-                .set("align-items", "center");
+                .set("align-items", "center")
+                .set("flex-shrink", "0");
         logoWrapper.addClickListener(e -> UI.getCurrent().navigate(""));
 
         // Center: Navigation Pills + fixed Create-Offer button
         HorizontalLayout centerGroup = new HorizontalLayout();
         centerGroup.setSpacing(false);
         centerGroup.setAlignItems(FlexComponent.Alignment.CENTER);
-        centerGroup.getStyle().set("gap", "12px");
+        centerGroup.addClassName("desktop-center-group");
+        centerGroup.getStyle()
+                .set("gap", "8px")
+                .set("flex-wrap", "wrap")
+                .set("justify-content", "center")
+                .set("flex", "1 1 auto")
+                .set("min-width", "0");
 
         findOwnerBtn = pillButton("Tierhalter finden");
         findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
@@ -159,7 +176,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             Button createOfferBtn = new Button("Angebot erstellen");
             createOfferBtn.getStyle()
                     .set("height", "42px")
-                    .set("padding", "0 22px")
+                    .set("padding", "0 clamp(12px, 2vw, 22px)")
                     .set("border-radius", "22px")
                     .set("background", "#774f35")
                     .set("color", "white")
@@ -185,6 +202,9 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         if (mailBadge != null) {
             updateMailBadge(mailBadge);
         }
+        if (dropdownMenu != null) {
+            dropdownMenu.getStyle().set("display", "none");
+        }
     }
 
     private void updateNavigationState(String path, Map<String, List<String>> queryParameters) {
@@ -208,12 +228,13 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             return loginBtn;
         }
 
-        HorizontalLayout rightIcons = new HorizontalLayout();
-        rightIcons.setSpacing(false);
-        rightIcons.setAlignItems(FlexComponent.Alignment.CENTER);
-        rightIcons.getStyle().set("gap", "8px");
+        HorizontalLayout desktopIcons = new HorizontalLayout();
+        desktopIcons.setSpacing(false);
+        desktopIcons.setAlignItems(FlexComponent.Alignment.CENTER);
+        desktopIcons.getStyle().set("gap", "8px");
+        desktopIcons.addClassName("desktop-header-actions");
 
-        rightIcons.add(buildMailButtonWithTypingIndicator(), buildNotificationButtonWithBadge());
+        desktopIcons.add(buildMailButtonWithTypingIndicator(), buildNotificationButtonWithBadge());
 
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
@@ -232,8 +253,15 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .set("flex-shrink", "0");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
-        rightIcons.add(heartBtn, profileBtn);
-        return rightIcons;
+        desktopIcons.add(heartBtn, profileBtn);
+
+        Component mobileBurger = buildBurgerMenuButton();
+
+        Div wrapper = new Div(desktopIcons, mobileBurger);
+        wrapper.getStyle()
+                .set("display", "flex")
+                .set("align-items", "center");
+        return wrapper;
     }
 
     public void refreshProfileImage() {
@@ -325,14 +353,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .map(user -> notificationService.countUnread(user.getId()))
                 .orElse(0L);
 
-        if (unread <= 0) {
-            badge.setText("");
-            badge.getStyle().set("display", "none");
-            return;
-        }
+        String text = unread > 99 ? "99+" : Long.toString(unread);
+        boolean show = unread > 0;
 
-        badge.setText(unread > 99 ? "99+" : Long.toString(unread));
-        badge.getStyle().set("display", "flex");
+        if (badge != null) {
+            badge.setText(show ? text : "");
+            badge.getStyle().set("display", show ? "flex" : "none");
+        }
+        if (burgerBadge != null) {
+            burgerBadge.setText(show ? text : "");
+            burgerBadge.getStyle().set("display", show ? "flex" : "none");
+        }
+        if (mobileNotificationBadge != null) {
+            mobileNotificationBadge.setText(show ? text : "");
+            mobileNotificationBadge.getStyle().set("display", show ? "flex" : "none");
+        }
     }
 
     private void openNotificationDialog() {
@@ -512,6 +547,9 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                         }
 
                         mailTypingIndicator.getStyle().set("display", "inline-block");
+                        if (mobileMailTypingIndicator != null) {
+                            mobileMailTypingIndicator.getStyle().set("display", "inline-block");
+                        }
 
                         if (hideTypingHeaderFuture != null) {
                             hideTypingHeaderFuture.cancel(false);
@@ -530,6 +568,9 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private void hideTypingHeaderIndicator() {
         if (mailTypingIndicator != null) {
             mailTypingIndicator.getStyle().set("display", "none");
+        }
+        if (mobileMailTypingIndicator != null) {
+            mobileMailTypingIndicator.getStyle().set("display", "none");
         }
     }
 
@@ -715,20 +756,23 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private Component buildFooter() {
         HorizontalLayout footer = new HorizontalLayout();
         footer.setWidthFull();
-        footer.setAlignItems(FlexComponent.Alignment.CENTER);
+        footer.setAlignItems(FlexComponent.Alignment.START);
         footer.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
         footer.getStyle()
                 .set("background", DARK)
                 .set("color", "white")
-                .set("padding", "34px 76px")
+                .set("padding", "clamp(20px, 4vw, 34px) clamp(16px, 5vw, 76px)")
                 .set("box-sizing", "border-box")
-                .set("margin-top", "auto");
+                .set("margin-top", "auto")
+                .set("flex-wrap", "wrap")
+                .set("gap", "28px");
 
         // Brand column
         VerticalLayout brand = new VerticalLayout();
         brand.setPadding(false);
         brand.setSpacing(false);
+        brand.getStyle().set("flex", "1 1 180px").set("min-width", "0");
 
         Image footerLogo = new Image("images/Pawsitter_logo_transparent.png", "Pawsitter Logo");
         footerLogo.getStyle()
@@ -752,8 +796,14 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
         // Links
         HorizontalLayout links = new HorizontalLayout();
-        links.setSpacing(true);
-        links.getStyle().set("gap", "28px");
+        links.setSpacing(false);
+        links.getStyle()
+                .set("gap", "clamp(10px, 2vw, 28px)")
+                .set("flex-wrap", "wrap")
+                .set("align-items", "center")
+                .set("flex", "2 1 280px")
+                .set("min-width", "0")
+                .set("justify-content", "center");
 
         links.add(
                 footerLink("Über uns",    "info"),
@@ -766,6 +816,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         // Social buttons
         HorizontalLayout socials = new HorizontalLayout();
         socials.setSpacing(true);
+        socials.getStyle().set("flex-shrink", "0").set("align-items", "center");
 
         Html facebookIcon = new Html("<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16' style='display: block;'><path d='M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z'/></svg>");
         Button facebookBtn = socialButton(facebookIcon);
@@ -819,14 +870,16 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         Button button = new Button(text);
         button.getStyle()
                 .set("height", "44px")
-                .set("padding", "0 36px")
+                .set("padding", "0 clamp(14px, 2.5vw, 36px)")
                 .set("border-radius", "28px")
                 .set("background", NAV_INACTIVE_BG)
                 .set("border", "1px solid " + NAV_BORDER)
                 .set("color", DARK)
                 .set("font-weight", "700")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer");
+                .set("cursor", "pointer")
+                .set("white-space", "nowrap")
+                .set("flex-shrink", "0");
         return button;
     }
 
@@ -890,5 +943,189 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .set("border", "none")
                 .set("padding", "0");
         return btn;
+    }
+
+    private Component buildBurgerMenuButton() {
+        HorizontalLayout container = new HorizontalLayout();
+        container.setAlignItems(FlexComponent.Alignment.CENTER);
+        container.setSpacing(false);
+        container.addClassName("mobile-header-actions");
+        container.getStyle()
+                .set("position", "relative")
+                .set("width", "42px")
+                .set("height", "42px");
+
+        Button burgerBtn = headerIconButton(VaadinIcon.MENU, "transparent", DARK);
+        container.add(burgerBtn);
+
+        burgerBadge = new Span();
+        burgerBadge.getStyle()
+                .set("position", "absolute")
+                .set("top", "0")
+                .set("right", "0")
+                .set("width", "20px")
+                .set("height", "20px")
+                .set("background", "#e74c3c")
+                .set("color", "white")
+                .set("border-radius", "50%")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("justify-content", "center")
+                .set("font-size", "10px")
+                .set("font-weight", "700")
+                .set("z-index", "10")
+                .set("display", "none");
+        container.add(burgerBadge);
+
+        dropdownMenu = new Div();
+        dropdownMenu.addClassName("burger-dropdown-menu");
+        dropdownMenu.getStyle()
+                .set("position", "absolute")
+                .set("top", "50px")
+                .set("right", "0")
+                .set("width", "260px")
+                .set("background-color", "#f3eada")
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "16px")
+                .set("padding", "12px")
+                .set("box-shadow", "0 4px 24px rgba(74, 52, 40, 0.15)")
+                .set("z-index", "10000")
+                .set("display", "none")
+                .set("flex-direction", "column")
+                .set("gap", "8px")
+                .set("box-sizing", "border-box");
+
+        boolean[] isOpen = {false};
+        burgerBtn.addClickListener(e -> {
+            isOpen[0] = !isOpen[0];
+            dropdownMenu.getStyle().set("display", isOpen[0] ? "flex" : "none");
+            if (isOpen[0]) {
+                rebuildBurgerDropdown();
+            }
+        });
+
+        container.add(dropdownMenu);
+        updateMailBadge(burgerBadge);
+        return container;
+    }
+
+    private void rebuildBurgerDropdown() {
+        if (dropdownMenu == null) return;
+        dropdownMenu.removeAll();
+
+        Component ownerRow = createMenuRow(VaadinIcon.USERS, "Tierhalter finden", () -> {
+            dropdownMenu.getStyle().set("display", "none");
+            UI.getCurrent().navigate("");
+        }, null);
+
+        Component sitterRow = createMenuRow(VaadinIcon.SEARCH, "Tiersitter finden", () -> {
+            dropdownMenu.getStyle().set("display", "none");
+            UI.getCurrent().navigate("tierhalter-finden");
+        }, null);
+
+        dropdownMenu.add(ownerRow, sitterRow);
+
+        if (authenticatedUser.get().isEmpty()) {
+            Component loginRow = createMenuRow(VaadinIcon.SIGN_IN, "Anmelden", () -> {
+                dropdownMenu.getStyle().set("display", "none");
+                UI.getCurrent().navigate(LoginView.class);
+            }, null);
+            dropdownMenu.add(loginRow);
+        } else {
+            Component createOfferRow = createMenuRow(VaadinIcon.PLUS_CIRCLE, "Angebot erstellen", () -> {
+                dropdownMenu.getStyle().set("display", "none");
+                openCreateOfferDialog();
+            }, null);
+
+            mobileMailTypingIndicator = new Span("...");
+            mobileMailTypingIndicator.getStyle()
+                    .set("padding", "0 6px")
+                    .set("border-radius", "8px")
+                    .set("background", "#8db3c3")
+                    .set("color", "white")
+                    .set("font-size", "11px")
+                    .set("font-weight", "700")
+                    .set("display", mailTypingIndicator != null && "inline-block".equals(mailTypingIndicator.getStyle().get("display")) ? "inline-block" : "none");
+
+            Component chatRow = createMenuRow(VaadinIcon.ENVELOPE_O, "Chat", () -> {
+                dropdownMenu.getStyle().set("display", "none");
+                UI.getCurrent().navigate("chat");
+            }, mobileMailTypingIndicator);
+
+            mobileNotificationBadge = new Span();
+            mobileNotificationBadge.getStyle()
+                    .set("width", "20px")
+                    .set("height", "20px")
+                    .set("background", "#e74c3c")
+                    .set("color", "white")
+                    .set("border-radius", "50%")
+                    .set("display", "flex")
+                    .set("align-items", "center")
+                    .set("justify-content", "center")
+                    .set("font-size", "10px")
+                    .set("font-weight", "700");
+
+            long unread = authenticatedUser.get()
+                    .map(user -> notificationService.countUnread(user.getId()))
+                    .orElse(0L);
+            if (unread > 0) {
+                mobileNotificationBadge.setText(unread > 99 ? "99+" : Long.toString(unread));
+                mobileNotificationBadge.getStyle().set("display", "flex");
+            } else {
+                mobileNotificationBadge.getStyle().set("display", "none");
+            }
+
+            Component notificationsRow = createMenuRow(VaadinIcon.BELL_O, "Benachrichtigungen", () -> {
+                dropdownMenu.getStyle().set("display", "none");
+                openNotificationDialog();
+            }, mobileNotificationBadge);
+
+            Component favoritesRow = createMenuRow(VaadinIcon.HEART_O, "Favoriten", () -> {
+                dropdownMenu.getStyle().set("display", "none");
+                UI.getCurrent().navigate("profile", QueryParameters.of("tab", "favorites"));
+            }, null);
+
+            Component profileRow = createMenuRow(VaadinIcon.USER, "Profil", () -> {
+                dropdownMenu.getStyle().set("display", "none");
+                UI.getCurrent().navigate("profile");
+            }, null);
+
+            dropdownMenu.add(createOfferRow, chatRow, notificationsRow, favoritesRow, profileRow);
+        }
+    }
+
+    private Component createMenuRow(VaadinIcon icon, String labelText, Runnable clickAction, Component rightDecoration) {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull();
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.getStyle()
+                .set("background", "#fffbf3")
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "12px")
+                .set("padding", "12px 18px")
+                .set("cursor", "pointer")
+                .set("box-sizing", "border-box");
+
+        row.addClassName("menu-item-row");
+
+        Icon menuIcon = new Icon(icon);
+        menuIcon.getStyle()
+                .set("color", DARK)
+                .set("font-size", "20px");
+
+        Span label = new Span(labelText);
+        label.getStyle()
+                .set("color", DARK)
+                .set("font-weight", "700")
+                .set("font-size", "16px");
+
+        row.add(menuIcon, label);
+        if (rightDecoration != null) {
+            row.add(rightDecoration);
+            row.setFlexGrow(1, label);
+        }
+
+        row.addClickListener(e -> clickAction.run());
+        return row;
     }
 }

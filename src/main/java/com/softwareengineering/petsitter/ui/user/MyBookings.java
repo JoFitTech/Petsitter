@@ -11,6 +11,7 @@ import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
@@ -470,13 +471,50 @@ public class MyBookings extends Div {
 
     private void openReviewDialog(UUID bookingId, UUID currentUserId) {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Buchung bewerten");
         dialog.setWidth("480px");
+        dialog.setMaxWidth("95vw");
+        dialog.setCloseOnEsc(false);
+        dialog.setCloseOnOutsideClick(false);
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "'Inter', sans-serif");
 
-        VerticalLayout content = new VerticalLayout();
-        content.setPadding(false);
-        content.setSpacing(false);
-        content.getStyle().set("gap", "10px");
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("padding", "32px 48px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("position", "relative")
+                .set("box-sizing", "border-box");
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "24px")
+                .set("right", "24px")
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        H2 title = new H2("Buchung bewerten");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("padding-right", "32px")
+                .set("color", DARK);
 
         Select<Integer> rating = new Select<>();
         rating.setLabel("Sterne");
@@ -494,12 +532,17 @@ public class MyBookings extends Div {
         submit.setWidthFull();
         submit.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#5c3d1e")
                 .set("color", "white")
-                .set("font-weight", "700");
+                .set("font-weight", "700")
+                .set("font-size", "15px")
+                .set("height", "48px")
+                .set("cursor", "pointer")
+                .set("border", "none")
+                .set("font-family", "'Inter', sans-serif");
 
-        content.add(rating, comment, submit);
-        dialog.add(content);
+        wrapper.add(closeBtn, title, rating, comment, submit);
+        dialog.add(wrapper);
         dialog.open();
     }
 

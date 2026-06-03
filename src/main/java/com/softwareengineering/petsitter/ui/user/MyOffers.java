@@ -409,7 +409,7 @@ public class MyOffers extends Div {
         Div wrapper = new Div();
         wrapper.getStyle()
                 .set("position", "relative")
-                .set("padding", "28px 28px 24px 28px")
+                .set("padding", "32px 48px")
                 .set("display", "flex")
                 .set("flex-direction", "column")
                 .set("gap", "16px")
@@ -417,21 +417,18 @@ public class MyOffers extends Div {
                 .set("border-radius", "20px")
                 .set("box-sizing", "border-box");
 
-        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
         closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("position", "absolute")
-                .set("top", "12px")
-                .set("right", "12px")
-                .set("width", "28px")
-                .set("height", "28px")
-                .set("min-width", "28px")
-                .set("border-radius", "50%")
+                .set("top", "24px")
+                .set("right", "24px")
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
                 .set("background", "transparent")
                 .set("border", "none")
-                .set("color", "#9a8070")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer")
                 .set("padding", "0")
                 .set("z-index", "10");
         closeBtn.addClickListener(e -> confirm.close());
@@ -458,9 +455,9 @@ public class MyOffers extends Div {
         Button delete = new Button("Löschen");
         delete.setWidthFull();
         delete.getStyle()
-                .set("height", "44px")
-                .set("border-radius", "14px")
-                .set("background", "#774f35")
+                .set("height", "48px")
+                .set("border-radius", "24px")
+                .set("background", "#5c3d1e")
                 .set("color", "white")
                 .set("font-weight", "700")
                 .set("font-family", "Inter, Arial, sans-serif")
@@ -523,7 +520,7 @@ public class MyOffers extends Div {
         Div wrapper = new Div();
         wrapper.getStyle()
                 .set("position", "relative")
-                .set("padding", "24px 24px 22px 24px")
+                .set("padding", "32px 48px")
                 .set("display", "flex")
                 .set("flex-direction", "column")
                 .set("gap", "14px")
@@ -532,21 +529,18 @@ public class MyOffers extends Div {
                 .set("box-sizing", "border-box");
 
         // X close button – absolute, top-right corner
-        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
         closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("position", "absolute")
-                .set("top", "12px")
-                .set("right", "12px")
-                .set("width", "28px")
-                .set("height", "28px")
-                .set("min-width", "28px")
-                .set("border-radius", "50%")
+                .set("top", "24px")
+                .set("right", "24px")
+                .set("color", DARK)
+                .set("font-size", "22px")
+                .set("cursor", "pointer")
                 .set("background", "transparent")
                 .set("border", "none")
-                .set("color", "#9a8070")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer")
                 .set("padding", "0")
                 .set("z-index", "10");
         closeBtn.addClickListener(e -> dialog.close());

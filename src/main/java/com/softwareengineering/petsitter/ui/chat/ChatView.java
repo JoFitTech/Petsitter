@@ -92,6 +92,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private Span chatTitle;
     private Span typingIndicator;
     private Div chatHeaderAvatar;
+    private HorizontalLayout chatContainer;
 
     // State
     private String activeConversationId;
@@ -158,7 +159,8 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         add(subtitle);
 
         // Main container card with fixed height
-        HorizontalLayout chatContainer = new HorizontalLayout();
+        this.chatContainer = new HorizontalLayout();
+        chatContainer.addClassName("chat-main-container");
         chatContainer.setWidthFull();
         chatContainer.setHeight("600px");
         chatContainer.setPadding(false);
@@ -205,6 +207,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private Component buildConversationList() {
         VerticalLayout layout = new VerticalLayout();
+        layout.addClassName("chat-conversation-sidebar");
         layout.setWidth("280px");
         layout.setHeightFull();
         layout.setPadding(true);
@@ -230,6 +233,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private Component buildChatWindow() {
         VerticalLayout layout = new VerticalLayout();
+        layout.addClassName("chat-window-pane");
         layout.setWidthFull();
         layout.setHeightFull();
         layout.setPadding(false);
@@ -282,13 +286,37 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             .set("gap", "14px")
             .set("flex-shrink", "0");
 
+        Button backBtn = new Button(new Icon(VaadinIcon.ARROW_LEFT));
+        backBtn.addClassName("chat-back-button");
+        backBtn.getStyle()
+                .set("background", "transparent")
+                .set("color", DARK)
+                .set("border", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("margin-right", "8px")
+                .set("min-width", "unset")
+                .set("width", "36px")
+                .set("height", "36px");
+        backBtn.addClickListener(e -> {
+            activeConversationId = null;
+            if (chatContainer != null) {
+                chatContainer.removeClassName("conversation-selected");
+            }
+            messageList.removeAll();
+            messageList.add(new Paragraph("Wähle ein Gespräch aus der Liste, um den Chat zu starten."));
+            chatTitle.setText("Wähle ein Gespräch");
+            chatHeaderAvatar.getStyle().set("display", "none");
+            refreshConversationList();
+        });
+
         // Avatar in header
         chatHeaderAvatar = createChatAvatar(38);
         chatHeaderAvatar.getStyle()
             .set("display", "none")
             .set("cursor", "pointer");
         chatHeaderAvatar.addClickListener(event -> openProfilePopUp());
-        header.add(chatHeaderAvatar);
+        header.add(backBtn, chatHeaderAvatar);
 
         VerticalLayout titleWrap = new VerticalLayout();
         titleWrap.setPadding(false);
@@ -539,6 +567,9 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
     private void selectConversation(String conversationId) {
         this.activeConversationId = conversationId;
+        if (chatContainer != null) {
+            chatContainer.addClassName("conversation-selected");
+        }
         ChatConversationDto selected = conversationsById.get(conversationId);
         if (selected != null) {
             boolean currentUserIsOwner = currentUserId.equals(selected.ownerId());

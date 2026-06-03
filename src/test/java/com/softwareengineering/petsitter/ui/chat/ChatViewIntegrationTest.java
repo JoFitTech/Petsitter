@@ -1,54 +1,52 @@
 package com.softwareengineering.petsitter.ui.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
 import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
-import com.softwareengineering.petsitter.booking.service.BookingService;
-import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
+import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.User;
-import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
-import com.vaadin.flow.component.html.Span;
+import com.vaadin.flow.component.HasText;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 class ChatViewIntegrationTest {
 
     @Test
     void chatView_loadsConversationListFromService() {
-        ChatService chatService = Mockito.mock(ChatService.class);
-        ChatEventBus eventBus = Mockito.mock(ChatEventBus.class);
-        AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
-        RequestService requestService = Mockito.mock(RequestService.class);
-        BookingService bookingService = Mockito.mock(BookingService.class);
-        UserService userService = Mockito.mock(UserService.class);
-
         UUID currentUserId = UUID.randomUUID();
         User currentUser = new User();
         currentUser.setId(currentUserId);
         currentUser.setFirstName("Anna");
         currentUser.setLastName("Owner");
 
-        when(authenticatedUser.get()).thenReturn(Optional.of(currentUser));
-        when(eventBus.register(eq(currentUserId), any())).thenReturn((Registration) () -> { });
-        when(chatService.getCurrentUserConversations()).thenReturn(List.of(
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        RequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
+
+        chatService.conversations = List.of(
                 new ChatConversationDto(
                         "conv-1",
                         UUID.randomUUID(),
@@ -62,23 +60,15 @@ class ChatViewIntegrationTest {
                         null,
                         null
                 )
-        ));
+        );
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
 
         assertThat(containsText(view, "Ben Sitter")).isTrue();
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void chatView_eventBusAppendsMessageForActiveConversation() throws Exception {
-        ChatService chatService = Mockito.mock(ChatService.class);
-        ChatEventBus eventBus = Mockito.mock(ChatEventBus.class);
-        AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
-        RequestService requestService = Mockito.mock(RequestService.class);
-        BookingService bookingService = Mockito.mock(BookingService.class);
-        UserService userService = Mockito.mock(UserService.class);
-
         UUID currentUserId = UUID.randomUUID();
         UUID otherUserId = UUID.randomUUID();
 
@@ -87,13 +77,11 @@ class ChatViewIntegrationTest {
         currentUser.setFirstName("Anna");
         currentUser.setLastName("Owner");
 
-        when(authenticatedUser.get()).thenReturn(Optional.of(currentUser));
-
-        AtomicReference<Consumer<ChatMessageDto>> listenerRef = new AtomicReference<>();
-        when(eventBus.register(eq(currentUserId), any())).thenAnswer(invocation -> {
-            listenerRef.set((Consumer<ChatMessageDto>) invocation.getArgument(1));
-            return (Registration) () -> { };
-        });
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        RequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
 
         ChatConversationDto conversation = new ChatConversationDto(
                 "conv-2",
@@ -109,8 +97,8 @@ class ChatViewIntegrationTest {
                 null
         );
 
-        when(chatService.getCurrentUserConversations()).thenReturn(List.of(conversation));
-        when(chatService.getMessages("conv-2")).thenReturn(List.of(
+        chatService.conversations = List.of(conversation);
+        chatService.messagesByConversation.put("conv-2", List.of(
                 new ChatMessageDto(
                         "m-old",
                         "conv-2",
@@ -126,7 +114,7 @@ class ChatViewIntegrationTest {
                 )
         ));
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
 
         Method selectConversation = ChatView.class.getDeclaredMethod("selectConversation", String.class);
         selectConversation.setAccessible(true);
@@ -160,13 +148,6 @@ class ChatViewIntegrationTest {
 
     @Test
     void chatView_rendersReviewCardWithStarsAndComment() throws Exception {
-        ChatService chatService = Mockito.mock(ChatService.class);
-        ChatEventBus eventBus = Mockito.mock(ChatEventBus.class);
-        AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
-        RequestService requestService = Mockito.mock(RequestService.class);
-        BookingService bookingService = Mockito.mock(BookingService.class);
-        UserService userService = Mockito.mock(UserService.class);
-
         UUID currentUserId = UUID.randomUUID();
         UUID otherUserId = UUID.randomUUID();
 
@@ -175,10 +156,11 @@ class ChatViewIntegrationTest {
         currentUser.setFirstName("Anna");
         currentUser.setLastName("Owner");
 
-        when(authenticatedUser.get()).thenReturn(Optional.of(currentUser));
-        when(eventBus.register(eq(currentUserId), any())).thenReturn((Registration) () -> { });
-        when(eventBus.registerTyping(eq(currentUserId), any())).thenReturn((Registration) () -> { });
-        when(eventBus.registerRefresh(eq(currentUserId), any())).thenReturn((Registration) () -> { });
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        RequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
 
         ChatConversationDto conversation = new ChatConversationDto(
                 "conv-review",
@@ -194,10 +176,10 @@ class ChatViewIntegrationTest {
                 null
         );
 
-        when(chatService.getCurrentUserConversations()).thenReturn(List.of(conversation));
-        when(chatService.getMessages("conv-review")).thenReturn(List.of());
+        chatService.conversations = List.of(conversation);
+        chatService.messagesByConversation.put("conv-review", List.of());
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
         invokePrivate(view, "selectConversation", new Class<?>[]{String.class}, "conv-review");
 
         ChatMessageDto reviewMessage = new ChatMessageDto(
@@ -221,18 +203,190 @@ class ChatViewIntegrationTest {
         assertThat(containsTextPart(bubble, "Sehr zuverlässig")).isTrue();
     }
 
+    @Test
+    void chatView_rendersPendingRequestCardWithOfferDetailsAndActions() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+
+        User currentUser = new User();
+        currentUser.setId(currentUserId);
+        currentUser.setFirstName("Anna");
+        currentUser.setLastName("Owner");
+
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        TestRequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
+        requestService.detailsByRequestId.put(requestId, new OfferRequestChatCardDto(
+                requestId,
+                RequestStatus.PENDING,
+                "Urlaubsbetreuung",
+                OfferType.OWNER_OFFER,
+                LocalDate.of(2026, 7, 10),
+                LocalDate.of(2026, 7, 15),
+                OfferFrequency.ONE_TIME,
+                Set.of(),
+                null,
+                "Balu, Minka",
+                null
+        ));
+
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
+        ChatMessageDto requestCard = new ChatMessageDto(
+                "m-request",
+                "conv-request",
+                null,
+                requesterId,
+                currentUserId,
+                null,
+                LocalDateTime.now(),
+                false,
+                "REQUEST_CARD",
+                requestId.toString(),
+                "Fallback-Titel"
+        );
+
+        Component bubble = (Component) invokePrivate(
+                view,
+                "buildRequestCardBubble",
+                new Class<?>[]{ChatMessageDto.class},
+                requestCard);
+
+        assertThat(containsTextPart(bubble, "Angebot: Urlaubsbetreuung")).isTrue();
+        assertThat(containsTextPart(bubble, "Zeitraum: 10")).isTrue();
+        assertThat(containsTextPart(bubble, "15. Juli")).isTrue();
+        assertThat(containsTextPart(bubble, "Tiere: Balu, Minka")).isTrue();
+        assertThat(containsText(bubble, "Annehmen")).isTrue();
+        assertThat(containsText(bubble, "Ablehnen")).isTrue();
+    }
+
+    @Test
+    void chatView_rendersRequestCardFallbackWhenDetailsCannotBeLoaded() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        UUID requesterId = UUID.randomUUID();
+        UUID requestId = UUID.randomUUID();
+
+        User currentUser = new User();
+        currentUser.setId(currentUserId);
+        currentUser.setFirstName("Anna");
+        currentUser.setLastName("Owner");
+
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        TestRequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
+        requestService.failingRequestIds.add(requestId);
+
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
+        ChatMessageDto requestCard = new ChatMessageDto(
+                "m-request",
+                "conv-request",
+                null,
+                requesterId,
+                currentUserId,
+                null,
+                LocalDateTime.now(),
+                false,
+                "REQUEST_CARD",
+                requestId.toString(),
+                "Alter gespeicherter Titel"
+        );
+
+        Component bubble = (Component) invokePrivate(
+                view,
+                "buildRequestCardBubble",
+                new Class<?>[]{ChatMessageDto.class},
+                requestCard);
+
+        assertThat(containsTextPart(bubble, "Angebot: Alter gespeicherter Titel")).isTrue();
+        assertThat(containsTextPart(bubble, "Status: Unbekannt")).isTrue();
+    }
+
     private boolean containsText(Component root, String text) {
-        if (root instanceof Span span && text.equals(span.getText())) {
+        if (root instanceof HasText hasText && text.equals(hasText.getText())) {
             return true;
         }
         return root.getChildren().anyMatch(child -> containsText(child, text));
     }
 
     private boolean containsTextPart(Component root, String textPart) {
-        if (root instanceof Span span && span.getText() != null && span.getText().contains(textPart)) {
+        if (root instanceof HasText hasText && hasText.getText() != null && hasText.getText().contains(textPart)) {
             return true;
         }
         return root.getChildren().anyMatch(child -> containsTextPart(child, textPart));
+    }
+
+    private static final class TestChatService extends ChatService {
+        private List<ChatConversationDto> conversations = List.of();
+        private final Map<String, List<ChatMessageDto>> messagesByConversation = new HashMap<>();
+
+        private TestChatService() {
+            super(null, null, null, null, null, null, null, null, null);
+        }
+
+        @Override
+        public List<ChatConversationDto> getCurrentUserConversations() {
+            return conversations;
+        }
+
+        @Override
+        public List<ChatMessageDto> getMessages(String conversationId) {
+            return messagesByConversation.getOrDefault(conversationId, List.of());
+        }
+
+        @Override
+        public void markConversationAsRead(String conversationId) {
+        }
+
+        @Override
+        public Map<String, Long> getUnreadCountsByConversation() {
+            return Map.of();
+        }
+    }
+
+    private static final class TestAuthenticatedUser extends AuthenticatedUser {
+        private final User user;
+
+        private TestAuthenticatedUser(User user) {
+            super(null);
+            this.user = user;
+        }
+
+        @Override
+        public Optional<User> get() {
+            return Optional.ofNullable(user);
+        }
+    }
+
+    private static final class TestRequestService extends RequestService {
+        private final Map<UUID, OfferRequestChatCardDto> detailsByRequestId = new HashMap<>();
+        private final Set<UUID> failingRequestIds = new HashSet<>();
+
+        private TestRequestService() {
+            super(null, null, null);
+        }
+
+        @Override
+        public OfferRequestChatCardDto findChatCardDetails(UUID requestId) {
+            if (failingRequestIds.contains(requestId)) {
+                throw new RuntimeException("Request fehlt");
+            }
+            return detailsByRequestId.get(requestId);
+        }
+    }
+
+    private static final class TestBookingService extends BookingService {
+        private TestBookingService() {
+            super(null, null, null, null, null);
+        }
+
+        @Override
+        public boolean isBookingCancelledForRequest(UUID requestId) {
+            return false;
+        }
     }
 
     private Object getField(Object target, String fieldName) throws Exception {

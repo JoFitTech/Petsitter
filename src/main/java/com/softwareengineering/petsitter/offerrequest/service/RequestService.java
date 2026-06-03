@@ -3,9 +3,11 @@ package com.softwareengineering.petsitter.offerrequest.service;
 import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
+import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.DuplicateRequestException;
 import com.softwareengineering.petsitter.shared.exception.ForbiddenOperationException;
@@ -219,6 +221,28 @@ public class RequestService {
     }
 
     @Transactional(readOnly = true)
+    public OfferRequestChatCardDto findChatCardDetails(UUID requestId) {
+        OfferRequest request = findById(requestId);
+        Offer offer = request.getOffer();
+        if (offer == null) {
+            throw new BusinessRuleViolationException("Request hat kein gueltiges Offer");
+        }
+        return new OfferRequestChatCardDto(
+                request.getId(),
+                request.getStatus(),
+                titleOrFallback(offer),
+                offer.getOfferType(),
+                offer.getStartDate(),
+                offer.getEndDate(),
+                offer.getFrequency(),
+                offer.getRecurringWeekdays(),
+                offer.getTimeSlot(),
+                petNames(offer),
+                offer.getAnimalType()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public OfferRequest findByIdWithDetails(UUID requestId) {
         OfferRequest req = findById(requestId);
         // Initialize lazy associations within transaction so they remain accessible after it closes
@@ -321,5 +345,22 @@ public class RequestService {
         }
         return normalized;
     }
-}
 
+    private String titleOrFallback(Offer offer) {
+        if (offer.getTitle() != null && !offer.getTitle().isBlank()) {
+            return offer.getTitle();
+        }
+        return "Angebot";
+    }
+
+    private String petNames(Offer offer) {
+        String names = offer.getPets().stream()
+                .filter(Objects::nonNull)
+                .map(Pet::getName)
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .distinct()
+                .collect(java.util.stream.Collectors.joining(", "));
+        return names.isBlank() ? null : names;
+    }
+}

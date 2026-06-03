@@ -10,13 +10,14 @@ import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.image.dto.ImageRefDto;
-import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
+import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
@@ -739,25 +740,20 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             .set("max-width", "60%")
             .set("width", "fit-content");
 
-        String offerTitle = msg.offerTitle() != null ? msg.offerTitle() : "Angebot";
         String requestId = msg.requestId();
-
-        // Determine current request status
-        RequestStatus status = null;
-        if (requestId != null) {
-            try {
-                status = requestService.findById(UUID.fromString(requestId)).getStatus();
-            } catch (Exception e) {
-                log.warn("Could not load request status for card: {}", e.getMessage());
-            }
-        }
+        UUID reqId = parseRequestId(requestId);
+        OfferRequestChatCardDto details = loadRequestCardDetails(reqId);
+        RequestStatus status = details != null ? details.status() : null;
+        String offerTitle = details != null && !isBlank(details.offerTitle())
+                ? details.offerTitle()
+                : fallbackOfferTitle(msg.offerTitle());
 
         // Styling and content based on status
         if (status == RequestStatus.ACCEPTED) {
             boolean cancelled = false;
-            if (requestId != null) {
+            if (reqId != null) {
                 try {
-                    cancelled = bookingService.isBookingCancelledForRequest(UUID.fromString(requestId));
+                    cancelled = bookingService.isBookingCancelledForRequest(reqId);
                 } catch (Exception e) {
                     log.warn("Could not check booking cancellation: {}", e.getMessage());
                 }
@@ -765,25 +761,24 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             if (cancelled) {
                 card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
                 card.add(makeCardTitle("🚫 Buchung storniert", "#7a6050"));
-                card.add(makeCardOfferSpan(offerTitle));
+                addRequestCardDetails(card, offerTitle, details);
             } else {
                 card.getStyle().set("background", "#edf7ed").set("border", "1px solid #b8ddb8");
                 card.add(makeCardTitle("✅ Anfrage angenommen", "#2e7d32"));
-                card.add(makeCardOfferSpan(offerTitle));
+                addRequestCardDetails(card, offerTitle, details);
             }
         } else if (status == RequestStatus.DENIED) {
             card.getStyle().set("background", "#f5f5f5").set("border", "1px solid #d0c8c0");
             card.add(makeCardTitle("❌ Anfrage abgelehnt", "#7a6050"));
-            card.add(makeCardOfferSpan(offerTitle));
+            addRequestCardDetails(card, offerTitle, details);
         } else if (status == RequestStatus.PENDING && isRecipient) {
             card.getStyle().set("background", "#fff8ec").set("border", "1px solid #f0d8a8");
             card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
-            card.add(makeCardOfferSpan(offerTitle));
+            addRequestCardDetails(card, offerTitle, details);
 
             HorizontalLayout buttons = new HorizontalLayout();
             buttons.getStyle().set("margin-top", "10px");
 
-            UUID reqId = UUID.fromString(requestId);
             Button acceptBtn = new Button("Annehmen", e -> handleAcceptRequest(reqId));
             acceptBtn.getStyle().set("background", "#774f35").set("color", "white").set("border-radius", "8px");
 
@@ -804,7 +799,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             // PENDING as sender, or unknown status
             card.getStyle().set("background", "#f0f4ff").set("border", "1px solid #c5d0e8");
             card.add(makeCardTitle("📋 Angebotsanfrage", "#4a3428"));
-            card.add(makeCardOfferSpan(offerTitle));
+            addRequestCardDetails(card, offerTitle, details);
             Span statusSpan = new Span(status == RequestStatus.PENDING ? "Status: Ausstehend" : "Status: Unbekannt");
             statusSpan.getStyle().set("font-size", "12px").set("color", "#7a6050").set("font-style", "italic").set("display", "block").set("margin-top", "4px");
             card.add(statusSpan);
@@ -826,6 +821,50 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         return row;
     }
 
+    private OfferRequestChatCardDto loadRequestCardDetails(UUID requestId) {
+        if (requestId == null) {
+            return null;
+        }
+        try {
+            return requestService.findChatCardDetails(requestId);
+        } catch (Exception e) {
+            log.warn("Could not load request card details: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private UUID parseRequestId(String requestId) {
+        if (requestId == null || requestId.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(requestId);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid request id on chat card: {}", requestId);
+            return null;
+        }
+    }
+
+    private void addRequestCardDetails(Div card, String offerTitle, OfferRequestChatCardDto details) {
+        card.add(makeCardDetailSpan("Angebot", offerTitle));
+        if (details == null) {
+            return;
+        }
+        card.add(makeCardDetailSpan("Zeitraum", OfferCardComponent.formatSchedule(
+                details.frequency(),
+                details.startDate(),
+                details.endDate(),
+                details.recurringWeekdays(),
+                details.timeSlot())));
+        if (!isBlank(details.petSummary())) {
+            card.add(makeCardDetailSpan("Tiere", details.petSummary()));
+        } else if (details.animalType() != null) {
+            card.add(makeCardDetailSpan("Tierart", details.animalType().label()));
+        } else {
+            card.add(makeCardDetailSpan("Tiere", "Nicht angegeben"));
+        }
+    }
+
     private Span makeCardTitle(String text, String color) {
         Span s = new Span(text);
         s.getStyle().set("font-weight", "700").set("font-size", "13px").set("color", color)
@@ -833,10 +872,22 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         return s;
     }
 
-    private Span makeCardOfferSpan(String offerTitle) {
-        Span s = new Span("Angebot: " + offerTitle);
-        s.getStyle().set("font-size", "13px").set("color", "#7a6050").set("display", "block");
+    private Span makeCardDetailSpan(String label, String value) {
+        Span s = new Span(label + ": " + (isBlank(value) ? "–" : value));
+        s.getStyle()
+            .set("font-size", "13px")
+            .set("color", "#7a6050")
+            .set("display", "block")
+            .set("line-height", "1.35");
         return s;
+    }
+
+    private String fallbackOfferTitle(String offerTitle) {
+        return isBlank(offerTitle) ? "Angebot" : offerTitle;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private void handleAcceptRequest(UUID requestId) {

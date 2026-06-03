@@ -427,8 +427,14 @@ public class RegistrateView extends VerticalLayout {
                     passwortConfirmField.setErrorMessage("Passwörter stimmen nicht überein");
                     valid = false;
                 }
-                if (valid)
+                if (valid) {
+                    if (userService.isEmailVerified(emailField.getValue())) {
+                        showError("Es existiert bereits ein Account mit dieser E-Mail-Adresse. Du wirst zum Login weitergeleitet.");
+                        UI.getCurrent().getPage().executeJs("setTimeout(() => window.location.href = 'login', 2500)");
+                        return;
+                    }
                     datenTab.click();
+                }
             } else {
                 boolean valid = true;
                 if (vornameField.getValue().isBlank()) {

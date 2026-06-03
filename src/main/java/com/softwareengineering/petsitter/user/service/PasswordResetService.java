@@ -66,7 +66,7 @@ public class PasswordResetService {
 
         if (userOpt.isEmpty()) {
             log.info("Passwort-Reset für nicht verifizierte oder unbekannte E-Mail angefordert: {}", email);
-            return UserAuthResult.success(GENERIC_REQUEST_MESSAGE, null);
+            return UserAuthResult.failure("Es gibt keinen Account mit dieser E-Mail-Adresse.");
         }
 
         invalidateCodesForEmail(email);

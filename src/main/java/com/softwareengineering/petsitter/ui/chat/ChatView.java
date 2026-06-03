@@ -693,10 +693,10 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         if (ownReview) {
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-            row.add(buildAvatar("Ich"), card);
+            row.add(buildAvatar(activeCurrentUserImage), card);
         } else {
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
-            row.add(buildAvatar(activeCounterpartName), card);
+            row.add(buildAvatar(activeCounterpartImage), card);
         }
 
         return row;

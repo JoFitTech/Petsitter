@@ -4,12 +4,14 @@ import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.dto.BookingDto;
 import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.wallet.domain.PaymentStatus;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
 import com.vaadin.flow.component.html.H3;
@@ -23,6 +25,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.select.Select;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.router.QueryParameters;
 import com.vaadin.flow.server.VaadinSession;
 
@@ -49,15 +52,22 @@ public class MyBookings extends Div {
 
     private final BookingService bookingService;
     private final ChatService chatService;
+    private final UserReviewService userReviewService;
     private final AuthenticatedUser authenticatedUser;
     private final Div bookingsContainer = new Div();
 
     private String activeFilter = "ALLE";   // ALLE | AKTIV | STORNIERT | VERGANGEN
     private String activeSort   = "STARTDATUM"; // STARTDATUM | BUCHUNGSDATUM
 
-    public MyBookings(BookingService bookingService, ChatService chatService, AuthenticatedUser authenticatedUser) {
+    public MyBookings(
+            BookingService bookingService,
+            ChatService chatService,
+            UserReviewService userReviewService,
+            AuthenticatedUser authenticatedUser
+    ) {
         this.bookingService = bookingService;
         this.chatService = chatService;
+        this.userReviewService = userReviewService;
         this.authenticatedUser = authenticatedUser;
 
         setWidthFull();
@@ -323,12 +333,15 @@ public class MyBookings extends Div {
 
         if (dto.status() == BookingStatus.CREATED) {
             card.add(chatBtn);
+            addCompletionAction(card, dto, currentUserId);
             addPaymentActions(card, dto, currentUserId, isOwner);
             if (!hasStarted(dto)) {
                 card.add(buildCancelLink(dto));
             }
         } else {
-            card.add(chatBtn, buildHideLink(dto.id()));
+            card.add(chatBtn);
+            addReviewAction(card, dto, currentUserId);
+            card.add(buildHideLink(dto.id()));
         }
 
         return card;
@@ -364,6 +377,15 @@ public class MyBookings extends Div {
         }
     }
 
+    private void addCompletionAction(Div card, BookingDto dto, UUID currentUserId) {
+        if (dto.endDate() == null || !LocalDate.now().isAfter(dto.endDate())) {
+            return;
+        }
+
+        card.add(actionButton("Termin als abgeschlossen markieren",
+                () -> completeBooking(dto.id(), currentUserId)));
+    }
+
     private Button actionButton(String label, Runnable action) {
         Button button = new Button(label);
         button.setWidthFull();
@@ -397,6 +419,101 @@ public class MyBookings extends Div {
         try {
             bookingService.requestPaymentRelease(bookingId, currentUserId);
             Notification.show("Auszahlung wurde angefordert.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+
+    private void completeBooking(UUID bookingId, UUID currentUserId) {
+        try {
+            bookingService.markBookingCompleted(bookingId, currentUserId);
+            Notification.show("Termin als abgeschlossen markiert.")
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            renderBookings();
+        } catch (Exception exception) {
+            Notification.show("Fehler: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+
+    private void addReviewAction(Div card, BookingDto dto, UUID currentUserId) {
+        if (dto.status() != BookingStatus.COMPLETED) {
+            return;
+        }
+
+        boolean alreadyReviewed;
+        try {
+            alreadyReviewed = userReviewService.hasUserReviewedBooking(dto.id(), currentUserId);
+        } catch (Exception exception) {
+            Notification.show("Bewertungsstatus konnte nicht geladen werden: " + exception.getMessage())
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            return;
+        }
+
+        if (alreadyReviewed) {
+            Span done = new Span("Du hast diese Buchung bereits bewertet.");
+            done.getStyle()
+                    .set("display", "block")
+                    .set("margin-top", "12px")
+                    .set("font-size", "12px")
+                    .set("font-weight", "700")
+                    .set("color", "#4f7f45");
+            card.add(done);
+            return;
+        }
+
+        card.add(actionButton("Bewertung abgeben", () -> openReviewDialog(dto.id(), currentUserId)));
+    }
+
+    private void openReviewDialog(UUID bookingId, UUID currentUserId) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Buchung bewerten");
+        dialog.setWidth("480px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(false);
+        content.getStyle().set("gap", "10px");
+
+        Select<Integer> rating = new Select<>();
+        rating.setLabel("Sterne");
+        rating.setItems(5, 4, 3, 2, 1);
+        rating.setValue(5);
+        rating.setWidthFull();
+
+        TextArea comment = new TextArea("Kommentar (optional)");
+        comment.setMaxLength(100);
+        comment.setWidthFull();
+        comment.setMinHeight("110px");
+
+        Button submit = new Button("Bewertung speichern", e ->
+                submitReview(bookingId, currentUserId, rating.getValue(), comment.getValue(), dialog));
+        submit.setWidthFull();
+        submit.getStyle()
+                .set("border-radius", "24px")
+                .set("background", DARK)
+                .set("color", "white")
+                .set("font-weight", "700");
+
+        content.add(rating, comment, submit);
+        dialog.add(content);
+        dialog.open();
+    }
+
+    private void submitReview(UUID bookingId, UUID currentUserId, Integer rating, String comment, Dialog dialog) {
+        if (rating == null) {
+            Notification.show("Bitte waehle eine Sternebewertung aus.")
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            return;
+        }
+
+        try {
+            userReviewService.submitReview(bookingId, currentUserId, rating, comment);
+            dialog.close();
+            Notification.show("Bewertung gespeichert.")
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             renderBookings();
         } catch (Exception exception) {

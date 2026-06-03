@@ -91,7 +91,6 @@ Gegenmaßnahmen im Projekt:
 
 Weitere notwendige Maßnahmen:
 
-- HTTPS verpflichtend.
 - Cookie-Flags `Secure`, `HttpOnly` und `SameSite` prüfen.
 - Remember-Me-Key ausschließlich als Secret konfigurieren.
 - Session-Fixation-Schutz prüfen und dokumentieren.
@@ -102,7 +101,7 @@ Risiko: Ein Nutzer könnte fremde Konversationen lesen oder Nachrichten in fremd
 
 Gegenmaßnahmen im Projekt:
 
-- Chat ist an Buchungen gekoppelt.
+- Chat ist an User/Buchungs gekoppelt.
 - Chat-Zugriff wird über Owner/Sitter-Beziehung geprüft.
 - Chatoperationen laufen über ChatService und ChatAccessService.
 - Nur beteiligte Nutzer einer Buchung dürfen Konversationen sehen und Nachrichten senden.
@@ -140,11 +139,9 @@ Gegenmaßnahmen im Projekt:
 - Relationale Daten liegen in MySQL.
 - Chatdaten liegen getrennt in MongoDB.
 - Schemaänderungen erfolgen über Flyway.
-- Testumgebung nutzt H2.
 
 Weitere notwendige Maßnahmen:
 
-- Datenbankzugangsdaten als Secrets verwalten.
 - Backups und Restore-Prozess definieren.
 - Minimale Datenbankrechte pro Anwendung.
 - Verschlüsselung ruhender Daten prüfen.
@@ -223,17 +220,10 @@ Weitere notwendige Maßnahmen:
 
 Technisch gibt es die Rollen:
 
-- `ADMIN`
+- `ADMIN` <!-- TODO: Admin nun raus oder nicht? -->
 - `SIGNED_IN_USER`
 
 Fachlich können angemeldete Nutzer sowohl Tierhalter als auch Sitter sein. Diese Unterscheidung ist im Projekt eher durch fachliche Aktionen und Datenbeziehungen abgebildet, nicht als starres separates Rollenmodell. Ein Nutzer kann also je nach Kontext Haustiere besitzen, Angebote erstellen oder Betreuungsleistungen anbieten.
-
-Für eine produktive Version sollte geprüft werden, ob zusätzliche Rollen sinnvoll sind:
-
-- `OWNER`
-- `SITTER`
-- `ADMIN`
-- `SUPPORT`
 
 ## Shift Security Left
 
@@ -279,3 +269,5 @@ Aktuell werden Build und Tests automatisiert ausgeführt. Es fehlen noch automat
 ## Fazit
 
 Das Projekt enthält bereits mehrere sinnvolle Sicherheitsmaßnahmen. Besonders relevant sind Spring Security, BCrypt, Passwortregeln, Registrierungscodes, Session-Logout, Remember-Me-Begrenzung und die Zugriffskontrolle im Chat. Für ein reales Produkt müssten vor allem Deployment-Sicherheit, Secrets, HTTPS, Audit-Logging, Rate-Limiting, Security-Tests und automatisierte Security-Checks erweitert werden.
+
+Stand: 01.06.2026

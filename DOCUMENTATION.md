@@ -22,28 +22,31 @@ Ziel war eine funktionale Plattform, über die Benutzer:
 
 - ein Profil erstellen,
 - Haustiere registrieren,
-- Angebote und Betreuungsanfragen erstellen,
+- Angebote und Betreuungsanfragen erstellen/verwalten,
 - passende Angebote finden,
 - Anfragen stellen,
-- Buchungen abschließen,
-- Chatnachrichten im Kontext einer Buchung austauschen können.
+- Buchungen abschließen/verwalten,
+- Chatnachrichten im Kontext einer Buchung austauschen können,
+- Bewertungen der Nutzer erhalten/erstellen,
+- Favoriten speichern,
+- Paymentmethoden hinterlegen können.
 
 Neben der funktionalen Umsetzung standen Architektur, Testing, Dokumentation, Security-Verständnis, Teamarbeit und CI im Fokus.
 
 ## Technologiestack
 
-| Bereich | Technologie |
-|---|---|
-| Sprache | Java 21 |
-| Backend | Spring Boot |
-| Build | Maven |
-| UI | Vaadin |
-| Relationale Persistenz | MySQL |
-| Chat-Persistenz | MongoDB |
-| Migrationen | Flyway |
+| Bereich | Technologie                                       |
+|---|---------------------------------------------------|
+| Sprache | Java 21                                           |
+| Backend | Spring Boot                                       |
+| Build | Maven                                             |
+| UI | Vaadin (erweitert mit CSS)                        |
+| Relationale Persistenz | MySQL                                             |
+| Chat-Persistenz | MongoDB                                           |
+| Migrationen | Flyway                                            |
 | Tests | JUnit, Spring Boot Test, Spring Security Test, H2 |
-| Container | Docker Compose |
-| CI | GitHub Actions |
+| Container | Docker Compose                                    |
+| CI | GitHub Actions                                    |
 
 ## Architektur
 
@@ -58,8 +61,6 @@ Die Schichten sind:
 | Repository Layer | Datenbankzugriff über Spring Data |
 | Domain Layer | Entities, Enums und fachliche Datenmodelle |
 | Persistence Layer | MySQL, MongoDB, Flyway-Migrationen |
-
-Geschäftslogik liegt primär in Services. Entities dienen vor allem als Datenmodell. Repositories werden als Query-Layer genutzt.
 
 ## Zentrale Fachbereiche
 

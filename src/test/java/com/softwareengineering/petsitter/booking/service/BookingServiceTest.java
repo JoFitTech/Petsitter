@@ -214,6 +214,44 @@ class BookingServiceTest {
                 .isInstanceOf(ForbiddenOperationException.class);
     }
 
+    @Test
+    void markBookingCompleted_setsCompletedWhenBookingEnded() {
+        User owner = user(UUID.randomUUID());
+        User sitter = user(UUID.randomUUID());
+        Booking booking = existingBooking(UUID.randomUUID(), owner, sitter, BookingStatus.CREATED);
+        booking.setEndDate(LocalDate.now().minusDays(1));
+
+        AtomicReference<Booking> savedBooking = new AtomicReference<>();
+        BookingService service = serviceWith(
+                requestRepositoryEmpty(),
+                offerRepositoryCapturing(new AtomicReference<>()),
+                bookingRepositoryWithBooking(booking, savedBooking)
+        );
+
+        Booking result = service.markBookingCompleted(booking.getId(), owner.getId());
+
+        assertThat(result.getStatus()).isEqualTo(BookingStatus.COMPLETED);
+        assertThat(savedBooking.get().getStatus()).isEqualTo(BookingStatus.COMPLETED);
+    }
+
+    @Test
+    void markBookingCompleted_failsWhenEndDateNotPassed() {
+        User owner = user(UUID.randomUUID());
+        User sitter = user(UUID.randomUUID());
+        Booking booking = existingBooking(UUID.randomUUID(), owner, sitter, BookingStatus.CREATED);
+        booking.setEndDate(LocalDate.now());
+
+        BookingService service = serviceWith(
+                requestRepositoryEmpty(),
+                offerRepositoryCapturing(new AtomicReference<>()),
+                bookingRepositoryWithBooking(booking, new AtomicReference<>())
+        );
+
+        assertThatThrownBy(() -> service.markBookingCompleted(booking.getId(), owner.getId()))
+                .isInstanceOf(BusinessRuleViolationException.class)
+                .hasMessageContaining("Enddatum");
+    }
+
     // ── Domain object factories ──────────────────────────────────────────
 
     private User user(UUID id) {

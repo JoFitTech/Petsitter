@@ -259,6 +259,67 @@ class ChatServiceTest {
                 .isInstanceOf(BusinessRuleViolationException.class);
     }
 
+    @Test
+    void saveReviewNotificationMessage_persistsReviewCardAndPublishesEvent() {
+        UUID reviewerId = UUID.randomUUID();
+        UUID recipientId = UUID.randomUUID();
+        UUID bookingId = UUID.randomUUID();
+
+        ChatConversationDocument conversation = new ChatConversationDocument();
+        conversation.setId("conv-review");
+        conversation.setOwnerId(reviewerId);
+        conversation.setSitterId(recipientId);
+        conversation.setBookingId(bookingId);
+        when(conversationRepository.findById("conv-review")).thenReturn(Optional.of(conversation));
+        when(messageRepository.save(any(ChatMessageDocument.class))).thenAnswer(invocation -> {
+            ChatMessageDocument saved = invocation.getArgument(0);
+            saved.setId("msg-review");
+            return saved;
+        });
+
+        chatService.saveReviewNotificationMessage("conv-review", reviewerId, 4, "Sehr zuverlässig");
+
+        assertThat(conversation.getLastMessageAt()).isNotNull();
+        assertThat(conversation.getLastMessagePreview()).contains("Neue Bewertung");
+        verify(conversationRepository).save(conversation);
+        verify(messageRepository).save(any(ChatMessageDocument.class));
+        verify(eventBus).publish(any(ChatMessageDto.class));
+    }
+
+    @Test
+    void postReviewReminderCard_persistsReminderCardAndUpdatesConversation() {
+        UUID bookingId = UUID.randomUUID();
+
+        ChatConversationDocument conversation = new ChatConversationDocument();
+        conversation.setId("conv-reminder");
+        conversation.setOwnerId(UUID.randomUUID());
+        conversation.setSitterId(UUID.randomUUID());
+        conversation.setBookingId(bookingId);
+        when(conversationRepository.findById("conv-reminder")).thenReturn(Optional.of(conversation));
+        when(messageRepository.save(any(ChatMessageDocument.class))).thenAnswer(invocation -> {
+            ChatMessageDocument saved = invocation.getArgument(0);
+            saved.setId("msg-reminder");
+            return saved;
+        });
+
+        chatService.postReviewReminderCard("conv-reminder", bookingId);
+
+        assertThat(conversation.getLastMessageAt()).isNotNull();
+        assertThat(conversation.getLastMessagePreview()).contains("Bewertung");
+        verify(conversationRepository).save(conversation);
+        verify(messageRepository).save(any(ChatMessageDocument.class));
+        verify(eventBus).publish(any(ChatMessageDto.class));
+    }
+
+    @Test
+    void postReviewReminderCard_throwsNotFoundWhenConversationDoesNotExist() {
+        UUID bookingId = UUID.randomUUID();
+        when(conversationRepository.findById("conv-nonexistent")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> chatService.postReviewReminderCard("conv-nonexistent", bookingId))
+            .isInstanceOf(NotFoundException.class);
+    }
+
     private User user(String firstName, String lastName) {
         User user = new User();
         user.setId(UUID.randomUUID());

@@ -158,11 +158,81 @@ class ChatViewIntegrationTest {
         assertThat(containsText(view, "Neue Event-Nachricht")).isTrue();
     }
 
+    @Test
+    void chatView_rendersReviewCardWithStarsAndComment() throws Exception {
+        ChatService chatService = Mockito.mock(ChatService.class);
+        ChatEventBus eventBus = Mockito.mock(ChatEventBus.class);
+        AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
+        RequestService requestService = Mockito.mock(RequestService.class);
+        BookingService bookingService = Mockito.mock(BookingService.class);
+        UserService userService = Mockito.mock(UserService.class);
+
+        UUID currentUserId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        User currentUser = new User();
+        currentUser.setId(currentUserId);
+        currentUser.setFirstName("Anna");
+        currentUser.setLastName("Owner");
+
+        when(authenticatedUser.get()).thenReturn(Optional.of(currentUser));
+        when(eventBus.register(eq(currentUserId), any())).thenReturn((Registration) () -> { });
+        when(eventBus.registerTyping(eq(currentUserId), any())).thenReturn((Registration) () -> { });
+        when(eventBus.registerRefresh(eq(currentUserId), any())).thenReturn((Registration) () -> { });
+
+        ChatConversationDto conversation = new ChatConversationDto(
+                "conv-review",
+                UUID.randomUUID(),
+                currentUserId,
+                otherUserId,
+                "Anna Owner",
+                "Ben Sitter",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                "Preview",
+                null,
+                null
+        );
+
+        when(chatService.getCurrentUserConversations()).thenReturn(List.of(conversation));
+        when(chatService.getMessages("conv-review")).thenReturn(List.of());
+
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
+        invokePrivate(view, "selectConversation", new Class<?>[]{String.class}, "conv-review");
+
+        ChatMessageDto reviewMessage = new ChatMessageDto(
+                "m-review",
+                "conv-review",
+                conversation.bookingId(),
+                otherUserId,
+                currentUserId,
+                "[RATING:4] Sehr zuverlässig",
+                LocalDateTime.now(),
+                false,
+                "REVIEW_CARD",
+                null,
+                null
+        );
+
+        Component bubble = (Component) invokePrivate(view, "buildReviewCardBubble", new Class<?>[]{ChatMessageDto.class}, reviewMessage);
+
+        assertThat(containsTextPart(bubble, "Neue Bewertung")).isTrue();
+        assertThat(containsTextPart(bubble, "Sterne:")).isTrue();
+        assertThat(containsTextPart(bubble, "Sehr zuverlässig")).isTrue();
+    }
+
     private boolean containsText(Component root, String text) {
         if (root instanceof Span span && text.equals(span.getText())) {
             return true;
         }
         return root.getChildren().anyMatch(child -> containsText(child, text));
+    }
+
+    private boolean containsTextPart(Component root, String textPart) {
+        if (root instanceof Span span && span.getText() != null && span.getText().contains(textPart)) {
+            return true;
+        }
+        return root.getChildren().anyMatch(child -> containsTextPart(child, textPart));
     }
 
     private Object getField(Object target, String fieldName) throws Exception {
@@ -177,4 +247,3 @@ class ChatViewIntegrationTest {
         return method.invoke(target, args);
     }
 }
-

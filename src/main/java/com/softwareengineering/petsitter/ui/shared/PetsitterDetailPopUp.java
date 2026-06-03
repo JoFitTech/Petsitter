@@ -225,7 +225,29 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         if (!location.isBlank()) {
-            content.add(readOnlyTextField("Standort", location));
+            Div locationSection = new Div();
+            locationSection.addClassName("offer-location-field");
+            locationSection.getStyle()
+                    .set("width", "100%")
+                    .set("box-sizing", "border-box")
+                    .set("font-family", "Inter, Arial, sans-serif")
+                    .set("color", "#7b5236");
+
+            Span locationLabel = new Span("Standort");
+            locationLabel.getStyle()
+                    .set("display", "block")
+                    .set("color", DARK)
+                    .set("font-size", "14px");
+
+            Span locationText = new Span(location);
+            locationText.getStyle()
+                    .set("display", "block")
+                    .set("font-size", "14px")
+                    .set("line-height", "1.4")
+                    .set("margin-top", "6px");
+
+            locationSection.add(locationLabel, locationText);
+            content.add(locationSection);
         }
 
         // ── Beschreibung ──────────────────────────────────────────────────

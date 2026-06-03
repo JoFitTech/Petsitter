@@ -165,6 +165,7 @@ class ChatViewIntegrationTest {
         AuthenticatedUser authenticatedUser = Mockito.mock(AuthenticatedUser.class);
         RequestService requestService = Mockito.mock(RequestService.class);
         BookingService bookingService = Mockito.mock(BookingService.class);
+        UserService userService = Mockito.mock(UserService.class);
 
         UUID currentUserId = UUID.randomUUID();
         UUID otherUserId = UUID.randomUUID();
@@ -196,7 +197,7 @@ class ChatViewIntegrationTest {
         when(chatService.getCurrentUserConversations()).thenReturn(List.of(conversation));
         when(chatService.getMessages("conv-review")).thenReturn(List.of());
 
-        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService);
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, userService);
         invokePrivate(view, "selectConversation", new Class<?>[]{String.class}, "conv-review");
 
         ChatMessageDto reviewMessage = new ChatMessageDto(
@@ -246,4 +247,3 @@ class ChatViewIntegrationTest {
         return method.invoke(target, args);
     }
 }
-

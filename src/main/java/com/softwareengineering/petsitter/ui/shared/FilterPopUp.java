@@ -3,6 +3,7 @@ package com.softwareengineering.petsitter.ui.shared;
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
@@ -17,6 +18,8 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.dependency.CssImport;
 
+import java.time.DayOfWeek;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -40,6 +43,7 @@ public class FilterPopUp extends Dialog {
 
     /** Currently selected minimum star rating (0-5); 0 means no local rating selection. */
     private int selectedStarRating = 0;
+    private final Set<DayOfWeek> selectedWeekdays = new LinkedHashSet<>();
 
     private final Consumer<AdditionalFilters> onApply;
 
@@ -148,7 +152,31 @@ public class FilterPopUp extends Dialog {
 
         dienstleistungSection.add(dienstleistungLabel, dienstleistungBox);
 
-        // ── Section 4: Bewertung (min.) ───────────────────────────────────
+        // ── Section 4: Wochentage ────────────────────────────────────────
+        Div weekdaySection = buildCard();
+        Span weekdayLabel = sectionLabel("Wochentage");
+        if (initialCriteria != null) {
+            selectedWeekdays.addAll(initialCriteria.recurringWeekdays());
+        }
+        HorizontalLayout weekdayRow = buildWeekdayRow();
+        weekdaySection.add(weekdayLabel, weekdayRow);
+
+        // ── Section 5: Tageszeit ─────────────────────────────────────────
+        Div timeSlotSection = buildCard();
+        Span timeSlotLabel = sectionLabel("Tageszeit");
+        ComboBox<OfferTimeSlot> timeSlotBox = new ComboBox<>();
+        timeSlotBox.setItems(OfferTimeSlot.values());
+        timeSlotBox.setItemLabelGenerator(OfferTimeSlot::label);
+        timeSlotBox.setPlaceholder("Egal");
+        timeSlotBox.setClearButtonVisible(true);
+        timeSlotBox.setWidthFull();
+        applyComboStyle(timeSlotBox);
+        if (initialCriteria != null && initialCriteria.timeSlot() != null) {
+            timeSlotBox.setValue(initialCriteria.timeSlot());
+        }
+        timeSlotSection.add(timeSlotLabel, timeSlotBox);
+
+        // ── Section 6: Bewertung (min.) ───────────────────────────────────
         Div bewertungSection = buildCard();
 
         Span bewertungLabel = sectionLabel("Bewertung (min.)");
@@ -181,6 +209,9 @@ public class FilterPopUp extends Dialog {
             betreuungBox.clear();
             tierartenBox.clear();
             dienstleistungBox.clear();
+            selectedWeekdays.clear();
+            refreshWeekdayRow(weekdayRow);
+            timeSlotBox.clear();
             selectedStarRating = 0;
             refreshStarRow(starRow);
         });
@@ -201,13 +232,15 @@ public class FilterPopUp extends Dialog {
             this.onApply.accept(new AdditionalFilters(
                     betreuungBox.getValue(),
                     dienstleistungBox.getValue(),
-                    tierartenBox.getValue()));
+                    tierartenBox.getValue(),
+                    Set.copyOf(selectedWeekdays),
+                    timeSlotBox.getValue()));
         });
 
         footer.add(resetBtn, applyBtn);
 
         content.add(header, betreuungSection, tierartenSection, dienstleistungSection,
-                bewertungSection, footer);
+                weekdaySection, timeSlotSection, bewertungSection, footer);
         add(content);
     }
 
@@ -219,6 +252,55 @@ public class FilterPopUp extends Dialog {
         row.getStyle().set("gap", "12px").set("margin-top", "4px");
         refreshStarRow(row);
         return row;
+    }
+
+    private HorizontalLayout buildWeekdayRow() {
+        HorizontalLayout row = new HorizontalLayout();
+        row.setSpacing(false);
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.getStyle().set("gap", "8px").set("flex-wrap", "wrap").set("margin-top", "4px");
+        refreshWeekdayRow(row);
+        return row;
+    }
+
+    private void refreshWeekdayRow(HorizontalLayout row) {
+        row.removeAll();
+        for (DayOfWeek day : DayOfWeek.values()) {
+            Button dayButton = new Button(shortDayLabel(day));
+            boolean selected = selectedWeekdays.contains(day);
+            dayButton.getStyle()
+                    .set("background", selected ? BROWN : "#fff6e6")
+                    .set("color", selected ? "white" : DARK)
+                    .set("border", "1.5px solid " + (selected ? BROWN : "#e9d5ae"))
+                    .set("border-radius", "999px")
+                    .set("height", "34px")
+                    .set("min-width", "42px")
+                    .set("padding", "0 12px")
+                    .set("font-weight", "800")
+                    .set("box-shadow", "none")
+                    .set("cursor", "pointer");
+            dayButton.addClickListener(e -> {
+                if (selectedWeekdays.contains(day)) {
+                    selectedWeekdays.remove(day);
+                } else {
+                    selectedWeekdays.add(day);
+                }
+                refreshWeekdayRow(row);
+            });
+            row.add(dayButton);
+        }
+    }
+
+    private String shortDayLabel(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> "Mo";
+            case TUESDAY -> "Di";
+            case WEDNESDAY -> "Mi";
+            case THURSDAY -> "Do";
+            case FRIDAY -> "Fr";
+            case SATURDAY -> "Sa";
+            case SUNDAY -> "So";
+        };
     }
 
     /**
@@ -294,10 +376,13 @@ public class FilterPopUp extends Dialog {
     public record AdditionalFilters(
             OfferCareType careType,
             OfferFrequency frequency,
-            Set<OfferAnimalType> animalTypes
+            Set<OfferAnimalType> animalTypes,
+            Set<DayOfWeek> recurringWeekdays,
+            OfferTimeSlot timeSlot
     ) {
         public AdditionalFilters {
             animalTypes = animalTypes == null ? Set.of() : Set.copyOf(animalTypes);
+            recurringWeekdays = recurringWeekdays == null ? Set.of() : Set.copyOf(recurringWeekdays);
         }
     }
 }

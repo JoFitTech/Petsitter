@@ -9,6 +9,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferSearchMode;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferSearchCriteria;
@@ -50,6 +51,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
@@ -157,7 +159,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 defaultCriteria.originPostalCode(),
                 null,
                 null,
-                Set.of());
+                Set.of(),
+                Set.of(),
+                null);
         }
 
         return new OfferSearchCriteria(
@@ -171,7 +175,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 parseOriginPostalCode(firstValue(parameters, "originPostalCode")),
                 OfferCareType.fromQueryValue(firstValue(parameters, "careType")),
                 OfferFrequency.fromQueryValue(firstValue(parameters, "frequency")),
-                parseAnimalTypes(parameters.get("animalType")));
+                parseAnimalTypes(parameters.get("animalType")),
+                parseWeekdays(parameters.get("weekday")),
+                OfferTimeSlot.fromQueryValue(firstValue(parameters, "timeSlot")));
     }
 
     private boolean containsAnyFilterParameter(Map<String, List<String>> parameters) {
@@ -184,7 +190,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 || parameters.containsKey("originPostalCode")
                 || parameters.containsKey("careType")
                 || parameters.containsKey("frequency")
-                || parameters.containsKey("animalType");
+                || parameters.containsKey("animalType")
+                || parameters.containsKey("weekday")
+                || parameters.containsKey("timeSlot");
     }
 
     private String firstValue(Map<String, List<String>> parameters, String key) {
@@ -204,6 +212,24 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
             }
         }
         return animalTypes;
+    }
+
+    private Set<DayOfWeek> parseWeekdays(List<String> values) {
+        Set<DayOfWeek> weekdays = new LinkedHashSet<>();
+        if (values == null) {
+            return weekdays;
+        }
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            try {
+                weekdays.add(DayOfWeek.valueOf(value.trim().toUpperCase(java.util.Locale.ROOT)));
+            } catch (IllegalArgumentException ignored) {
+                // Ignore invalid query parameters.
+            }
+        }
+        return weekdays;
     }
 
     private LocalDate parseDate(String value) {
@@ -397,7 +423,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 criteria.originPostalCode(),
                 currentCriteria.careType(),
                 currentCriteria.frequency(),
-                currentCriteria.animalTypes());
+                currentCriteria.animalTypes(),
+                currentCriteria.recurringWeekdays(),
+                currentCriteria.timeSlot());
         UI.getCurrent().navigate("petsitter-suche", queryParametersFor(nextCriteria));
     }
 
@@ -413,7 +441,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 currentCriteria.originPostalCode(),
                 filters.careType(),
                 filters.frequency(),
-                filters.animalTypes());
+                filters.animalTypes(),
+                filters.recurringWeekdays(),
+                filters.timeSlot());
         UI.getCurrent().navigate("petsitter-suche", queryParametersFor(nextCriteria));
     }
 
@@ -451,6 +481,15 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         }
         if (criteria.frequency() != null) {
             parameters.put("frequency", List.of(criteria.frequency().queryValue()));
+        }
+        if (!criteria.recurringWeekdays().isEmpty()) {
+            parameters.put("weekday", criteria.recurringWeekdays().stream()
+                    .sorted(java.util.Comparator.comparingInt(DayOfWeek::getValue))
+                    .map(day -> day.name().toLowerCase(java.util.Locale.ROOT))
+                    .toList());
+        }
+        if (criteria.timeSlot() != null) {
+            parameters.put("timeSlot", List.of(criteria.timeSlot().queryValue()));
         }
         if (!criteria.animalTypes().isEmpty()) {
             parameters.put("animalType", criteria.animalTypes().stream()
@@ -749,7 +788,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 defaultCriteria.originPostalCode(),
                 null,
                 null,
-                Set.of());
+                Set.of(),
+                Set.of(),
+                null);
     }
 
     private SearchDisplay displayFor(OfferSearchMode mode) {

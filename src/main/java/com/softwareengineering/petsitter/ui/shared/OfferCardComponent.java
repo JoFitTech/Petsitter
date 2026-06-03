@@ -1,6 +1,8 @@
 package com.softwareengineering.petsitter.ui.shared;
 
 import com.softwareengineering.petsitter.offer.domain.OfferAnimalType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.html.*;
@@ -11,10 +13,12 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -153,7 +157,8 @@ public class OfferCardComponent extends Div {
         facts.getStyle().set("gap", "4px");
 
         facts.add(
-                factItem("Zeitraum",   formatDateRange(dto.startDate(), dto.endDate())),
+                factItem("Zeitraum",   formatSchedule(dto.frequency(), dto.startDate(), dto.endDate(),
+                        dto.recurringWeekdays(), dto.timeSlot())),
                 factItem("Verdienst",  formatPrice(dto.price())),
                 factItem("Entfernung", formatDistance(dto.distanceKm()))
         );
@@ -222,6 +227,45 @@ public class OfferCardComponent extends Div {
             return start.format(day) + ".–" + end.format(day) + ". " + start.format(month);
         }
         return start.format(dayMonth) + " – " + end.format(dayMonth);
+    }
+
+    public static String formatSchedule(
+            OfferFrequency frequency,
+            LocalDate start,
+            LocalDate end,
+            Set<DayOfWeek> recurringWeekdays,
+            OfferTimeSlot timeSlot
+    ) {
+        if (frequency == OfferFrequency.REGULAR) {
+            String weekdays = formatWeekdays(recurringWeekdays);
+            if (weekdays.isBlank()) {
+                return timeSlot == null ? "regelmäßig" : timeSlot.label();
+            }
+            return timeSlot == null ? weekdays : weekdays + " · " + timeSlot.label();
+        }
+        return formatDateRange(start, end);
+    }
+
+    public static String formatWeekdays(Set<DayOfWeek> weekdays) {
+        if (weekdays == null || weekdays.isEmpty()) {
+            return "";
+        }
+        return weekdays.stream()
+                .sorted(java.util.Comparator.comparingInt(DayOfWeek::getValue))
+                .map(OfferCardComponent::shortDayLabel)
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private static String shortDayLabel(DayOfWeek day) {
+        return switch (day) {
+            case MONDAY -> "Mo";
+            case TUESDAY -> "Di";
+            case WEDNESDAY -> "Mi";
+            case THURSDAY -> "Do";
+            case FRIDAY -> "Fr";
+            case SATURDAY -> "Sa";
+            case SUNDAY -> "So";
+        };
     }
 
     static String formatPrice(BigDecimal price) {

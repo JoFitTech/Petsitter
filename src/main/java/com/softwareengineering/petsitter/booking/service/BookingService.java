@@ -1,11 +1,14 @@
 package com.softwareengineering.petsitter.booking.service;
 
 import com.softwareengineering.petsitter.booking.domain.Booking;
+import com.softwareengineering.petsitter.booking.domain.BookingPause;
 import com.softwareengineering.petsitter.booking.domain.BookingStatus;
 import com.softwareengineering.petsitter.booking.dto.BookingDto;
 import com.softwareengineering.petsitter.booking.dto.BookingAcceptancePreview;
+import com.softwareengineering.petsitter.booking.repository.BookingPauseRepository;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
 import com.softwareengineering.petsitter.offer.domain.Offer;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
@@ -20,13 +23,16 @@ import com.softwareengineering.petsitter.shared.exception.NotFoundException;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.softwareengineering.petsitter.wallet.dto.BookingPaymentDto;
+import com.softwareengineering.petsitter.wallet.dto.RecurringBookingPaymentSummaryDto;
 import com.softwareengineering.petsitter.wallet.service.WalletService;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.math.RoundingMode;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -54,6 +60,7 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final OfferRequestRepository offerRequestRepository;
     private final OfferRepository offerRepository;
+    private final BookingPauseRepository bookingPauseRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final WalletService walletService;
     private final OfferImagePresentationMapper imagePresentationMapper;
@@ -63,6 +70,7 @@ public class BookingService {
             BookingRepository bookingRepository,
             OfferRequestRepository offerRequestRepository,
             OfferRepository offerRepository,
+            BookingPauseRepository bookingPauseRepository,
             ApplicationEventPublisher eventPublisher,
             WalletService walletService,
             OfferImagePresentationMapper imagePresentationMapper
@@ -70,6 +78,7 @@ public class BookingService {
         this.bookingRepository = bookingRepository;
         this.offerRequestRepository = offerRequestRepository;
         this.offerRepository = offerRepository;
+        this.bookingPauseRepository = bookingPauseRepository;
         this.eventPublisher = eventPublisher;
         this.walletService = walletService;
         this.imagePresentationMapper = imagePresentationMapper;
@@ -82,7 +91,7 @@ public class BookingService {
             ApplicationEventPublisher eventPublisher,
             WalletService walletService
     ) {
-        this(bookingRepository, offerRequestRepository, offerRepository, eventPublisher, walletService, null);
+        this(bookingRepository, offerRequestRepository, offerRepository, null, eventPublisher, walletService, null);
     }
 
     BookingService(
@@ -91,7 +100,7 @@ public class BookingService {
             OfferRepository offerRepository,
             ApplicationEventPublisher eventPublisher
     ) {
-        this(bookingRepository, offerRequestRepository, offerRepository, eventPublisher, null, null);
+        this(bookingRepository, offerRequestRepository, offerRepository, null, eventPublisher, null, null);
     }
 
     /**
@@ -146,13 +155,17 @@ public class BookingService {
         Booking booking = buildBooking(offer, request);
         booking = bookingRepository.save(booking);
         if (walletService != null) {
-            try {
-                walletService.holdForBooking(booking);
-            } catch (InsufficientBalanceException exception) {
-                if (!exception.getOwnerId().equals(offerCreatorId)) {
-                    walletService.notifyTopUpRequired(exception.getOwnerId());
+            if (isRecurring(booking)) {
+                walletService.fundCurrentRecurringWeek(booking);
+            } else {
+                try {
+                    walletService.holdForBooking(booking);
+                } catch (InsufficientBalanceException exception) {
+                    if (!exception.getOwnerId().equals(offerCreatorId)) {
+                        walletService.notifyTopUpRequired(exception.getOwnerId());
+                    }
+                    throw exception;
                 }
-                throw exception;
             }
         }
 
@@ -199,6 +212,11 @@ public class BookingService {
                     "Stornierung nicht moeglich: Die Betreuung hat bereits begonnen.");
         }
 
+        if (isRecurring(booking)) {
+            endRecurringBooking(bookingId, userId);
+            return;
+        }
+
         if (walletService != null) {
             walletService.refundForCancelledBooking(booking);
         }
@@ -208,6 +226,68 @@ public class BookingService {
         Offer offer = booking.getOffer();
         offer.setStatus(OfferStatus.OPEN);
         offerRepository.save(offer);
+    }
+
+    @Transactional
+    public void endRecurringBooking(UUID bookingId, UUID userId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+        requireParticipant(booking, userId);
+        if (!isRecurring(booking)) {
+            throw new BusinessRuleViolationException("Nur regelmaessige Buchungen koennen beendet werden.");
+        }
+
+        booking.setRecurringEndedOn(LocalDate.now());
+        if (walletService != null) {
+            walletService.recalculateHeldRecurringPaymentsForPause(
+                    booking,
+                    LocalDate.now().plusDays(1),
+                    LocalDate.now().plusYears(20));
+        }
+        booking.setStatus(BookingStatus.ENDED);
+        bookingRepository.save(booking);
+
+        Offer offer = booking.getOffer();
+        offer.setStatus(OfferStatus.OPEN);
+        offerRepository.save(offer);
+    }
+
+    @Transactional
+    public void addRecurringPause(UUID bookingId, UUID userId, LocalDate startDate, LocalDate endDate) {
+        if (bookingPauseRepository == null) {
+            throw new BusinessRuleViolationException("Pausen sind nicht konfiguriert.");
+        }
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new NotFoundException("Booking nicht gefunden: " + bookingId));
+        requireParticipant(booking, userId);
+        if (!isRecurring(booking)) {
+            throw new BusinessRuleViolationException("Nur regelmaessige Buchungen koennen pausiert werden.");
+        }
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
+            throw new BusinessRuleViolationException("Bitte einen gueltigen Pausenzeitraum angeben.");
+        }
+        if (startDate.isBefore(LocalDate.now())) {
+            throw new BusinessRuleViolationException("Pausen koennen nur fuer heutige oder zukuenftige Termine eingetragen werden.");
+        }
+
+        User creator = booking.getOwner().getId().equals(userId) ? booking.getOwner() : booking.getSitter();
+        BookingPause pause = new BookingPause();
+        pause.setBooking(booking);
+        pause.setStartDate(startDate);
+        pause.setEndDate(endDate);
+        pause.setCreatedBy(creator);
+        bookingPauseRepository.save(pause);
+        if (walletService != null) {
+            walletService.recalculateHeldRecurringPaymentsForPause(booking, startDate, endDate);
+        }
+    }
+
+    public void releaseRecurringPayments(UUID bookingId, UUID userId) {
+        walletService.releaseRecurringPayments(bookingId, userId);
+    }
+
+    public void requestRecurringPaymentRelease(UUID bookingId, UUID userId) {
+        walletService.requestRecurringRelease(bookingId, userId);
     }
 
     @Transactional(readOnly = true)
@@ -346,6 +426,7 @@ public class BookingService {
 
     private Booking buildBooking(Offer offer, OfferRequest acceptedRequest) {
         BookingParties parties = determineParties(offer, acceptedRequest);
+        OfferFrequency frequency = normalizedFrequency(offer.getFrequency());
 
         Booking booking = new Booking();
         booking.setOffer(offer);
@@ -353,8 +434,11 @@ public class BookingService {
         booking.setOwner(parties.owner());
         booking.setSitter(parties.sitter());
         booking.setPet(offer.getPet());
-        booking.setStartDate(offer.getStartDate());
-        booking.setEndDate(offer.getEndDate());
+        booking.setStartDate(frequency == OfferFrequency.REGULAR ? null : offer.getStartDate());
+        booking.setEndDate(frequency == OfferFrequency.REGULAR ? null : offer.getEndDate());
+        booking.setFrequency(frequency);
+        booking.setTimeSlot(offer.getTimeSlot());
+        booking.setRecurringWeekdays(offer.getRecurringWeekdays());
         booking.setPricePerDay(offer.getPrice());
         booking.setTotalPrice(calculateTotalPrice(offer));
         booking.setStatus(BookingStatus.CREATED);
@@ -377,8 +461,13 @@ public class BookingService {
         String ownerName  = fullName(booking.getOwner());
         String sitterName = fullName(booking.getSitter());
         BookingPaymentDto payment = walletService == null
+                || isRecurring(booking)
                 ? null
                 : walletService.getPaymentForBooking(booking.getId());
+        RecurringBookingPaymentSummaryDto recurringPayment = walletService == null
+                || !isRecurring(booking)
+                ? RecurringBookingPaymentSummaryDto.empty()
+                : walletService.getRecurringPaymentSummary(booking.getId());
 
         return new BookingDto(
                 booking.getId(),
@@ -389,6 +478,10 @@ public class BookingService {
                 petName,
                 booking.getStartDate(),
                 booking.getEndDate(),
+                normalizedFrequency(booking.getFrequency()),
+                booking.getRecurringWeekdays(),
+                booking.getTimeSlot(),
+                booking.getRecurringEndedOn(),
                 booking.getPricePerDay(),
                 booking.getTotalPrice(),
                 booking.getStatus(),
@@ -396,6 +489,11 @@ public class BookingService {
                 payment == null ? null : payment.status(),
                 payment == null ? null : payment.releaseRequestedAt(),
                 payment == null ? null : payment.automaticReleaseAt(),
+                recurringPayment.status(),
+                recurringPayment.payableOccurrences(),
+                recurringPayment.payableAmount(),
+                recurringPayment.releaseRequestedAt(),
+                recurringPayment.automaticReleaseAt(),
                 coverTiles
         );
     }
@@ -410,7 +508,19 @@ public class BookingService {
     }
 
     private BigDecimal calculateTotalPrice(Offer offer) {
-        if (offer.getPrice() == null || offer.getStartDate() == null || offer.getEndDate() == null) {
+        if (offer.getPrice() == null) {
+            throw new BusinessRuleViolationException("Preis und Betreuungszeitraum muessen vollstaendig sein.");
+        }
+        if (normalizedFrequency(offer.getFrequency()) == OfferFrequency.REGULAR) {
+            int occurrences = offer.getRecurringWeekdays().size();
+            if (occurrences <= 0) {
+                throw new BusinessRuleViolationException("Regelmaessige Angebote brauchen mindestens einen Wochentag.");
+            }
+            return offer.getPrice()
+                    .multiply(BigDecimal.valueOf(occurrences))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+        if (offer.getStartDate() == null || offer.getEndDate() == null) {
             throw new BusinessRuleViolationException("Preis und Betreuungszeitraum muessen vollstaendig sein.");
         }
         long days = ChronoUnit.DAYS.between(offer.getStartDate(), offer.getEndDate()) + 1;
@@ -423,6 +533,22 @@ public class BookingService {
     }
 
     private record BookingParties(User owner, User sitter) {
+    }
+
+    private boolean isRecurring(Booking booking) {
+        return booking != null && normalizedFrequency(booking.getFrequency()) == OfferFrequency.REGULAR;
+    }
+
+    private OfferFrequency normalizedFrequency(OfferFrequency frequency) {
+        return frequency == null ? OfferFrequency.ONE_TIME : frequency;
+    }
+
+    private void requireParticipant(Booking booking, UUID userId) {
+        boolean isOwner = booking.getOwner().getId().equals(userId);
+        boolean isSitter = booking.getSitter().getId().equals(userId);
+        if (!isOwner && !isSitter) {
+            throw new ForbiddenOperationException("Nur Owner oder Sitter duerfen diese Buchung verwalten.");
+        }
     }
 
     private String fullName(User user) {

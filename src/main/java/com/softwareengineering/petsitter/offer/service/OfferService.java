@@ -11,6 +11,7 @@ import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferDateFilterMode;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
+import com.softwareengineering.petsitter.offer.domain.OfferTimeSlot;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferDateSelection;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferFormData;
@@ -42,6 +43,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.Collections;
@@ -365,11 +367,49 @@ public class OfferService {
     }
 
     private boolean matchesDateRange(Offer offer, OfferSearchCriteria criteria) {
+        if (isRegular(offer)) {
+            return switch (criteria.dateFilterMode()) {
+                case ANY -> true;
+                case CONTAINED, OVERLAP -> matchesRecurringDateRange(
+                        offer,
+                        adjustedFrom(criteria.from(), criteria.dateFlexDays()),
+                        adjustedTo(criteria.to(), criteria.dateFlexDays()));
+            };
+        }
         return switch (criteria.dateFilterMode()) {
             case ANY -> true;
             case CONTAINED -> matchesContainedDateRange(offer, criteria.from(), criteria.to());
             case OVERLAP -> matchesFlexibleDateRange(offer, criteria.from(), criteria.to(), criteria.dateFlexDays());
         };
+    }
+
+    private LocalDate adjustedFrom(LocalDate from, int flexDays) {
+        return from == null ? null : from.minusDays(Math.max(0, flexDays));
+    }
+
+    private LocalDate adjustedTo(LocalDate to, int flexDays) {
+        return to == null ? null : to.plusDays(Math.max(0, flexDays));
+    }
+
+    private boolean matchesRecurringDateRange(Offer offer, LocalDate from, LocalDate to) {
+        Set<DayOfWeek> weekdays = offer.getRecurringWeekdays();
+        if (weekdays.isEmpty()) {
+            return false;
+        }
+        if (from == null || to == null) {
+            return true;
+        }
+        if (to.isBefore(from)) {
+            return false;
+        }
+        LocalDate cursor = from;
+        while (!cursor.isAfter(to)) {
+            if (weekdays.contains(cursor.getDayOfWeek())) {
+                return true;
+            }
+            cursor = cursor.plusDays(1);
+        }
+        return false;
     }
 
     private boolean matchesContainedDateRange(Offer offer, LocalDate from, LocalDate to) {
@@ -411,6 +451,8 @@ public class OfferService {
     private boolean matchesAdditionalFilters(Offer offer, OfferSearchCriteria criteria) {
         return matchesCareType(offer, criteria.careType())
                 && matchesFrequency(offer, criteria.frequency())
+                && matchesTimeSlot(offer, criteria.timeSlot())
+                && matchesRecurringWeekdays(offer, criteria.recurringWeekdays())
                 && matchesAnimalTypes(offer, criteria.animalTypes());
     }
 
@@ -419,7 +461,35 @@ public class OfferService {
     }
 
     private boolean matchesFrequency(Offer offer, OfferFrequency frequency) {
-        return frequency == null || offer.getFrequency() == frequency;
+        return frequency == null || normalizedFrequency(offer.getFrequency()) == frequency;
+    }
+
+    private boolean matchesTimeSlot(Offer offer, OfferTimeSlot timeSlot) {
+        return timeSlot == null || offer.getTimeSlot() == timeSlot;
+    }
+
+    private boolean matchesRecurringWeekdays(Offer offer, Set<DayOfWeek> weekdays) {
+        if (weekdays == null || weekdays.isEmpty()) {
+            return true;
+        }
+        if (isRegular(offer)) {
+            return offer.getRecurringWeekdays().stream().anyMatch(weekdays::contains);
+        }
+        return matchesOneTimeWeekday(offer, weekdays);
+    }
+
+    private boolean matchesOneTimeWeekday(Offer offer, Set<DayOfWeek> weekdays) {
+        if (offer.getStartDate() == null || offer.getEndDate() == null) {
+            return false;
+        }
+        LocalDate cursor = offer.getStartDate();
+        while (!cursor.isAfter(offer.getEndDate())) {
+            if (weekdays.contains(cursor.getDayOfWeek())) {
+                return true;
+            }
+            cursor = cursor.plusDays(1);
+        }
+        return false;
     }
 
     private boolean matchesAnimalTypes(Offer offer, Set<OfferAnimalType> animalTypes) {
@@ -631,6 +701,8 @@ public class OfferService {
                 verified,
                 offer.getDescription(),
                 offer.getFrequency(),
+                offer.getRecurringWeekdays(),
+                offer.getTimeSlot(),
                 offer.getCareType(),
                 petNames(pets),
                 petSpeciesLabels(pets),
@@ -668,6 +740,8 @@ public class OfferService {
                 offer.getStatus(),
                 offer.getDescription(),
                 offer.getFrequency(),
+                offer.getRecurringWeekdays(),
+                offer.getTimeSlot(),
                 offer.getCareType(),
                 petNames(pets),
                 petSpeciesLabels(pets),
@@ -813,6 +887,7 @@ public class OfferService {
         return new CreateOfferFormData(
                 List.of(OfferType.values()),
                 List.of(OfferFrequency.values()),
+                List.of(OfferTimeSlot.values()),
                 List.of(OfferCareType.values()),
                 List.of(OfferAnimalType.values()),
                 findCurrentUserPetOptions(),
@@ -865,15 +940,18 @@ public class OfferService {
                 .orElseThrow(() -> new BusinessRuleViolationException(
                         "Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden."));
         validateCreateOfferRequest(request);
+        OfferFrequency frequency = normalizedFrequency(request.frequency());
 
         Offer offer = new Offer();
-        offer.setStartDate(request.startDate());
-        offer.setEndDate(request.endDate());
+        offer.setStartDate(frequency == OfferFrequency.REGULAR ? null : request.startDate());
+        offer.setEndDate(frequency == OfferFrequency.REGULAR ? null : request.endDate());
         offer.setCreateUser(currentUser);
         offer.setUpdateUser(currentUser);
         offer.setPets(resolvePets(request.petIds(), currentUser));
         offer.setTitle(cleanText(request.title()));
-        offer.setFrequency(request.frequency());
+        offer.setFrequency(frequency);
+        offer.setRecurringWeekdays(request.recurringWeekdays());
+        offer.setTimeSlot(request.timeSlot());
         offer.setCareType(request.careType());
         offer.setAnimalType(request.animalType());
         offer.setOfferType(request.offerType());
@@ -896,16 +974,19 @@ public class OfferService {
         User currentUser = currentUserOrThrow();
         Offer offer = loadEditableCurrentUserOffer(offerId, currentUser);
         validateCreateOfferRequest(request);
+        OfferFrequency frequency = normalizedFrequency(request.frequency());
         if (request.offerType() != offer.getOfferType()) {
             throw new BusinessRuleViolationException("Der Angebotstyp kann nicht geaendert werden.");
         }
 
-        offer.setStartDate(request.startDate());
-        offer.setEndDate(request.endDate());
+        offer.setStartDate(frequency == OfferFrequency.REGULAR ? null : request.startDate());
+        offer.setEndDate(frequency == OfferFrequency.REGULAR ? null : request.endDate());
         offer.setUpdateUser(currentUser);
         offer.setPets(resolvePets(request.petIds(), currentUser));
         offer.setTitle(cleanText(request.title()));
-        offer.setFrequency(request.frequency());
+        offer.setFrequency(frequency);
+        offer.setRecurringWeekdays(request.recurringWeekdays());
+        offer.setTimeSlot(request.timeSlot());
         offer.setCareType(request.careType());
         offer.setAnimalType(request.animalType());
         offer.setPrice(request.price());
@@ -1125,7 +1206,8 @@ public class OfferService {
     }
 
     private boolean isExpiredOpenOffer(Offer offer) {
-        return offer.getStatus() == OfferStatus.OPEN
+        return !isRegular(offer)
+                && offer.getStatus() == OfferStatus.OPEN
                 && offer.getStartDate() != null
                 && offer.getStartDate().isBefore(createOfferFormRules.minimumStartDate());
     }
@@ -1145,25 +1227,18 @@ public class OfferService {
                 offer.getFrequency(),
                 offer.getCareType(),
                 offer.getAnimalType(),
-                offer.getDescription());
+                offer.getDescription(),
+                offer.getRecurringWeekdays(),
+                offer.getTimeSlot());
     }
 
     private void validateCreateOfferRequest(CreateOfferRequest request) {
-        if (request == null || request.offerType() == null || request.startDate() == null || request.endDate() == null) {
+        if (request == null || request.offerType() == null) {
             throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
         }
 
-        if (request.startDate().isBefore(createOfferFormRules.minimumStartDate())) {
-            throw new BusinessRuleViolationException("Das Startdatum darf nicht in der Vergangenheit liegen.");
-        }
-
-        if (request.endDate().isBefore(createOfferFormRules.minimumEndDate(null))) {
-            throw new BusinessRuleViolationException("Das Enddatum ist ungueltig.");
-        }
-
-        if (request.startDate().isAfter(request.endDate())) {
-            throw new BusinessRuleViolationException("Das Enddatum muss am oder nach dem Startdatum liegen.");
-        }
+        OfferFrequency frequency = normalizedFrequency(request.frequency());
+        validateSchedule(request, frequency);
 
         if (request.offerType() == OfferType.OWNER_OFFER && request.petIds().isEmpty()) {
             throw new BusinessRuleViolationException("Bitte ein Haustier fuer den Auftrag auswaehlen.");
@@ -1177,6 +1252,10 @@ public class OfferService {
             throw new BusinessRuleViolationException("Sitter-Angebote duerfen kein eigenes Haustier enthalten.");
         }
 
+        if (frequency == OfferFrequency.ONE_TIME && request.timeSlot() != null) {
+            throw new BusinessRuleViolationException("Tageszeiten werden nur bei regelmaessigen Angeboten gespeichert.");
+        }
+
         if (request.title() != null && request.title().length() > createOfferFormRules.titleMaxLength()) {
             throw new BusinessRuleViolationException("Der Titel darf maximal 120 Zeichen enthalten.");
         }
@@ -1185,6 +1264,42 @@ public class OfferService {
                 && request.description().length() > createOfferFormRules.descriptionMaxLength()) {
             throw new BusinessRuleViolationException("Die Beschreibung darf maximal 255 Zeichen enthalten.");
         }
+    }
+
+    private void validateSchedule(CreateOfferRequest request, OfferFrequency frequency) {
+        if (frequency == OfferFrequency.REGULAR) {
+            if (request.recurringWeekdays().isEmpty()) {
+                throw new BusinessRuleViolationException("Bitte mindestens einen Wochentag auswaehlen.");
+            }
+            if (request.timeSlot() == null) {
+                throw new BusinessRuleViolationException("Bitte eine Tageszeit fuer das regelmaessige Angebot auswaehlen.");
+            }
+            return;
+        }
+
+        if (!request.recurringWeekdays().isEmpty()) {
+            throw new BusinessRuleViolationException("Wochentage werden nur bei regelmaessigen Angeboten gespeichert.");
+        }
+        if (request.startDate() == null || request.endDate() == null) {
+            throw new BusinessRuleViolationException("Bitte Start- und Enddatum auswaehlen.");
+        }
+        if (request.startDate().isBefore(createOfferFormRules.minimumStartDate())) {
+            throw new BusinessRuleViolationException("Das Startdatum darf nicht in der Vergangenheit liegen.");
+        }
+        if (request.endDate().isBefore(createOfferFormRules.minimumEndDate(null))) {
+            throw new BusinessRuleViolationException("Das Enddatum ist ungueltig.");
+        }
+        if (request.startDate().isAfter(request.endDate())) {
+            throw new BusinessRuleViolationException("Das Enddatum muss am oder nach dem Startdatum liegen.");
+        }
+    }
+
+    private boolean isRegular(Offer offer) {
+        return offer != null && normalizedFrequency(offer.getFrequency()) == OfferFrequency.REGULAR;
+    }
+
+    private OfferFrequency normalizedFrequency(OfferFrequency frequency) {
+        return frequency == null ? OfferFrequency.ONE_TIME : frequency;
     }
 
     private Pet resolvePet(UUID petId, User currentUser) {

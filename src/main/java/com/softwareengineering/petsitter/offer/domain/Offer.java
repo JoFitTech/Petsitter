@@ -3,6 +3,8 @@ package com.softwareengineering.petsitter.offer.domain;
 import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.user.domain.User;
 import jakarta.persistence.Column;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -18,6 +20,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -37,10 +40,10 @@ public class Offer {
     @Column(name = "offer_id", nullable = false)
     private UUID offerId;
 
-    @Column(name = "start_date", nullable = false)
+    @Column(name = "start_date")
     private LocalDate startDate;
 
-    @Column(name = "end_date", nullable = false)
+    @Column(name = "end_date")
     private LocalDate endDate;
 
     @Column(name = "create_date", nullable = false)
@@ -82,6 +85,18 @@ public class Offer {
     @Enumerated(EnumType.STRING)
     @Column(name = "animal_type", length = 32)
     private OfferAnimalType animalType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "time_slot", length = 32)
+    private OfferTimeSlot timeSlot;
+
+    @ElementCollection(fetch = FetchType.LAZY)
+    @CollectionTable(
+            name = "offer_weekday",
+            joinColumns = @JoinColumn(name = "offer_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "weekday", nullable = false, length = 16)
+    private Set<DayOfWeek> recurringWeekdays = new LinkedHashSet<>();
 
     @Enumerated(EnumType.STRING)
     @Column(name = "offer_type", nullable = false)
@@ -250,6 +265,30 @@ public class Offer {
 
     public void setAnimalType(OfferAnimalType animalType) {
         this.animalType = animalType;
+    }
+
+    public OfferTimeSlot getTimeSlot() {
+        return timeSlot;
+    }
+
+    public void setTimeSlot(OfferTimeSlot timeSlot) {
+        this.timeSlot = timeSlot;
+    }
+
+    public Set<DayOfWeek> getRecurringWeekdays() {
+        if (recurringWeekdays == null) {
+            recurringWeekdays = new LinkedHashSet<>();
+        }
+        return recurringWeekdays;
+    }
+
+    public void setRecurringWeekdays(Collection<DayOfWeek> recurringWeekdays) {
+        getRecurringWeekdays().clear();
+        if (recurringWeekdays != null) {
+            recurringWeekdays.stream()
+                    .filter(java.util.Objects::nonNull)
+                    .forEach(this.recurringWeekdays::add);
+        }
     }
 
     public OfferType getOfferType() {

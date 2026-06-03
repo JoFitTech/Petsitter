@@ -4,6 +4,7 @@ import com.softwareengineering.petsitter.booking.service.BookingService;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
+import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
@@ -11,6 +12,7 @@ import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
@@ -336,7 +338,9 @@ public class MyOffers extends Div {
         detailsRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
         detailsRow.getStyle().set("gap", "12px");
         detailsRow.add(
-                buildDetailColumn("Zeitraum", formatDateRange(offer.startDate(), offer.endDate()), DARK),
+                buildDetailColumn("Zeitraum", OfferCardComponent.formatSchedule(
+                        offer.frequency(), offer.startDate(), offer.endDate(),
+                        offer.recurringWeekdays(), offer.timeSlot()), DARK),
                 buildDetailColumn("Verdienst", formatPrice(offer.price()), "#a5663b"),
                 buildDetailColumn("Status", statusLabel(offer.status()), DARK)
         );
@@ -592,6 +596,7 @@ public class MyOffers extends Div {
 
     private boolean isExpiredOpenOffer(MyOfferCardDto offer) {
         return offer.status() == OfferStatus.OPEN
+                && offer.frequency() != OfferFrequency.REGULAR
                 && offer.startDate() != null
                 && offer.startDate().isBefore(LocalDate.now());
     }
@@ -607,6 +612,8 @@ public class MyOffers extends Div {
                 false,
                 offer.description(),
                 offer.frequency(),
+                offer.recurringWeekdays(),
+                offer.timeSlot(),
                 offer.careType(),
                 offer.petName(),
                 offer.petSpecies(),

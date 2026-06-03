@@ -1,5 +1,7 @@
 package com.softwareengineering.petsitter.user.service;
 
+import com.softwareengineering.petsitter.image.dto.ImageRefDto;
+import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.pet.service.PetService;
@@ -44,6 +46,7 @@ public class UserService {
     private final PostalCodeService postalCodeService;
     private final PasswordPolicyService passwordPolicyService;
     private final WalletService walletService;
+    private final ImageAssetService imageAssetService;
 
     @Autowired
     public UserService(
@@ -54,7 +57,8 @@ public class UserService {
             PetService petService,
             PostalCodeService postalCodeService,
             PasswordPolicyService passwordPolicyService,
-            WalletService walletService
+            WalletService walletService,
+            ImageAssetService imageAssetService
     ) {
         this.userRepository = userRepository;
         this.authenticatedUser = authenticatedUser;
@@ -64,6 +68,21 @@ public class UserService {
         this.postalCodeService = postalCodeService;
         this.passwordPolicyService = passwordPolicyService;
         this.walletService = walletService;
+        this.imageAssetService = imageAssetService;
+    }
+
+    public UserService(
+            UserRepository userRepository,
+            AuthenticatedUser authenticatedUser,
+            PasswordEncoder passwordEncoder,
+            LoginCodeService loginCodeService,
+            PetService petService,
+            PostalCodeService postalCodeService,
+            PasswordPolicyService passwordPolicyService,
+            WalletService walletService
+    ) {
+        this(userRepository, authenticatedUser, passwordEncoder, loginCodeService, petService,
+                postalCodeService, passwordPolicyService, walletService, null);
     }
 
     public UserService(
@@ -76,7 +95,7 @@ public class UserService {
             PasswordPolicyService passwordPolicyService
     ) {
         this(userRepository, authenticatedUser, passwordEncoder, loginCodeService, petService,
-                postalCodeService, passwordPolicyService, null);
+                postalCodeService, passwordPolicyService, null, null);
     }
 
     public Optional<User> findUserById(UUID userId) {
@@ -288,6 +307,18 @@ public class UserService {
                 .orElse("Gast");
     }
 
+    public void validateProfileImageUpload(byte[] content, String mimeType) {
+        requireImageAssetService().validateUpload(content, mimeType);
+    }
+
+    public ImageRefDto replaceCurrentUserProfileImage(byte[] content) {
+        return requireImageAssetService().replaceCurrentUserProfileImage(content);
+    }
+
+    public void removeCurrentUserProfileImage() {
+        requireImageAssetService().removeCurrentUserProfileImage();
+    }
+
     private UserProfileDto toProfileDto(User user) {
         return new UserProfileDto(
                 user.getId(),
@@ -310,7 +341,8 @@ public class UserService {
                 user.getPendingEmailRequestedAt(),
                 petService.getPetSummaryForOwner(user.getId()),
                 user.getAccountRole(),
-                user.getAccountStatus()
+                user.getAccountStatus(),
+                profileImage(user)
         );
     }
 
@@ -330,8 +362,20 @@ public class UserService {
                 user.getPostalCode(),
                 user.getCity(),
                 petService.getPetSummaryForOwner(user.getId()),
-                user.getAccountStatus()
+                user.getAccountStatus(),
+                profileImage(user)
         );
+    }
+
+    private ImageRefDto profileImage(User user) {
+        return imageAssetService == null ? null : imageAssetService.findUserImage(user.getId()).orElse(null);
+    }
+
+    private ImageAssetService requireImageAssetService() {
+        if (imageAssetService == null) {
+            throw new IllegalStateException("Bildverwaltung ist nicht konfiguriert.");
+        }
+        return imageAssetService;
     }
 
     private Optional<String> validateProfileUpdateRequest(UserProfileUpdateRequest request) {

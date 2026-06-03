@@ -9,6 +9,8 @@ import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.service.PetService;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.PendingImageChange;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -90,7 +92,7 @@ public class MyPetView extends Div {
         Button addBtn = new Button("Tier hinzufügen", new Icon(VaadinIcon.PLUS));
         addBtn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")
@@ -127,12 +129,7 @@ public class MyPetView extends Div {
         leftSection.getStyle().set("gap", "24px");
         leftSection.setAlignItems(FlexComponent.Alignment.START);
 
-        Div avatar = new Div();
-        avatar.getStyle()
-                .set("width", "100px").set("height", "100px")
-                .set("border-radius", "50%")
-                .set("background", "#e3cda8")
-                .set("flex-shrink", "0");
+        Div avatar = ImageComponents.avatar(pet.profileImage(), 100, "#e3cda8");
 
         VerticalLayout info = new VerticalLayout();
         info.setPadding(false);
@@ -166,7 +163,7 @@ public class MyPetView extends Div {
         Button editBtn = new Button("Bearbeiten", new Icon(VaadinIcon.PENCIL));
         editBtn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")
@@ -226,17 +223,29 @@ public class MyPetView extends Div {
     }
 
     private void openPetDialog(PetDto existing) {
-        AddPetPopUp dialog = new AddPetPopUp(existing, dto -> {
+        AddPetPopUp dialog = new AddPetPopUp(existing, petService, result -> {
+            PetDto dto = result.pet();
+            UUID petId;
             if (existing == null) {
-                petService.createPetForCurrentUser(dto);
+                petId = petService.createPetForCurrentUser(dto).id();
                 Notification.show("Tier hinzugefügt.", 2500, Notification.Position.TOP_CENTER);
             } else {
                 petService.updatePet(existing.id(), dto);
+                petId = existing.id();
                 Notification.show("Änderungen gespeichert.", 2500, Notification.Position.TOP_CENTER);
             }
+            applyImageChange(petId, result.imageChange());
             loadPets();
         });
         dialog.open();
+    }
+
+    private void applyImageChange(UUID petId, PendingImageChange imageChange) {
+        if (imageChange.type() == PendingImageChange.Type.REPLACE) {
+            petService.replaceCurrentUserPetImage(petId, imageChange.content());
+        } else if (imageChange.type() == PendingImageChange.Type.REMOVE) {
+            petService.removeCurrentUserPetImage(petId);
+        }
     }
 
     private void confirmDelete(PetDto pet) {
@@ -485,7 +494,7 @@ public class MyPetView extends Div {
         Button btn = new Button(label);
         btn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")

@@ -9,6 +9,8 @@ import com.softwareengineering.petsitter.offer.domain.Offer;
 import com.softwareengineering.petsitter.offer.domain.OfferStatus;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.repository.OfferRepository;
+import com.softwareengineering.petsitter.offer.service.OfferImagePresentationMapper;
+import com.softwareengineering.petsitter.offer.dto.OfferCoverTileDto;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.repository.OfferRequestRepository;
@@ -24,6 +26,7 @@ import java.time.LocalDate;
 import java.math.RoundingMode;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
@@ -53,6 +56,7 @@ public class BookingService {
     private final OfferRepository offerRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final WalletService walletService;
+    private final OfferImagePresentationMapper imagePresentationMapper;
 
     @Autowired
     public BookingService(
@@ -60,13 +64,25 @@ public class BookingService {
             OfferRequestRepository offerRequestRepository,
             OfferRepository offerRepository,
             ApplicationEventPublisher eventPublisher,
-            WalletService walletService
+            WalletService walletService,
+            OfferImagePresentationMapper imagePresentationMapper
     ) {
         this.bookingRepository = bookingRepository;
         this.offerRequestRepository = offerRequestRepository;
         this.offerRepository = offerRepository;
         this.eventPublisher = eventPublisher;
         this.walletService = walletService;
+        this.imagePresentationMapper = imagePresentationMapper;
+    }
+
+    public BookingService(
+            BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
+            OfferRepository offerRepository,
+            ApplicationEventPublisher eventPublisher,
+            WalletService walletService
+    ) {
+        this(bookingRepository, offerRequestRepository, offerRepository, eventPublisher, walletService, null);
     }
 
     BookingService(
@@ -75,7 +91,7 @@ public class BookingService {
             OfferRepository offerRepository,
             ApplicationEventPublisher eventPublisher
     ) {
-        this(bookingRepository, offerRequestRepository, offerRepository, eventPublisher, null);
+        this(bookingRepository, offerRequestRepository, offerRepository, eventPublisher, null, null);
     }
 
     /**
@@ -317,9 +333,12 @@ public class BookingService {
      */
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<BookingDto> getBookings(UUID userId) {
-        return bookingRepository.findAllByOwnerIdOrSitterId(userId, userId)
-                .stream()
-                .map(this::toDto)
+        List<Booking> bookings = bookingRepository.findAllByOwnerIdOrSitterId(userId, userId);
+        Map<UUID, List<OfferCoverTileDto>> tiles = imagePresentationMapper == null
+                ? Map.of()
+                : imagePresentationMapper.coverTilesByOffer(bookings.stream().map(Booking::getOffer).toList());
+        return bookings.stream()
+                .map(booking -> toDto(booking, tiles.getOrDefault(booking.getOffer().getOfferId(), List.of())))
                 .toList();
     }
 
@@ -343,6 +362,12 @@ public class BookingService {
     }
 
     private BookingDto toDto(Booking booking) {
+        return toDto(booking, imagePresentationMapper == null
+                ? List.of()
+                : imagePresentationMapper.coverTiles(booking.getOffer()));
+    }
+
+    private BookingDto toDto(Booking booking, List<OfferCoverTileDto> coverTiles) {
         String offerTitle = (booking.getOffer().getTitle() != null && !booking.getOffer().getTitle().isBlank())
                 ? booking.getOffer().getTitle()
                 : "Betreuungsvereinbarung";
@@ -370,7 +395,8 @@ public class BookingService {
                 booking.getCreatedAt(),
                 payment == null ? null : payment.status(),
                 payment == null ? null : payment.releaseRequestedAt(),
-                payment == null ? null : payment.automaticReleaseAt()
+                payment == null ? null : payment.automaticReleaseAt(),
+                coverTiles
         );
     }
 

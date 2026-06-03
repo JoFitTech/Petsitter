@@ -1,0 +1,16 @@
+[part="overlay"] {
+    font-family: 'Inter', sans-serif !important;
+    border-radius: 12px;
+}
+
+:host([theme~="success"]) [part="overlay"] {
+    background-color: #f0faf5 !important;
+    color: #2e7d32 !important;
+    border: 1px solid #c8e6c9 !important;
+}
+
+:host([theme~="error"]) [part="overlay"] {
+    background-color: #fdeded !important;
+    color: #c62828 !important;
+    border: 1px solid #ef9a9a !important;
+}

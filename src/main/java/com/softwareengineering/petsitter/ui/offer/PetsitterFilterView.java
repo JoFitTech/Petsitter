@@ -84,6 +84,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
 
     private H1 pageTitle;
     private Div leftBlob;
+    private Div rightBlob;
     private H2 resultsLabel;
     private Div filterBarContainer;
     private Div offerGrid;
@@ -135,7 +136,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
     private void applyModeChrome() {
         SearchDisplay display = displayFor(currentCriteria.mode());
         pageTitle.setText(display.pageTitle);
+        getStyle().set("background", display.pageBgColor);
         leftBlob.getStyle().set("background", display.leftBlobColor);
+        rightBlob.getStyle().set("background", display.rightBlobColor);
     }
 
     private OfferSearchCriteria parseCriteria(Map<String, List<String>> parameters) {
@@ -281,7 +284,7 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 .set("top", "-150px")
                 .set("left", "-200px");
 
-        Div rightBlob = new Div();
+        rightBlob = new Div();
         rightBlob.getStyle()
                 .set("position", "absolute")
                 .set("width", "800px")
@@ -332,8 +335,8 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
         row.setAlignItems(FlexComponent.Alignment.CENTER);
         row.setSpacing(false);
         row.getStyle()
-                .set("gap", "16px")
-                .set("flex-wrap", "wrap");
+                .set("gap", "28px")
+                .set("flex-wrap", "nowrap");
 
         SearchDisplay display = displayFor(currentCriteria.mode());
         FilterSearchBar searchBar = new FilterSearchBar(
@@ -341,11 +344,21 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 toFilterCriteria(currentCriteria),
                 offerService::validateOriginPostalCode,
                 this::onSearchClicked);
+        searchBar.setWidthFull();
         searchBar.getStyle()
                 .set("margin", "0")
-                .set("max-width", "860px")
-                .set("width", "min(860px, 100%)")
-                .set("flex", "1 1 640px");
+                .set("max-width", "none")
+                .set("flex-grow", "1")
+                .set("flex-shrink", "1")
+                .set("flex-basis", "auto");
+
+        Div filterBtnWrapper = new Div();
+        filterBtnWrapper.getStyle()
+                .set("width", "380px")
+                .set("min-width", "320px")
+                .set("display", "flex")
+                .set("justify-content", "flex-start")
+                .set("flex-shrink", "0");
 
         Button filterBtn = new Button("Filter");
         Icon filterIcon = new Icon(VaadinIcon.FILTER);
@@ -366,7 +379,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                 currentCriteria,
                 this::onAdditionalFiltersApplied).open());
 
-        row.add(searchBar, filterBtn);
+        filterBtnWrapper.add(filterBtn);
+        row.add(searchBar, filterBtnWrapper);
+        row.setFlexGrow(1, searchBar);
         filterBarContainer.add(row);
     }
 
@@ -743,12 +758,16 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
                     FilterSearchBar.EarningsMode.MINIMUM,
                     "Finde liebevolle Tierhalter in deiner Nähe",
                     "Tierhalter",
-                    "#f6ead5");
+                    CREAM,
+                    "#f6ead5",
+                    "#e7f0f0");
             case TIERSITTER -> new SearchDisplay(
                     FilterSearchBar.EarningsMode.MAXIMUM,
                     "Finde liebevolle Tiersitter in deiner Nähe",
                     "Tiersitter",
-                    "#e2f2eb");
+                    "#ebf6f0",
+                    "#e2f5ec",
+                    "#eef0fa");
         };
     }
 
@@ -756,7 +775,9 @@ public class PetsitterFilterView extends VerticalLayout implements BeforeEnterOb
             FilterSearchBar.EarningsMode earningsMode,
             String pageTitle,
             String resultNoun,
-            String leftBlobColor
+            String pageBgColor,
+            String leftBlobColor,
+            String rightBlobColor
     ) {
     }
 

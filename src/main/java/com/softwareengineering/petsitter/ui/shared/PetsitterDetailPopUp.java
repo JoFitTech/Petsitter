@@ -8,13 +8,21 @@ import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.pet.domain.PetTag;
+import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
+import com.softwareengineering.petsitter.pet.dto.PetDto;
+import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.chat.ProfilePopUp;
 import com.softwareengineering.petsitter.user.service.UserService;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.Period;
+import java.util.List;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.notification.Notification;
@@ -28,7 +36,11 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.component.dependency.CssImport;
 
+@CssImport(value = "./styles/custom-dialog-overlay.css", themeFor = "vaadin-dialog-overlay")
+@CssImport(value = "./styles/custom-readonly-field.css", themeFor = "vaadin-text-field")
+@CssImport(value = "./styles/custom-readonly-field.css", themeFor = "vaadin-text-area")
 public class PetsitterDetailPopUp extends Dialog {
 
     private static final String DARK  = "#4a3428";
@@ -66,7 +78,7 @@ public class PetsitterDetailPopUp extends Dialog {
         content.setPadding(false);
         content.setSpacing(false);
         content.getStyle()
-                .set("background", "#fdf8f0")
+                .set("background", "#f3eada")
                 .set("font-family", "Inter, Arial, sans-serif")
                 .set("border-radius", "20px")
                 .set("padding", "28px 28px 24px 28px")
@@ -86,8 +98,10 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("color", DARK);
 
         Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         closeBtn.getStyle()
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("color", DARK)
                 .set("box-shadow", "none")
                 .set("cursor", "pointer")
@@ -99,11 +113,9 @@ public class PetsitterDetailPopUp extends Dialog {
         header.add(dialogTitle, closeBtn);
 
         // ── Image area ────────────────────────────────────────────────────
-        Div imageArea = new Div();
+        Div imageArea = ImageComponents.offerCover(dto.coverTiles(), "160px", topColor);
         imageArea.getStyle()
                 .set("width", "100%")
-                .set("height", "160px")
-                .set("background", topColor)
                 .set("border-radius", "16px")
                 .set("position", "relative")
                 .set("overflow", "hidden");
@@ -121,13 +133,24 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("padding", "6px 14px");
         imageArea.add(starsBadge);
 
-        // ── Offer title ───────────────────────────────────────────────────
+        // ── Offer title & Creator Link ────────────────────────────────────
         H3 offerTitle = new H3(dto.title());
         offerTitle.getStyle()
                 .set("font-size", "18px")
                 .set("font-weight", "800")
                 .set("margin", "4px 0 0 0")
                 .set("color", DARK);
+
+        VerticalLayout titleLayout = new VerticalLayout();
+        titleLayout.setPadding(false);
+        titleLayout.setSpacing(false);
+        titleLayout.getStyle().set("gap", "4px");
+        titleLayout.add(offerTitle);
+
+        Component creatorLink = createCreatorLink(dto);
+        if (creatorLink != null) {
+            titleLayout.add(creatorLink);
+        }
 
         // ── Facts row: Zeitraum | Verdienst | Entfernung ──────────────────
         Div factsRow = new Div();
@@ -137,7 +160,9 @@ public class PetsitterDetailPopUp extends Dialog {
                 .set("background", "white")
                 .set("border-radius", "14px")
                 .set("padding", "14px 18px")
-                .set("gap", "0");
+                .set("gap", "0")
+                .set("width", "100%")
+                .set("box-sizing", "border-box");
 
         factsRow.add(
                 factColumn("Zeitraum",   date),
@@ -175,14 +200,13 @@ public class PetsitterDetailPopUp extends Dialog {
         infoRow.add(careSpan, infoSep, freqSpan);
 
         // ── Tier-Feld: dynamisch je nach OWNER_OFFER vs SITTER_OFFER ──────
-        content.add(header, imageArea, offerTitle, factsRow, infoRow);
-        Component creatorRow = createCreatorRow(dto);
-        if (creatorRow != null) {
-            content.add(creatorRow);
-        }
+        content.add(header, imageArea, titleLayout, factsRow, infoRow);
 
-        if (dto.petName() != null) {
-            // OWNER_OFFER: zeige konkretes Haustier
+        if (!dto.pets().isEmpty()) {
+            // OWNER_OFFER: zeige jedes Haustier mit seinen eigenen Details
+            content.add(petDetails(dto.pets()));
+        } else if (dto.petName() != null) {
+            // Legacy-Fallback fuer DTOs ohne strukturierte Tierdaten
             StringBuilder petValue = new StringBuilder(dto.petName());
             if (dto.petSpecies() != null || dto.petBreed() != null) {
                 petValue.append(" (");
@@ -205,16 +229,31 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         // ── Beschreibung ──────────────────────────────────────────────────
-        TextArea zusatzField = new TextArea("Beschreibung");
-        zusatzField.setWidthFull();
-        zusatzField.setMinHeight("90px");
-        zusatzField.setValue(dto.description() != null ? dto.description() : "");
-        zusatzField.setReadOnly(true);
-        zusatzField.getStyle()
-                .set("background", "white")
-                .set("border-radius", "10px")
-                .set("font-family", "Inter, Arial, sans-serif");
-        content.add(zusatzField);
+        if (!isBlank(dto.description())) {
+            Div descriptionSection = new Div();
+            descriptionSection.addClassName("offer-description-field");
+            descriptionSection.getStyle()
+                    .set("width", "100%")
+                    .set("box-sizing", "border-box")
+                    .set("font-family", "Inter, Arial, sans-serif")
+                    .set("color", "#7b5236");
+
+            Span descriptionLabel = new Span("Beschreibung");
+            descriptionLabel.getStyle()
+                    .set("display", "block")
+                    .set("color", DARK)
+                    .set("font-size", "14px");
+
+            Span description = new Span(dto.description());
+            description.getStyle()
+                    .set("display", "block")
+                    .set("font-size", "14px")
+                    .set("line-height", "1.4")
+                    .set("margin-top", "6px");
+
+            descriptionSection.add(descriptionLabel, description);
+            content.add(descriptionSection);
+        }
 
         Button actionButton = createActionButton(dto);
         content.add(actionButton);
@@ -282,57 +321,64 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         Button btn = styledButton("Auftrag anfragen");
+        btn.getStyle().set("background", BROWN);
         btn.addClickListener(e -> onAuftragAnfragenClicked(dto.id()));
         return btn;
     }
 
-    private Component createCreatorRow(OfferCardDto dto) {
+    private Component createCreatorLink(OfferCardDto dto) {
         if (dto.creatorUserId() == null || isBlank(dto.creatorDisplayName())) {
             return null;
         }
 
-        HorizontalLayout row = new HorizontalLayout();
-        row.setAlignItems(FlexComponent.Alignment.CENTER);
-        row.setSpacing(false);
-        row.getStyle()
-                .set("gap", "6px")
-                .set("background", "white")
-                .set("border-radius", "12px")
-                .set("padding", "10px 14px");
-
-        Span label = new Span("Anbieter:");
-        label.getStyle()
-                .set("font-size", "14px")
-                .set("font-weight", "700")
-                .set("color", "#7a6050");
-
-        Button nameButton = new Button(dto.creatorDisplayName());
-        nameButton.getStyle()
+        Button profileButton = new Button();
+        profileButton.addClassName("offer-creator-link");
+        profileButton.getElement().setAttribute("aria-label", "Profil von " + dto.creatorDisplayName() + " öffnen");
+        profileButton.getStyle()
                 .set("background", "transparent")
+                .set("border", "none")
                 .set("box-shadow", "none")
                 .set("padding", "0")
                 .set("height", "auto")
+                .set("min-height", "0")
                 .set("min-width", "0")
+                .set("cursor", "pointer")
+                .set("margin", "0")
+                .set("align-self", "flex-start");
+
+        Div profileContent = new Div();
+        profileContent.getStyle()
+                .set("display", "flex")
+                .set("flex-direction", "row")
+                .set("align-items", "center")
+                .set("gap", "7px");
+
+        Span creatorName = new Span(dto.creatorDisplayName());
+        creatorName.addClassName("offer-creator-name");
+        creatorName.getStyle()
                 .set("color", DARK)
-                .set("font-size", "14px")
-                .set("font-weight", "800")
-                .set("text-decoration", "underline")
-                .set("cursor", "pointer");
-        nameButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("line-height", "1.1");
+
+        Div creatorAvatar = ImageComponents.avatar(dto.creatorProfileImage(), 36, "#e0c4a4");
+        creatorAvatar.addClassName("offer-creator-avatar");
+        profileContent.add(creatorAvatar, creatorName);
+        profileButton.getElement().appendChild(profileContent.getElement());
+        profileButton.addClickListener(event -> userService.getPublicUserProfile(dto.creatorUserId())
                 .ifPresentOrElse(
                         profile -> new ProfilePopUp(profile).open(),
                         () -> Notification.show("Profil konnte nicht geladen werden.")
                 ));
-
-        row.add(label, nameButton);
-        return row;
+        return profileButton;
     }
 
     private Button styledButton(String label) {
         Button btn = new Button(label);
         btn.setWidthFull();
         btn.getStyle()
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("height", "52px")
                 .set("border-radius", "28px")
@@ -365,25 +411,64 @@ public class PetsitterDetailPopUp extends Dialog {
         }
 
         Dialog dialog = new Dialog();
-        dialog.setWidth("400px");
+        dialog.setWidth("440px");
+        dialog.getElement().getThemeList().add("no-padding");
 
         VerticalLayout dialogContent = new VerticalLayout();
         dialogContent.setPadding(true);
-        dialogContent.setSpacing(true);
+        dialogContent.setSpacing(false);
+        dialogContent.getStyle()
+                .set("background-color", "#f3eada")
+                .set("padding", "32px")
+                .set("border-radius", "20px")
+                .set("font-family", "'Inter', sans-serif")
+                .set("gap", "16px");
+
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
 
         H2 dialogTitle = new H2("Anfrage senden");
-        dialogTitle.getStyle().set("font-size", "18px").set("margin", "0 0 8px 0").set("color", DARK);
+        dialogTitle.getStyle()
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("margin", "0")
+                .set("color", DARK);
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", DARK)
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("width", "36px")
+                .set("height", "36px")
+                .set("border-radius", "50%");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        header.add(dialogTitle, closeBtn);
 
         TextArea messageArea = new TextArea("Nachricht (optional)");
         messageArea.setWidthFull();
         messageArea.setPlaceholder("Schreibe dem Anbieter eine kurze Nachricht...");
         messageArea.setMaxLength(1000);
+        messageArea.getStyle()
+                .set("--vaadin-input-field-background", "#FCF9F2")
+                .set("--vaadin-input-field-border", "1px solid #efe4d3")
+                .set("--vaadin-input-field-border-radius", "12px")
+                .set("--vaadin-input-field-value-color", "#4a3428")
+                .set("--lumo-secondary-text-color", "#4a3428")
+                .set("--lumo-body-text-color", "#4a3428")
+                .set("color", "#4a3428");
 
         HorizontalLayout buttons = new HorizontalLayout();
         buttons.setWidthFull();
         buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
+        buttons.getStyle().set("margin-top", "8px");
 
-        Button cancelBtn = new Button("Abbrechen", e -> dialog.close());
         Button submitBtn = new Button("Anfragen", e -> {
             try {
                 var request = requestService.createRequest(offerId, currentUserId, messageArea.getValue());
@@ -399,10 +484,19 @@ public class PetsitterDetailPopUp extends Dialog {
                 Notification.show("Fehler: " + ex.getMessage());
             }
         });
-        submitBtn.getStyle().set("background", DARK).set("color", "white").set("border-radius", "8px");
+        submitBtn.getStyle()
+                .set("background-color", BROWN)
+                .set("color", "white")
+                .set("border-radius", "24px")
+                .set("padding", "0 28px")
+                .set("height", "44px")
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("cursor", "pointer")
+                .set("border", "none");
 
-        buttons.add(cancelBtn, submitBtn);
-        dialogContent.add(dialogTitle, messageArea, buttons);
+        buttons.add(submitBtn);
+        dialogContent.add(header, messageArea, buttons);
         dialog.add(dialogContent);
         dialog.open();
     }
@@ -484,15 +578,145 @@ public class PetsitterDetailPopUp extends Dialog {
         return d;
     }
 
+    private static Component petDetails(List<PetDto> pets) {
+        VerticalLayout section = new VerticalLayout();
+        section.addClassName("offer-pet-details");
+        section.setPadding(false);
+        section.setSpacing(false);
+        section.getStyle().set("gap", "10px");
+
+        Span label = new Span(pets.size() == 1 ? "Haustier" : "Haustiere");
+        label.getStyle()
+                .set("font-size", "13px")
+                .set("font-weight", "700")
+                .set("color", BROWN);
+        section.add(label);
+        pets.stream()
+                .map(PetsitterDetailPopUp::petDetailCard)
+                .forEach(section::add);
+        return section;
+    }
+
+    private static Div petDetailCard(PetDto pet) {
+        Div card = new Div();
+        card.addClassName("offer-pet-detail-card");
+        card.getStyle()
+                .set("background", "white")
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "14px")
+                .set("padding", "12px 16px 14px")
+                .set("box-sizing", "border-box")
+                .set("width", "100%");
+
+        H4 name = new H4(isBlank(pet.name()) ? "Haustier" : pet.name());
+        name.getStyle()
+                .set("color", DARK)
+                .set("font-size", "17px")
+                .set("font-weight", "800")
+                .set("margin", "0");
+
+        Div attributes = new Div();
+        attributes.addClassName("offer-pet-attributes");
+        attributes.getStyle()
+                .set("display", "flex")
+                .set("flex-wrap", "wrap")
+                .set("gap", "7px")
+                .set("margin-top", "10px");
+        addChipIfPresent(attributes, speciesLabel(pet));
+        addChipIfPresent(attributes, pet.breed());
+        if (pet.birthDate() != null) {
+            addChipIfPresent(attributes, formatAge(pet.birthDate()));
+        }
+        PetVaccinationStatus vaccinationStatus = pet.vaccinationStatus() == null
+                ? PetVaccinationStatus.UNBEKANNT
+                : pet.vaccinationStatus();
+        attributes.add(petAttributeChip(vaccinationStatus.label()));
+        if (pet.tags() != null) {
+            pet.tags().stream()
+                    .filter(java.util.Objects::nonNull)
+                    .map(PetTag::label)
+                    .map(PetsitterDetailPopUp::petAttributeChip)
+                    .forEach(attributes::add);
+        }
+
+        Span descriptionLabel = new Span("Tierbeschreibung");
+        descriptionLabel.getStyle()
+                .set("display", "block")
+                .set("color", DARK)
+                .set("font-size", "13px")
+                .set("font-weight", "800")
+                .set("margin-top", "12px");
+
+        Span description = new Span(isBlank(pet.notes())
+                ? "Keine Tierbeschreibung hinterlegt."
+                : pet.notes());
+        description.addClassName("offer-pet-description");
+        description.getStyle()
+                .set("display", "block")
+                .set("color", BROWN)
+                .set("font-size", "14px")
+                .set("line-height", "1.5")
+                .set("margin-top", "4px");
+
+        HorizontalLayout header = new HorizontalLayout();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.getStyle().set("gap", "12px");
+        header.add(ImageComponents.avatar(pet.profileImage(), 52, "#e3cda8"), name);
+        card.add(header, attributes, descriptionLabel, description);
+        return card;
+    }
+
+    private static void addChipIfPresent(Div attributes, String value) {
+        if (!isBlank(value)) {
+            attributes.add(petAttributeChip(value));
+        }
+    }
+
+    private static Span petAttributeChip(String label) {
+        Span chip = new Span(label);
+        chip.getStyle()
+                .set("border", "1px solid #ead5ae")
+                .set("border-radius", "999px")
+                .set("background", "#fbf8f1")
+                .set("color", "#7a6050")
+                .set("font-size", "12px")
+                .set("font-weight", "800")
+                .set("padding", "5px 10px")
+                .set("line-height", "1.2");
+        return chip;
+    }
+
+    private static String speciesLabel(PetDto pet) {
+        if (pet.species() == null) {
+            return null;
+        }
+        if (pet.species() == com.softwareengineering.petsitter.pet.domain.PetSpecies.OTHER
+                && !isBlank(pet.customSpecies())) {
+            return pet.customSpecies();
+        }
+        return PetService.speciesLabel(pet.species());
+    }
+
+    private static String formatAge(LocalDate birthDate) {
+        int years = Period.between(birthDate, LocalDate.now()).getYears();
+        if (years == 0) {
+            int months = Period.between(birthDate, LocalDate.now()).getMonths();
+            return months <= 1 ? "weniger als 1 Monat alt" : months + " Monate alt";
+        }
+        return years == 1 ? "1 Jahr alt" : years + " Jahre alt";
+    }
+
     private static TextField readOnlyTextField(String label, String value) {
         TextField field = new TextField(label);
         field.setWidthFull();
         field.setValue(value != null ? value : "");
         field.setReadOnly(true);
         field.getStyle()
-                .set("background", "white")
-                .set("border-radius", "10px")
-                .set("font-family", "Inter, Arial, sans-serif");
+                .set("background", "#f3eada")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("--lumo-secondary-text-color", "#7b5236")
+                .set("--lumo-body-text-color", "#7b5236")
+                .set("color", "#7b5236");
         return field;
     }
 

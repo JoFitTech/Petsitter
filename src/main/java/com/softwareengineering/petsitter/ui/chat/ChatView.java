@@ -9,13 +9,16 @@ import com.softwareengineering.petsitter.chat.dto.ChatTypingEventDto;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
+import com.softwareengineering.petsitter.image.dto.ImageRefDto;
 import com.softwareengineering.petsitter.offerrequest.domain.OfferRequest;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
+import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.UI;
@@ -67,7 +70,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private static final Logger log = LoggerFactory.getLogger(ChatView.class);
 
     private static final String DARK = "#4a3428";
-    private static final String CREAM = "#fbf8f1";
+    private static final String CREAM = "#e8d9c8";
     private static final String CARD_BG = "#ffffff";
     private static final String SIDEBAR_ITEM_BG = "#fdf6e8";
     private static final String SIDEBAR_ITEM_ACTIVE = "#f0e0c4";
@@ -79,6 +82,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private final ChatEventBus eventBus;
     private final RequestService requestService;
     private final BookingService bookingService;
+    private final UserService userService;
 
     // UI Components
     private VerticalLayout conversationList;
@@ -93,6 +97,8 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
     private String activeConversationId;
     private UUID activeRecipientId;
     private String activeCounterpartName;
+    private ImageRefDto activeCurrentUserImage;
+    private ImageRefDto activeCounterpartImage;
     private UUID currentUserId;
     private final Map<String, ChatConversationDto> conversationsById = new HashMap<>();
     private final Map<String, Boolean> typingByConversationId = new HashMap<>();
@@ -107,12 +113,14 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             ChatEventBus eventBus,
             AuthenticatedUser authenticatedUser,
             RequestService requestService,
-            BookingService bookingService
+            BookingService bookingService,
+            UserService userService
     ) {
         this.chatService = chatService;
         this.eventBus = eventBus;
         this.requestService = requestService;
         this.bookingService = bookingService;
+        this.userService = userService;
 
         setSizeFull();
         setPadding(true);
@@ -276,7 +284,10 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         // Avatar in header
         chatHeaderAvatar = createChatAvatar(38);
-        chatHeaderAvatar.getStyle().set("display", "none");
+        chatHeaderAvatar.getStyle()
+            .set("display", "none")
+            .set("cursor", "pointer");
+        chatHeaderAvatar.addClickListener(event -> openProfilePopUp());
         header.add(chatHeaderAvatar);
 
         VerticalLayout titleWrap = new VerticalLayout();
@@ -442,7 +453,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             .set("transition", "background 0.15s ease");
 
         // Avatar
-        Div avatar = createChatAvatar(42);
+        Div avatar = createChatAvatar(counterpartImage(conv), 42);
         item.add(avatar);
 
         // Determine counterpart name
@@ -533,9 +544,12 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             boolean currentUserIsOwner = currentUserId.equals(selected.ownerId());
             activeRecipientId = currentUserIsOwner ? selected.sitterId() : selected.ownerId();
             activeCounterpartName = currentUserIsOwner ? selected.sitterDisplayName() : selected.ownerDisplayName();
+            activeCurrentUserImage = currentUserIsOwner ? selected.ownerProfileImage() : selected.sitterProfileImage();
+            activeCounterpartImage = currentUserIsOwner ? selected.sitterProfileImage() : selected.ownerProfileImage();
             chatTitle.setText(activeCounterpartName != null ? activeCounterpartName : "Chat");
             // Show avatar in header
             if (chatHeaderAvatar != null) {
+                replaceAvatarContent(chatHeaderAvatar, activeCounterpartImage, 38);
                 chatHeaderAvatar.getStyle().set("display", "flex");
             }
         }
@@ -597,10 +611,10 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         if (msg.senderId().equals(currentUserId)) {
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-            row.add(buildAvatar("Ich"), createBubble(msg.message(), true));
+            row.add(buildAvatar(activeCurrentUserImage), createBubble(msg.message(), true));
         } else {
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
-            row.add(buildAvatar(activeCounterpartName), createBubble(msg.message(), false));
+            row.add(buildAvatar(activeCounterpartImage), createBubble(msg.message(), false));
         }
 
         return row;
@@ -771,7 +785,7 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
             UUID reqId = UUID.fromString(requestId);
             Button acceptBtn = new Button("Annehmen", e -> handleAcceptRequest(reqId));
-            acceptBtn.getStyle().set("background", "#4a3428").set("color", "white").set("border-radius", "8px");
+            acceptBtn.getStyle().set("background", "#774f35").set("color", "white").set("border-radius", "8px");
 
             Button denyBtn = new Button("Ablehnen", e -> {
                 try {
@@ -803,10 +817,10 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         if (isOwnRequest) {
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-            row.add(buildAvatar("Ich"), card);
+            row.add(buildAvatar(activeCurrentUserImage), card);
         } else {
             row.setJustifyContentMode(FlexComponent.JustifyContentMode.START);
-            row.add(buildAvatar(activeCounterpartName), card);
+            row.add(buildAvatar(activeCounterpartImage), card);
         }
 
         return row;
@@ -939,32 +953,45 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         return bubble;
     }
 
-    private Component buildAvatar(String displayName) {
-        return createChatAvatar(32);
+    private void openProfilePopUp() {
+        if (activeRecipientId == null) {
+            return;
+        }
+        userService.getPublicUserProfile(activeRecipientId).ifPresentOrElse(
+            profile -> {
+                ProfilePopUp popUp = new ProfilePopUp(profile);
+                popUp.open();
+            },
+            () -> {
+                Notification n = Notification.show("Profil konnte nicht geladen werden.");
+                n.addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        );
+    }
+
+    private Component buildAvatar(ImageRefDto image) {
+        return createChatAvatar(image, 32);
     }
 
     private Div createChatAvatar(int size) {
-        Div avatar = new Div();
-        avatar.getStyle()
-            .set("width", size + "px")
-            .set("height", size + "px")
-            .set("min-width", size + "px")
-            .set("border-radius", "50%")
-            .set("background-color", "#c8dce6")
-            .set("display", "flex")
-            .set("align-items", "center")
-            .set("justify-content", "center")
-            .set("overflow", "hidden")
-            .set("flex-shrink", "0");
+        return createChatAvatar(null, size);
+    }
 
-        int svgSize = (int)(size * 0.65);
-        Div svgWrap = new Div();
-        svgWrap.getElement().setProperty("innerHTML",
-            "<svg width='" + svgSize + "' height='" + svgSize + "' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'>" +
-            "<circle cx='12' cy='8' r='4' fill='#8db3c3'/>" +
-            "<path d='M4 20c0-4 3.6-7 8-7s8 3 8 7' fill='#8db3c3'/></svg>");
-        avatar.add(svgWrap);
+    private Div createChatAvatar(ImageRefDto image, int size) {
+        Div avatar = ImageComponents.avatar(image, size, "#c8dce6");
+        avatar.getStyle().set("flex-shrink", "0");
         return avatar;
+    }
+
+    private ImageRefDto counterpartImage(ChatConversationDto conversation) {
+        return currentUserId.equals(conversation.ownerId())
+                ? conversation.sitterProfileImage()
+                : conversation.ownerProfileImage();
+    }
+
+    private void replaceAvatarContent(Div target, ImageRefDto image, int size) {
+        target.removeAll();
+        createChatAvatar(image, size).getChildren().toList().forEach(target::add);
     }
 
     private String initials(String displayName) {

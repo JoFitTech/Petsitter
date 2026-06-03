@@ -26,6 +26,7 @@ Das Projekt nutzt einen Monolithen mit Schichtenarchitektur. Es wurde bewusst ke
 | MongoDB für Chat | dokumentenorientierte Speicherung von Chatnachrichten und Konversationen |
 | Docker Compose | reproduzierbare lokale Infrastruktur für MySQL und MongoDB |
 | GitHub Actions | automatische Prüfung von Build und Tests |
+| Technische Admin-Schnittstelle ohne Admin-Bereich | Aktuell besteht kein fachlicher Nutzen für Admin-Funktionen. Die Rolle `ADMIN` bleibt als Erweiterungspunkt für eine mögliche spätere Umsetzung erhalten. |
 
 ## Systemübersicht
 
@@ -137,6 +138,8 @@ Technische Rollen:
 - `ADMIN`,
 - `SIGNED_IN_USER`.
 
+Reguläre Nutzer erhalten die Rolle `SIGNED_IN_USER`. Die Rolle `ADMIN` ist derzeit nur als technische Schnittstelle für mögliche spätere Erweiterungen vorhanden. Ein fachlicher Admin-Bereich und produktiv nutzbare Admin-Funktionen sind aktuell bewusst nicht implementiert, da sie für die Kernanforderungen keinen konkreten Nutzen bieten. Ein lokal vorhandener Seed-Account mit dieser Rolle stellt keine implementierte Admin-Funktionalität dar.
+
 ### Pet
 
 Ein Haustier gehört einem User. Es kann in Angeboten referenziert werden.
@@ -208,13 +211,21 @@ MySQL speichert die relationalen Kerndaten der Anwendung:
 - OfferRequest,
 - Booking,
 - Notification,
-- LoginCode.
+- LoginCode,
+- ImageAsset und ImageAssetVariant für optionale Profil- und Haustierbilder.
 
 Flyway verwaltet die Schemaänderungen.
+
+Profil- und Haustierbilder werden als optimierte JPEG-Varianten (`AVATAR` und `DISPLAY`) in separaten MySQL-Tabellen
+gespeichert. Die Originaldatei wird nach dem Zuschneiden verworfen. Ein Bild gehört genau einem User oder Pet;
+Fremdschlüssel mit `ON DELETE CASCADE` entfernen Varianten beim Löschen des Besitzers. Öffentliche Profile und Offers
+verwenden unveränderliche URLs unter `/media/images/{assetId}/{variant}`. Offer-Cover werden nicht zusätzlich
+persistiert: Sitter-Angebote nutzen das Profilbild, Tierhalter-Aufträge erzeugen ihre Haustier-Collage dynamisch.
 
 ### MongoDB
 
 MongoDB speichert Chatdaten. Diese Trennung wurde gewählt, weil Chatnachrichten append-orientiert sind und sich als Dokumente mit Zeitstempel und Konversationsbezug gut modellieren lassen.
+Bildreferenzen werden beim Lesen aus MySQL ergänzt und nicht in MongoDB kopiert.
 
 ### Docker Compose
 
@@ -343,7 +354,7 @@ Docker Compose wird in der CI deaktiviert. Dadurch ist die Pipeline unabhängige
 | Monolith skaliert organisatorisch nur begrenzt | Für Projektgröße sinnvoll |
 | Chat ohne produktive Ende-zu-Ende-Verschlüsselung | Für Uni-Demo ausreichend, produktiv zu ergänzen |
 | Demo-Konfiguration aktiv | Für Abgabe praktisch, produktiv zu deaktivieren |
-| Kein vollständiges Admin-Backend | Nicht Kernanforderung |
+| Kein Admin-Bereich und keine fachlichen Admin-Funktionen | Aktuell kein konkreter Nutzen für die Kernanforderungen; die technische Rolle `ADMIN` bleibt als zukünftiger Erweiterungspunkt erhalten |
 | Keine produktive Mail-Infrastruktur garantiert | Für lokale Demo über Logs lösbar |
 | Security-Scans nicht vollständig automatisiert | zukünftige Erweiterung |
 

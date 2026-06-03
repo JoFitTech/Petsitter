@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.ui.shared;
 
+import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.chat.service.ChatEventBus;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.notification.domain.Notification;
@@ -8,11 +9,13 @@ import com.softwareengineering.petsitter.notification.service.NotificationServic
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.vaadin.flow.component.Component;
+import com.vaadin.flow.component.Html;
 import com.vaadin.flow.component.DetachEvent;
 import com.vaadin.flow.component.HasElement;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.applayout.AppLayout;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.*;
 import com.vaadin.flow.component.html.Image;
@@ -47,8 +50,10 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     private final AuthenticatedUser authenticatedUser;
     private final NotificationService notificationService;
     private final ChatEventBus chatEventBus;
+    private final ImageAssetService imageAssetService;
     private Button findOwnerBtn;
     private Button findSitterBtn;
+    private Button profileBtn;
     private Span mailBadge;
     private Span mailTypingIndicator;
     private Registration badgeRegistration;
@@ -61,11 +66,13 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
     public MainLayout(
             AuthenticatedUser authenticatedUser,
             NotificationService notificationService,
-            ChatEventBus chatEventBus
+            ChatEventBus chatEventBus,
+            ImageAssetService imageAssetService
     ) {
         this.authenticatedUser = authenticatedUser;
         this.notificationService = notificationService;
         this.chatEventBus = chatEventBus;
+        this.imageAssetService = imageAssetService;
 
         // ── Global page background & font ─────────────────────────────────
         getElement().getStyle()
@@ -133,10 +140,11 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .set("align-items", "center");
         logoWrapper.addClickListener(e -> UI.getCurrent().navigate(""));
 
-        // Center: Navigation Pills
-        HorizontalLayout nav = new HorizontalLayout();
-        nav.setSpacing(true);
-        nav.setAlignItems(FlexComponent.Alignment.CENTER);
+        // Center: Navigation Pills + fixed Create-Offer button
+        HorizontalLayout centerGroup = new HorizontalLayout();
+        centerGroup.setSpacing(false);
+        centerGroup.setAlignItems(FlexComponent.Alignment.CENTER);
+        centerGroup.getStyle().set("gap", "12px");
 
         findOwnerBtn = pillButton("Tierhalter finden");
         findOwnerBtn.addClickListener(e -> UI.getCurrent().navigate(""));
@@ -144,9 +152,27 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         findSitterBtn = pillButton("Tiersitter finden");
         findSitterBtn.addClickListener(e -> UI.getCurrent().navigate("tierhalter-finden"));
 
-        nav.add(findOwnerBtn, findSitterBtn);
+        centerGroup.add(findOwnerBtn, findSitterBtn);
 
-        header.add(logoWrapper, nav, buildHeaderActions());
+        // Fixed "Angebot erstellen" button – only visible for logged-in users
+        if (authenticatedUser.get().isPresent()) {
+            Button createOfferBtn = new Button("Angebot erstellen");
+            createOfferBtn.getStyle()
+                    .set("height", "42px")
+                    .set("padding", "0 22px")
+                    .set("border-radius", "22px")
+                    .set("background", "#774f35")
+                    .set("color", "white")
+                    .set("font-weight", "700")
+                    .set("font-size", "14px")
+                    .set("box-shadow", "none")
+                    .set("cursor", "pointer")
+                    .set("flex-shrink", "0");
+            createOfferBtn.addClickListener(e -> openCreateOfferDialog());
+            centerGroup.add(createOfferBtn);
+        }
+
+        header.add(logoWrapper, centerGroup, buildHeaderActions());
         return header;
     }
 
@@ -192,11 +218,37 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         Button heartBtn = headerIconButton(VaadinIcon.HEART_O, "transparent", DARK);
         heartBtn.addClickListener(e -> UI.getCurrent().navigate("profile", com.vaadin.flow.router.QueryParameters.of("tab", "favorites")));
 
-        Button profileBtn = headerIconButton(VaadinIcon.USER, "#8db3c3", "white");
+        profileBtn = new Button(headerProfileAvatar());
+        profileBtn.setAriaLabel("Profil öffnen");
+        profileBtn.getStyle()
+                .set("width", "42px")
+                .set("height", "42px")
+                .set("min-width", "42px")
+                .set("padding", "0")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("flex-shrink", "0");
         profileBtn.addClickListener(e -> UI.getCurrent().navigate("profile"));
 
         rightIcons.add(heartBtn, profileBtn);
         return rightIcons;
+    }
+
+    public void refreshProfileImage() {
+        if (profileBtn != null) {
+            profileBtn.setIcon(headerProfileAvatar());
+        }
+    }
+
+    private Component headerProfileAvatar() {
+        return ImageComponents.avatar(
+                authenticatedUser.get()
+                        .flatMap(user -> imageAssetService.findUserImage(user.getId()))
+                        .orElse(null),
+                42,
+                "#8db3c3");
     }
 
     private Component buildMailButtonWithTypingIndicator() {
@@ -285,8 +337,50 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
 
     private void openNotificationDialog() {
         Dialog dialog = new Dialog();
-        dialog.setHeaderTitle("Benachrichtigungen");
         dialog.setWidth("480px");
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "16px")
+                .set("font-family", "Inter, Arial, sans-serif");
+
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "24px 28px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "16px")
+                .set("box-sizing", "border-box")
+                .set("color", DARK);
+
+        HorizontalLayout header = new HorizontalLayout();
+        header.setWidthFull();
+        header.setAlignItems(FlexComponent.Alignment.CENTER);
+        header.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+
+        H2 title = new H2("Benachrichtigungen");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "22px")
+                .set("font-weight", "800")
+                .set("color", DARK);
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("color", DARK)
+                .set("font-size", "20px")
+                .set("padding", "0")
+                .set("min-width", "auto")
+                .set("height", "auto")
+                .set("cursor", "pointer")
+                .set("background", "transparent")
+                .set("border", "none");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        header.add(title, closeBtn);
 
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
@@ -297,15 +391,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                 .orElse(List.of());
 
         if (inbox.isEmpty()) {
-            content.add(new Paragraph("Keine Benachrichtigungen vorhanden."));
+            Paragraph emptyText = new Paragraph("Keine Benachrichtigungen vorhanden.");
+            emptyText.getStyle()
+                    .set("color", "#7A6050")
+                    .set("font-size", "15px")
+                    .set("margin", "0")
+                    .set("font-weight", "500");
+            content.add(emptyText);
         } else {
             Map<LocalDate, List<Notification>> grouped = groupNotificationsByDate(inbox);
             for (Map.Entry<LocalDate, List<Notification>> entry : grouped.entrySet()) {
                 Span groupHeader = new Span(toDateGroupLabel(entry.getKey()));
                 groupHeader.getStyle()
-                        .set("font-weight", "700")
-                        .set("font-size", "13px")
-                        .set("color", "#7a6050")
+                        .set("font-weight", "800")
+                        .set("font-size", "15px")
+                        .set("color", DARK)
                         .set("margin", "8px 0 2px 0");
                 content.add(groupHeader);
 
@@ -315,13 +415,8 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
             }
         }
 
-        Button chatButton = new Button("Chat öffnen", e -> {
-            dialog.close();
-            UI.getCurrent().navigate("chat");
-        });
-
-        dialog.add(content);
-        dialog.getFooter().add(chatButton);
+        wrapper.add(header, content);
+        dialog.add(wrapper);
         dialog.open();
     }
 
@@ -331,22 +426,32 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         row.getStyle()
                 .set("text-align", "left")
                 .set("justify-content", "flex-start")
-                .set("background", notification.isRead() ? "#ffffff" : "#fff4de")
-                .set("border", notification.isRead() ? "1px solid #ead5ae" : "1px solid #e2b56b")
-                .set("border-left", notification.isRead() ? "1px solid #ead5ae" : "5px solid #e2b56b")
-                .set("border-radius", "10px")
-                .set("padding", "10px");
+                .set("background", notification.isRead() ? "#FCF9F2" : "#fff4de")
+                .set("border", notification.isRead() ? "1px solid #efe4d3" : "1px solid #e2b56b")
+                .set("border-left", notification.isRead() ? "1px solid #efe4d3" : "5px solid #e2b56b")
+                .set("border-radius", "12px")
+                .set("padding", "12px 16px")
+                .set("height", "auto")
+                .set("min-height", "60px")
+                .set("color", DARK)
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("box-sizing", "border-box");
 
         VerticalLayout layout = new VerticalLayout();
         layout.setPadding(false);
         layout.setSpacing(false);
+        layout.getStyle().set("gap", "4px");
 
         Span message = new Span(notification.getMessage());
-        message.getStyle().set("font-weight", notification.isRead() ? "500" : "700");
+        message.getStyle()
+                .set("font-size", "15px")
+                .set("color", DARK)
+                .set("white-space", "normal")
+                .set("font-weight", notification.isRead() ? "600" : "800");
 
         Span meta = new Span(notification.getType().name() + " • "
                 + notification.getCreatedAt().format(NOTIFICATION_TIME_FORMAT));
-        meta.getStyle().set("font-size", "12px").set("color", "#7a6050");
+        meta.getStyle().set("font-size", "13px").set("color", "#7A6050");
 
         if (!notification.isRead()) {
             Span unreadDot = new Span();
@@ -356,7 +461,7 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
                     .set("border-radius", "50%")
                     .set("display", "inline-block")
                     .set("background", "#d98b2b")
-                    .set("margin-bottom", "6px");
+                    .set("margin-bottom", "4px");
             layout.add(unreadDot);
         }
 
@@ -448,6 +553,148 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         return date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
     }
 
+
+    // ── Create-Offer Dialog ───────────────────────────────────────────────
+    private void openCreateOfferDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setWidth("520px");
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "Inter, Arial, sans-serif");
+
+        // Wrapper with position:relative so X can be placed absolute
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "24px 24px 22px 24px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "14px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("box-sizing", "border-box");
+
+        // X close button – absolute, top-right corner
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "12px")
+                .set("right", "12px")
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", "#9a8070")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> dialog.close());
+
+        com.vaadin.flow.component.html.H2 title =
+                new com.vaadin.flow.component.html.H2("Was möchtest du erstellen?");
+        title.getStyle()
+                .set("margin", "0")
+                .set("font-size", "21px")
+                .set("font-weight", "800")
+                .set("line-height", "1.2")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("padding-right", "32px")  // prevent overlap with X
+                .set("color", DARK);
+
+        Paragraph copy = new Paragraph(
+                "Wähle aus, ob du Betreuung suchst oder selbst Betreuung anbieten möchtest.");
+        copy.getStyle()
+                .set("margin", "0")
+                .set("font-size", "13px")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("line-height", "1.5")
+                .set("color", "#9a8070");
+
+        wrapper.add(
+                closeBtn,
+                title,
+                copy,
+                createDialogOption(dialog, VaadinIcon.HOME,
+                        "Betreuung für mein Haustier suchen",
+                        "Erstelle einen Auftrag für dein Haustier.", "request"),
+                createDialogOption(dialog, VaadinIcon.HEART,
+                        "Betreuung anbieten",
+                        "Erstelle ein Angebot als Tiersitter.", "offer")
+        );
+
+        dialog.add(wrapper);
+        dialog.open();
+    }
+
+    private Component createDialogOption(Dialog dialog, VaadinIcon iconType,
+            String titleText, String description, String mode) {
+        Button option = new Button();
+        option.setWidthFull();
+        option.getStyle()
+                .set("height", "auto")
+                .set("min-height", "68px")
+                .set("padding", "14px 16px")
+                .set("border", "1.5px solid #e8d9c4")
+                .set("border-radius", "14px")
+                .set("background", "#fefcf8")
+                .set("color", DARK)
+                .set("box-shadow", "0 2px 8px rgba(74,52,40,0.05)")
+                .set("cursor", "pointer")
+                .set("text-align", "left");
+
+        Icon icon = new Icon(iconType);
+        icon.setSize("22px");
+        icon.getStyle()
+                .set("color", DARK)
+                .set("flex-shrink", "0");
+
+        VerticalLayout optionContent = new VerticalLayout();
+        optionContent.setPadding(false);
+        optionContent.setSpacing(false);
+        optionContent.getStyle().set("gap", "3px");
+
+        Span optTitle = new Span(titleText);
+        optTitle.getStyle()
+                .set("font-size", "15px")
+                .set("font-weight", "700")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("letter-spacing", "-0.1px")
+                .set("color", DARK);
+
+        Span desc = new Span(description);
+        desc.getStyle()
+                .set("font-size", "12.5px")
+                .set("font-weight", "400")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("color", "#9a8070");
+
+        optionContent.add(optTitle, desc);
+
+        HorizontalLayout row = new HorizontalLayout(icon, optionContent);
+        row.setPadding(false);
+        row.setSpacing(false);
+        row.setAlignItems(FlexComponent.Alignment.CENTER);
+        row.getStyle().set("gap", "14px");
+
+        option.getElement().appendChild(row.getElement());
+        option.addClickListener(event -> {
+            dialog.close();
+            UI ui = UI.getCurrent();
+            if (ui != null) {
+                Map<String, List<String>> params = new LinkedHashMap<>();
+                params.put("mode", List.of(mode));
+                params.put("returnTo", List.of("/profile?tab=offers"));
+                ui.navigate("auftrag-erstellen", new QueryParameters(params));
+            }
+        });
+        return option;
+    }
+
     @Override
     protected void onDetach(DetachEvent detachEvent) {
         super.onDetach(detachEvent);
@@ -520,12 +767,14 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         HorizontalLayout socials = new HorizontalLayout();
         socials.setSpacing(true);
 
-        Button facebookBtn = socialButton("f");
+        Html facebookIcon = new Html("<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16' style='display: block;'><path d='M16 8.049c0-4.446-3.582-8.05-8-8.05C3.58 0-.002 3.603-.002 8.05c0 4.017 2.926 7.347 6.75 7.951v-5.625h-2.03V8.05H6.75V6.275c0-2.017 1.195-3.131 3.022-3.131.876 0 1.791.157 1.791.157v1.98h-1.009c-.993 0-1.303.621-1.303 1.258v1.51h2.218l-.354 2.326H9.25V16c3.824-.604 6.75-3.934 6.75-7.951z'/></svg>");
+        Button facebookBtn = socialButton(facebookIcon);
         facebookBtn.addClickListener(e -> {
             // TODO: UI.getCurrent().getPage().open("https://facebook.com/pawsitter");
         });
 
-        Button instagramBtn = socialButton("◎");
+        Html instagramIcon = new Html("<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' viewBox='0 0 16 16' style='display: block;'><path d='M8 0C5.829 0 5.556.01 4.703.048 3.85.088 3.269.222 2.76.42a3.9 3.9 0 0 0-1.417.923A3.9 3.9 0 0 0 .42 2.76C.222 3.268.087 3.85.048 4.7.01 5.555 0 5.827 0 8.001c0 2.172.01 2.444.048 3.297.04.852.174 1.433.372 1.942.205.526.478.972.923 1.417.444.445.89.719 1.416.923.51.198 1.09.333 1.942.372C5.555 15.99 5.827 16 8 16s2.444-.01 3.298-.048c.851-.04 1.434-.174 1.943-.372a3.9 3.9 0 0 0 1.416-.923c.445-.445.718-.891.923-1.417.197-.509.332-1.09.372-1.942C15.99 10.445 16 10.173 16 8s-.01-2.445-.048-3.299c-.04-.851-.175-1.433-.372-1.941a3.9 3.9 0 0 0-.923-1.417A3.9 3.9 0 0 0 13.24.42c-.51-.198-1.092-.333-1.943-.372C10.443.01 10.172 0 7.998 0zm-.717 1.442h.718c2.136 0 2.389.007 3.232.046.78.035 1.204.166 1.486.275.373.145.64.319.92.599.28.28.453.546.598.92.11.281.24.705.275 1.485.039.843.047 1.096.047 3.231s-.008 2.389-.047 3.232c-.035.78-.166 1.203-.275 1.485a2.5 2.5 0 0 1-.599.919c-.28.28-.546.453-.92.598-.28.11-.704.24-1.485.276-.843.038-1.096.047-3.232.047s-2.39-.009-3.233-.047c-.78-.036-1.203-.166-1.485-.276a2.5 2.5 0 0 1-.92-.598 2.5 2.5 0 0 1-.6-.92c-.109-.281-.24-.705-.275-1.485-.038-.843-.046-1.096-.046-3.233s.008-2.388.046-3.231c.036-.78.166-1.204.276-1.486.145-.373.319-.64.599-.92.28-.28.546-.453.92-.598.282-.11.705-.24 1.485-.276.738-.034 1.024-.044 2.515-.045zm4.988 1.328a.96.96 0 1 0 0 1.92.96.96 0 0 0 0-1.92zm-4.27 1.122a4.109 4.109 0 1 0 0 8.217 4.109 4.109 0 0 0 0-8.217zm0 1.441a2.667 2.667 0 1 1 0 5.334 2.667 2.667 0 0 1 0-5.334z'/></svg>");
+        Button instagramBtn = socialButton(instagramIcon);
         instagramBtn.addClickListener(e -> {
             // TODO: UI.getCurrent().getPage().open("https://instagram.com/pawsitter");
         });
@@ -625,17 +874,21 @@ public class MainLayout extends AppLayout implements AfterNavigationObserver {
         return btn;
     }
 
-    private Button socialButton(String value) {
-        Button btn = new Button(value);
+    private Button socialButton(Component icon) {
+        Button btn = new Button(icon);
         btn.getStyle()
                 .set("width", "32px")
                 .set("height", "32px")
                 .set("border-radius", "50%")
                 .set("background", "#87b2c3")
                 .set("color", "white")
-                .set("font-weight", "800")
+                .set("display", "inline-flex")
+                .set("align-items", "center")
+                .set("justify-content", "center")
                 .set("box-shadow", "none")
-                .set("cursor", "pointer");
+                .set("cursor", "pointer")
+                .set("border", "none")
+                .set("padding", "0");
         return btn;
     }
 }

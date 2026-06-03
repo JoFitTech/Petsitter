@@ -1,5 +1,6 @@
 package com.softwareengineering.petsitter.offer.service;
 
+import com.softwareengineering.petsitter.image.dto.ImageRefDto;
 import com.softwareengineering.petsitter.location.domain.PostalCodeLocation;
 import com.softwareengineering.petsitter.location.dto.PostalCodeMapLocation;
 import com.softwareengineering.petsitter.location.service.PostalCodeLookupException;
@@ -17,6 +18,7 @@ import com.softwareengineering.petsitter.offer.dto.CreateOfferRequest;
 import com.softwareengineering.petsitter.offer.dto.CreateOfferResult;
 import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
+import com.softwareengineering.petsitter.offer.dto.OfferCoverTileDto;
 import com.softwareengineering.petsitter.offer.dto.OfferHeroStatisticsDto;
 import com.softwareengineering.petsitter.offer.dto.OfferMapLocation;
 import com.softwareengineering.petsitter.offer.dto.OfferPetOptionDto;
@@ -27,6 +29,7 @@ import com.softwareengineering.petsitter.pet.domain.Pet;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
+import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.repository.PetRepository;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
@@ -101,21 +104,36 @@ public class OfferService {
     private final AuthenticatedUser authenticatedUser;
     private final CreateOfferFormRules createOfferFormRules;
     private final PostalCodeService postalCodeService;
+    private final OfferImagePresentationMapper imagePresentationMapper;
 
     @Autowired
     public OfferService(OfferRepository offerRepository, PetRepository petRepository,
+            AuthenticatedUser authenticatedUser, PostalCodeService postalCodeService,
+            OfferImagePresentationMapper imagePresentationMapper) {
+        this(offerRepository, petRepository, authenticatedUser, new CreateOfferFormRules(), postalCodeService,
+                imagePresentationMapper);
+    }
+
+    public OfferService(OfferRepository offerRepository, PetRepository petRepository,
             AuthenticatedUser authenticatedUser, PostalCodeService postalCodeService) {
-        this(offerRepository, petRepository, authenticatedUser, new CreateOfferFormRules(), postalCodeService);
+        this(offerRepository, petRepository, authenticatedUser, new CreateOfferFormRules(), postalCodeService, null);
     }
 
     OfferService(OfferRepository offerRepository, PetRepository petRepository,
             AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules,
             PostalCodeService postalCodeService) {
+        this(offerRepository, petRepository, authenticatedUser, createOfferFormRules, postalCodeService, null);
+    }
+
+    OfferService(OfferRepository offerRepository, PetRepository petRepository,
+            AuthenticatedUser authenticatedUser, CreateOfferFormRules createOfferFormRules,
+            PostalCodeService postalCodeService, OfferImagePresentationMapper imagePresentationMapper) {
         this.offerRepository = offerRepository;
         this.petRepository = petRepository;
         this.authenticatedUser = authenticatedUser;
         this.createOfferFormRules = createOfferFormRules;
         this.postalCodeService = postalCodeService;
+        this.imagePresentationMapper = imagePresentationMapper;
     }
 
     public boolean hasAuthenticatedUser() {
@@ -126,12 +144,12 @@ public class OfferService {
     public List<OfferCardDto> getOpenOffersByType(OfferType offerType) {
         User currentUser = authenticatedUser.get().orElse(null);
 
-        return offerRepository
+        List<Offer> offers = offerRepository
                 .findAllByOfferTypeAndStatus(offerType, OfferStatus.OPEN)
                 .stream()
                 .filter(offer -> isVisibleInPublicLists(offer, currentUser))
-                .map(this::toCardDto)
                 .toList();
+        return toCardDtos(offers);
     }
 
     @Transactional(readOnly = true)
@@ -309,10 +327,7 @@ public class OfferService {
     @Transactional(readOnly = true)
     public List<MyOfferCardDto> getCurrentUserOffers() {
         return authenticatedUser.get()
-                .map(user -> offerRepository.findAllByCreateUserIdOrderByCreateDateDesc(user.getId())
-                        .stream()
-                        .map(this::toMyOfferCardDto)
-                        .toList())
+                .map(user -> toMyOfferCardDtos(offerRepository.findAllByCreateUserIdOrderByCreateDateDesc(user.getId())))
                 .orElseGet(List::of);
     }
 
@@ -449,9 +464,7 @@ public class OfferService {
 
     private List<OfferCardDto> toDistanceAwareCardDtos(List<Offer> offers, OfferSearchCriteria criteria) {
         if (criteria.originPostalCode() == null || criteria.originPostalCode().isBlank()) {
-            List<OfferCardDto> results = offers.stream()
-                    .map(this::toCardDto)
-                    .toList();
+            List<OfferCardDto> results = toCardDtos(offers);
             LOGGER.info("Distance filter inactive: resultCount={}, resultIds={}",
                     results.size(),
                     describeOfferCardIds(results));
@@ -470,6 +483,7 @@ public class OfferService {
             return List.of();
         }
 
+        boolean unlimitedDistance = criteria.hasUnlimitedDistance();
         int maxDistanceKm = Math.max(0, criteria.distanceKm());
         PostalCodeLocation resolvedOrigin = originLocation.get();
         Set<String> targetPostalCodes = offers.stream()
@@ -480,24 +494,27 @@ public class OfferService {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         Map<String, PostalCodeLocation> targetLocations = postalCodeService.findCachedGermanLocations(targetPostalCodes);
         LOGGER.info("Distance filter active: originPostalCode={}, originPlace={}, originLat={}, originLon={}, "
-                        + "maxDistanceKm={}, candidates={}, uniqueTargetPostalCodes={}, cachedTargetPostalCodes={}",
+                        + "maxDistanceKm={}, unlimitedDistance={}, candidates={}, uniqueTargetPostalCodes={}, "
+                        + "cachedTargetPostalCodes={}",
                 criteria.originPostalCode(),
                 resolvedOrigin.getPrimaryPlaceName(),
                 resolvedOrigin.getLatitude(),
                 resolvedOrigin.getLongitude(),
                 maxDistanceKm,
+                unlimitedDistance,
                 offers.size(),
                 targetPostalCodes.size(),
                 targetLocations.size());
 
-        List<OfferCardDto> results = offers.stream()
+        List<OfferDistance> offerDistances = offers.stream()
                 .map(offer -> offerDistance(offer, originLocation.get(), targetLocations))
                 .flatMap(Optional::stream)
                 .filter(offerDistance -> {
-                    boolean included = offerDistance.distanceKm() <= maxDistanceKm;
+                    boolean included = unlimitedDistance || offerDistance.distanceKm() <= maxDistanceKm;
                     LOGGER.info(
                             "Distance filter decision: offerId={}, targetPostalCode={}, targetCity={}, "
-                                    + "targetLat={}, targetLon={}, distanceKm={}, maxDistanceKm={}, included={}",
+                                    + "targetLat={}, targetLon={}, distanceKm={}, maxDistanceKm={}, "
+                                    + "unlimitedDistance={}, included={}",
                             offerDistance.offer().getOfferId(),
                             creatorPostalCode(offerDistance.offer()),
                             creatorCity(offerDistance.offer()),
@@ -505,13 +522,23 @@ public class OfferService {
                             offerDistance.targetLocation().getLongitude(),
                             postalCodeService.roundedDistanceKm(offerDistance.distanceKm()),
                             maxDistanceKm,
+                            unlimitedDistance,
                             included);
                     return included;
                 })
                 .sorted(Comparator.comparingDouble(OfferDistance::distanceKm))
+                .toList();
+        List<Offer> displayedOffers = offerDistances.stream().map(OfferDistance::offer).toList();
+        Map<UUID, List<OfferCoverTileDto>> tiles = coverTilesByOffer(displayedOffers);
+        Map<UUID, List<PetDto>> petDtos = petDtosByOffer(displayedOffers);
+        Map<UUID, ImageRefDto> creatorImages = creatorImagesByOffer(displayedOffers);
+        List<OfferCardDto> results = offerDistances.stream()
                 .map(offerDistance -> toCardDto(
                         offerDistance.offer(),
-                        postalCodeService.roundedDistanceKm(offerDistance.distanceKm())))
+                        postalCodeService.roundedDistanceKm(offerDistance.distanceKm()),
+                        tiles.getOrDefault(offerDistance.offer().getOfferId(), List.of()),
+                        petDtos.getOrDefault(offerDistance.offer().getOfferId(), List.of()),
+                        creatorImages.get(offerDistance.offer().getOfferId())))
                 .toList();
         LOGGER.info("Distance filter results: resultCount={}, resultIds={}",
                 results.size(),
@@ -576,6 +603,20 @@ public class OfferService {
     }
 
     private OfferCardDto toCardDto(Offer offer, Integer distanceKm) {
+        return toCardDto(
+                offer,
+                distanceKm,
+                imagePresentationMapper == null ? List.of() : imagePresentationMapper.coverTiles(offer),
+                imagePresentationMapper == null ? petDtos(offerPets(offer)) : imagePresentationMapper.petDtos(offerPets(offer)),
+                imagePresentationMapper == null ? null : imagePresentationMapper.userImage(offer.getCreateUser()));
+    }
+
+    private OfferCardDto toCardDto(
+            Offer offer,
+            Integer distanceKm,
+            List<OfferCoverTileDto> coverTiles,
+            List<PetDto> petDtos,
+            ImageRefDto creatorProfileImage) {
         boolean verified = offer.getCreateUser() != null
                 && offer.getCreateUser().getAccountStatus() == AccountStatus.VERIFIED;
         List<Pet> pets = offerPets(offer);
@@ -595,17 +636,27 @@ public class OfferService {
                 petSpeciesLabels(pets),
                 petBreeds(pets),
                 petTags(pets),
+                petDtos,
                 createUser != null ? createUser.getPostalCode() : null,
                 createUser != null ? createUser.getCity() : null,
                 distanceKm,
                 false,
                 offer.getOfferType(),
                 createUser != null ? createUser.getId() : null,
-                creatorDisplayName(createUser)
+                creatorDisplayName(createUser),
+                coverTiles,
+                creatorProfileImage
         );
     }
 
     private MyOfferCardDto toMyOfferCardDto(Offer offer) {
+        return toMyOfferCardDto(
+                offer,
+                imagePresentationMapper == null ? List.of() : imagePresentationMapper.coverTiles(offer),
+                imagePresentationMapper == null ? petDtos(offerPets(offer)) : imagePresentationMapper.petDtos(offerPets(offer)));
+    }
+
+    private MyOfferCardDto toMyOfferCardDto(Offer offer, List<OfferCoverTileDto> coverTiles, List<PetDto> petDtos) {
         List<Pet> pets = offerPets(offer);
         return new MyOfferCardDto(
                 offer.getOfferId(),
@@ -622,8 +673,47 @@ public class OfferService {
                 petSpeciesLabels(pets),
                 petBreeds(pets),
                 petTags(pets),
-                offer.getAnimalType()
+                petDtos,
+                offer.getAnimalType(),
+                coverTiles
         );
+    }
+
+    private List<OfferCardDto> toCardDtos(List<Offer> offers) {
+        if (imagePresentationMapper == null) {
+            return offers.stream().map(this::toCardDto).toList();
+        }
+        Map<UUID, List<OfferCoverTileDto>> tiles = coverTilesByOffer(offers);
+        Map<UUID, List<PetDto>> petDtos = petDtosByOffer(offers);
+        Map<UUID, ImageRefDto> creatorImages = creatorImagesByOffer(offers);
+        return offers.stream()
+                .map(offer -> toCardDto(offer, null, tiles.getOrDefault(offer.getOfferId(), List.of()),
+                        petDtos.getOrDefault(offer.getOfferId(), List.of()), creatorImages.get(offer.getOfferId())))
+                .toList();
+    }
+
+    private List<MyOfferCardDto> toMyOfferCardDtos(List<Offer> offers) {
+        if (imagePresentationMapper == null) {
+            return offers.stream().map(this::toMyOfferCardDto).toList();
+        }
+        Map<UUID, List<OfferCoverTileDto>> tiles = coverTilesByOffer(offers);
+        Map<UUID, List<PetDto>> petDtos = petDtosByOffer(offers);
+        return offers.stream()
+                .map(offer -> toMyOfferCardDto(offer, tiles.getOrDefault(offer.getOfferId(), List.of()),
+                        petDtos.getOrDefault(offer.getOfferId(), List.of())))
+                .toList();
+    }
+
+    private Map<UUID, List<OfferCoverTileDto>> coverTilesByOffer(List<Offer> offers) {
+        return imagePresentationMapper == null ? Map.of() : imagePresentationMapper.coverTilesByOffer(offers);
+    }
+
+    private Map<UUID, List<PetDto>> petDtosByOffer(List<Offer> offers) {
+        return imagePresentationMapper == null ? Map.of() : imagePresentationMapper.petDtosByOffer(offers);
+    }
+
+    private Map<UUID, ImageRefDto> creatorImagesByOffer(List<Offer> offers) {
+        return imagePresentationMapper == null ? Map.of() : imagePresentationMapper.creatorImagesByOffer(offers);
     }
 
     private String titleOrFallback(Offer offer) {
@@ -654,6 +744,16 @@ public class OfferService {
 
     private String petNames(List<Pet> pets) {
         return petSummary(pets, Pet::getName);
+    }
+
+    private List<PetDto> petDtos(List<Pet> pets) {
+        if (imagePresentationMapper != null) {
+            return imagePresentationMapper.petDtos(pets);
+        }
+        return pets.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(PetDto::from)
+                .toList();
     }
 
     private String petSpeciesLabels(List<Pet> pets) {
@@ -961,6 +1061,9 @@ public class OfferService {
     }
 
     private OfferPetOptionDto toPetOption(Pet pet) {
+        if (imagePresentationMapper != null) {
+            return imagePresentationMapper.petOption(pet);
+        }
         return new OfferPetOptionDto(pet.getId(), pet.getName(), pet.getSpecies());
     }
 

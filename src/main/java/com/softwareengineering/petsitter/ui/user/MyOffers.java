@@ -10,10 +10,12 @@ import com.softwareengineering.petsitter.offer.dto.MyOfferCardDto;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.ui.shared.PetsitterDetailPopUp;
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
+import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H2;
@@ -189,7 +191,7 @@ public class MyOffers extends Div {
         Button addBtn = new Button("Auftrag anbieten", new Icon(VaadinIcon.PLUS));
         addBtn.getStyle()
                 .set("border-radius", "24px")
-                .set("background", DARK)
+                .set("background", "#774f35")
                 .set("color", "white")
                 .set("box-shadow", "none")
                 .set("font-weight", "600")
@@ -280,12 +282,10 @@ public class MyOffers extends Div {
                 .set("cursor", "pointer");
         card.addClickListener(event -> openOfferDialog(offer));
 
-        Div imagePlaceholder = new Div();
+        Div imagePlaceholder = ImageComponents.offerCover(offer.coverTiles(), "160px", cardColor(offer));
         imagePlaceholder.getStyle()
-                .set("height", "160px")
                 .set("width", "100%")
                 .set("border-radius", "12px")
-                .set("background", cardColor(offer))
                 .set("position", "relative")
                 .set("margin-bottom", "20px");
 
@@ -399,34 +399,74 @@ public class MyOffers extends Div {
 
     private void openDeleteConfirmDialog(MyOfferCardDto offer) {
         Dialog confirm = new Dialog();
-        confirm.setWidth("380px");
-        confirm.setCloseOnEsc(true);
-        confirm.setCloseOnOutsideClick(false);
+        confirm.setWidth("400px");
+        confirm.getElement().getThemeList().add("no-padding");
+        confirm.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "Inter, Arial, sans-serif");
 
-        VerticalLayout layout = new VerticalLayout();
-        layout.setPadding(false);
-        layout.setSpacing(false);
-        layout.getStyle().set("gap", "18px");
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "28px 28px 24px 28px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "16px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("box-sizing", "border-box");
+
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "12px")
+                .set("right", "12px")
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", "#9a8070")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> confirm.close());
 
         H3 title = new H3("Offer löschen?");
         title.getStyle()
                 .set("margin", "0")
-                .set("font-size", "20px")
+                .set("font-size", "21px")
                 .set("font-weight", "800")
+                .set("line-height", "1.2")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("padding-right", "32px")
                 .set("color", DARK);
 
         Paragraph message = new Paragraph("Möchtest du \"" + offer.title()
                 + "\" wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.");
         message.getStyle()
                 .set("margin", "0")
-                .set("font-size", "14px")
-                .set("color", MUTED)
-                .set("line-height", "1.5");
+                .set("font-size", "13.5px")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("line-height", "1.5")
+                .set("color", "#9a8070");
 
-        Button cancel = styledCancelButton("Abbrechen");
-        cancel.addClickListener(event -> confirm.close());
-
-        Button delete = styledDeleteButton("Löschen");
+        Button delete = new Button("Löschen");
+        delete.setWidthFull();
+        delete.getStyle()
+                .set("height", "44px")
+                .set("border-radius", "14px")
+                .set("background", "#774f35")
+                .set("color", "white")
+                .set("font-weight", "700")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("font-size", "15px")
+                .set("box-shadow", "0 2px 8px rgba(74,52,40,0.1)")
+                .set("cursor", "pointer")
+                .set("border", "none");
         delete.addClickListener(event -> {
             try {
                 offerService.deleteCurrentUserOffer(offer.id());
@@ -441,41 +481,11 @@ public class MyOffers extends Div {
             }
         });
 
-        HorizontalLayout buttons = new HorizontalLayout(cancel, delete);
-        buttons.setWidthFull();
-        buttons.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        buttons.getStyle().set("gap", "10px");
-
-        layout.add(title, message, buttons);
-        confirm.add(layout);
+        wrapper.add(closeBtn, title, message, delete);
+        confirm.add(wrapper);
         confirm.open();
     }
 
-    private Button styledDeleteButton(String label) {
-        Button button = new Button(label);
-        button.getStyle()
-                .set("border-radius", "24px")
-                .set("background", "#9a4f36")
-                .set("color", "white")
-                .set("box-shadow", "none")
-                .set("font-weight", "700")
-                .set("height", "40px")
-                .set("cursor", "pointer");
-        return button;
-    }
-
-    private Button styledCancelButton(String label) {
-        Button button = new Button(label);
-        button.getStyle()
-                .set("border-radius", "24px")
-                .set("background", "#e8ddd4")
-                .set("color", DARK)
-                .set("box-shadow", "none")
-                .set("font-weight", "700")
-                .set("height", "40px")
-                .set("cursor", "pointer");
-        return button;
-    }
 
     private Component buildDetailColumn(String labelText, String valueText, String valueColor) {
         VerticalLayout col = new VerticalLayout();
@@ -503,35 +513,75 @@ public class MyOffers extends Div {
     private void openCreateOfferDialog() {
         Dialog dialog = new Dialog();
         dialog.setWidth("520px");
+        dialog.getElement().getThemeList().add("no-padding");
+        dialog.getElement().getStyle()
+                .set("border-radius", "20px")
+                .set("font-family", "Inter, Arial, sans-serif");
 
-        VerticalLayout content = new VerticalLayout();
-        content.setPadding(false);
-        content.setSpacing(false);
-        content.getStyle().set("gap", "18px").set("padding", "8px");
+        // Wrapper with position:relative so X can be placed absolute
+        Div wrapper = new Div();
+        wrapper.getStyle()
+                .set("position", "relative")
+                .set("padding", "24px 24px 22px 24px")
+                .set("display", "flex")
+                .set("flex-direction", "column")
+                .set("gap", "14px")
+                .set("background-color", "#f3eada")
+                .set("border-radius", "20px")
+                .set("box-sizing", "border-box");
+
+        // X close button – absolute, top-right corner
+        Button closeBtn = new Button(new Icon(VaadinIcon.CLOSE_SMALL));
+        closeBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+        closeBtn.getStyle()
+                .set("position", "absolute")
+                .set("top", "12px")
+                .set("right", "12px")
+                .set("width", "28px")
+                .set("height", "28px")
+                .set("min-width", "28px")
+                .set("border-radius", "50%")
+                .set("background", "transparent")
+                .set("border", "none")
+                .set("color", "#9a8070")
+                .set("box-shadow", "none")
+                .set("cursor", "pointer")
+                .set("padding", "0")
+                .set("z-index", "10");
+        closeBtn.addClickListener(e -> dialog.close());
 
         H2 title = new H2("Was möchtest du erstellen?");
         title.getStyle()
                 .set("margin", "0")
-                .set("font-size", "24px")
+                .set("font-size", "21px")
                 .set("font-weight", "800")
+                .set("line-height", "1.2")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("padding-right", "32px")  // prevent overlap with X
                 .set("color", DARK);
 
-        Paragraph copy = new Paragraph("Wähle aus, ob du Betreuung suchst oder selbst Betreuung anbieten möchtest.");
+        Paragraph copy = new Paragraph(
+                "Wähle aus, ob du Betreuung suchst oder selbst Betreuung anbieten möchtest.");
         copy.getStyle()
-                .set("margin", "-8px 0 0 0")
-                .set("font-size", "14px")
-                .set("color", MUTED);
+                .set("margin", "0")
+                .set("font-size", "13px")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("line-height", "1.5")
+                .set("color", "#9a8070");
 
-        content.add(
+        wrapper.add(
+                closeBtn,
                 title,
                 copy,
-                createDialogOption(dialog, VaadinIcon.HOME, "Betreuung für mein Haustier suchen",
+                createDialogOption(dialog, VaadinIcon.HOME,
+                        "Betreuung für mein Haustier suchen",
                         "Erstelle einen Auftrag für dein Haustier.", "request"),
-                createDialogOption(dialog, VaadinIcon.HEART, "Betreuung anbieten",
+                createDialogOption(dialog, VaadinIcon.HEART,
+                        "Betreuung anbieten",
                         "Erstelle ein Angebot als Tiersitter.", "offer")
         );
 
-        dialog.add(content);
+        dialog.add(wrapper);
         dialog.open();
     }
 
@@ -562,11 +612,16 @@ public class MyOffers extends Div {
                 offer.petSpecies(),
                 offer.petBreed(),
                 offer.petTags(),
+                offer.pets(),
                 null,
                 null,
                 null,
                 false,
-                offer.offerType()
+                offer.offerType(),
+                null,
+                null,
+                offer.coverTiles(),
+                null
         );
     }
 
@@ -576,13 +631,13 @@ public class MyOffers extends Div {
         option.setWidthFull();
         option.getStyle()
                 .set("height", "auto")
-                .set("min-height", "82px")
-                .set("padding", "18px")
-                .set("border", "1px solid " + BORDER)
+                .set("min-height", "68px")
+                .set("padding", "14px 16px")
+                .set("border", "1.5px solid #e8d9c4")
                 .set("border-radius", "14px")
-                .set("background", "#fffdf8")
+                .set("background", "#fefcf8")
                 .set("color", DARK)
-                .set("box-shadow", "none")
+                .set("box-shadow", "0 2px 8px rgba(74,52,40,0.05)")
                 .set("cursor", "pointer")
                 .set("text-align", "left");
 
@@ -590,25 +645,29 @@ public class MyOffers extends Div {
         icon.setSize("22px");
         icon.getStyle().set("color", DARK).set("flex-shrink", "0");
 
-        VerticalLayout copy = new VerticalLayout();
-        copy.setPadding(false);
-        copy.setSpacing(false);
-        copy.getStyle().set("gap", "4px");
+        VerticalLayout optionContent = new VerticalLayout();
+        optionContent.setPadding(false);
+        optionContent.setSpacing(false);
+        optionContent.getStyle().set("gap", "3px");
 
-        Span title = new Span(titleText);
-        title.getStyle()
+        Span optTitle = new Span(titleText);
+        optTitle.getStyle()
                 .set("font-size", "15px")
-                .set("font-weight", "800")
+                .set("font-weight", "700")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("letter-spacing", "-0.1px")
                 .set("color", DARK);
 
         Span desc = new Span(description);
         desc.getStyle()
-                .set("font-size", "13px")
-                .set("font-weight", "500")
-                .set("color", MUTED);
+                .set("font-size", "12.5px")
+                .set("font-weight", "400")
+                .set("font-family", "Inter, Arial, sans-serif")
+                .set("color", "#9a8070");
 
-        copy.add(title, desc);
-        HorizontalLayout row = new HorizontalLayout(icon, copy);
+        optionContent.add(optTitle, desc);
+
+        HorizontalLayout row = new HorizontalLayout(icon, optionContent);
         row.setPadding(false);
         row.setSpacing(false);
         row.setAlignItems(FlexComponent.Alignment.CENTER);
@@ -619,9 +678,10 @@ public class MyOffers extends Div {
             dialog.close();
             UI ui = UI.getCurrent();
             if (ui != null) {
-                ui.navigate("auftrag-erstellen", new QueryParameters(java.util.Map.of(
-                        "mode", List.of(mode),
-                        "returnTo", List.of("/profile?tab=offers"))));
+                java.util.Map<String, List<String>> params = new java.util.LinkedHashMap<>();
+                params.put("mode", List.of(mode));
+                params.put("returnTo", List.of("/profile?tab=offers"));
+                ui.navigate("auftrag-erstellen", new QueryParameters(params));
             }
         });
         return option;

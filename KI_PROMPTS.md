@@ -11,6 +11,7 @@ Diese Datei dokumentiert die KI-Nutzung im Projekt Pawsitters. Nicht alle urspr�
 | ChatGPT | Konzept, Architektur, Präsentation, Dokumentation, technische Erklärungen |
 | Claude | Implementierungsideen, Refactoring, Debugging |
 | Codex | Implementierungsunterstützung, Code, Tests, Anpassungen im Repository |
+| Gemini/Antigravity | Implementierungsunterstützung, Code, Tests, Anpassungen im Repository |
 
 ## Qualitätsregeln
 
@@ -22,7 +23,7 @@ KI-Ergebnisse wurden nach folgenden Regeln behandelt:
 - Tests müssen laufen.
 - Security-Aussagen müssen zum implementierten Stand passen.
 - Nicht umgesetzte Maßnahmen werden als zukünftige Maßnahmen dokumentiert.
-- Teammitglieder müssen finalen Code erklären können.
+
 
 ## Prompt-Kategorien
 

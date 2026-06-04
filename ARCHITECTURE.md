@@ -66,12 +66,27 @@ Beispiele:
 
 ## Ergänzende Architekturdiagramme
 
-Neben dieser textuellen Architekturbeschreibung gibt es weitere Diagramme, die einzelne Sichten auf das Projekt dokumentieren:
+Neben dieser textuellen Architekturbeschreibung gibt es weitere Diagramme, die einzelne Sichten auf das Projekt dokumentieren.
 
-- [Klassendiagramm](diagrams/Klassendiagramm_SE.drawio.svg), das zu Beginn der Entwicklung als fachliche und technische Strukturierung erstellt wurde,
-- [Aktivitätsdiagramm Offer erstellen](diagrams/Aktivitätsdiagramm_offer_erstellen.drawio.svg), für den Ablauf beim Erstellen eines Offers,
-- [Aktivitätsdiagramm Login / Registrierung / Passwort vergessen](diagrams/Aktivitätsdiagram_login_registrieren_pwvergessen.drawio.svg), für die Account-Flows Login, Passwort vergessen und Registrierung,
-- eine Docker-Visualisierung der lokalen Infrastruktur und Container-Zusammenhänge.
+### Klassendiagramm
+
+Das Klassendiagramm wurde zu Beginn der Entwicklung als fachliche und technische Strukturierung erstellt.
+
+![Klassendiagramm](diagrams/Klassendiagramm_SE.drawio.svg)
+
+### Aktivitätsdiagramm Offer erstellen
+
+Dieses Aktivitätsdiagramm beschreibt den Ablauf beim Erstellen eines Offers.
+
+![Aktivitätsdiagramm Offer erstellen](diagrams/Aktivitätsdiagramm_offer_erstellen.drawio.svg)
+
+### Aktivitätsdiagramm Login / Registrierung / Passwort vergessen
+
+Dieses Aktivitätsdiagramm beschreibt die Account-Flows Login, Passwort vergessen und Registrierung.
+
+![Aktivitätsdiagramm Login Registrierung Passwort vergessen](diagrams/Aktivitätsdiagram_login_registrieren_pwvergessen.drawio.svg)
+
+Zusätzlich gibt es eine Docker-Visualisierung der lokalen Infrastruktur und Container-Zusammenhänge.
 
 Das Klassendiagramm diente vor allem der frühen Abstimmung über zentrale Domänenobjekte und Beziehungen. Die Aktivitätsdiagramme beschreiben wichtige Nutzer- und Systemabläufe, während die Docker-Visualisierung zeigt, wie Anwendung, MySQL und MongoDB in der lokalen Entwicklungsumgebung zusammenspielen.
 

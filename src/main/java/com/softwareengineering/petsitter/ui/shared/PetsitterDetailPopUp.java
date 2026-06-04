@@ -14,6 +14,7 @@ import com.softwareengineering.petsitter.pet.dto.PetDto;
 import com.softwareengineering.petsitter.pet.service.PetService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.chat.ProfilePopUp;
+import com.softwareengineering.petsitter.ui.user.LoginView;
 import com.softwareengineering.petsitter.user.service.UserService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -418,7 +419,7 @@ public class PetsitterDetailPopUp extends Dialog {
                 .map(com.softwareengineering.petsitter.user.domain.User::getId)
                 .orElse(null);
         if (currentUserId == null) {
-            Notification.show("Bitte melde dich an.");
+            redirectAnonymousUserToLogin();
             return;
         }
 
@@ -522,6 +523,14 @@ public class PetsitterDetailPopUp extends Dialog {
         dialogContent.add(header, messageArea, buttons);
         dialog.add(dialogContent);
         dialog.open();
+    }
+
+    private void redirectAnonymousUserToLogin() {
+        close();
+        UI ui = UI.getCurrent();
+        if (ui != null) {
+            ui.navigate(LoginView.class);
+        }
     }
 
     private void openInsufficientBalanceDialog(BookingAcceptancePreview preview) {

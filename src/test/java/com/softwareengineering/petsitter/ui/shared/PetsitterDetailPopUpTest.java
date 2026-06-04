@@ -1,28 +1,44 @@
 package com.softwareengineering.petsitter.ui.shared;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
+import com.softwareengineering.petsitter.booking.service.BookingService;
+import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.offer.domain.OfferCareType;
 import com.softwareengineering.petsitter.offer.domain.OfferFrequency;
 import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offer.dto.OfferCardDto;
 import com.softwareengineering.petsitter.offer.service.OfferService;
+import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.pet.domain.PetSpecies;
 import com.softwareengineering.petsitter.pet.domain.PetTag;
 import com.softwareengineering.petsitter.pet.domain.PetVaccinationStatus;
 import com.softwareengineering.petsitter.pet.dto.PetDto;
+import com.softwareengineering.petsitter.security.AuthenticatedUser;
+import com.softwareengineering.petsitter.ui.user.LoginView;
+import com.softwareengineering.petsitter.user.domain.User;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasText;
+import com.vaadin.flow.component.UI;
 import com.vaadin.flow.component.button.Button;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 class PetsitterDetailPopUpTest {
+
+    @AfterEach
+    void clearCurrentUi() {
+        UI.setCurrent(null);
+    }
 
     @Test
     void rendersSeparateDetailBlockForEachOwnerOfferPet() {
@@ -127,6 +143,31 @@ class PetsitterDetailPopUpTest {
         assertThat(containsText(popup, "Beschreibung")).isFalse();
     }
 
+    @Test
+    void requestActionRedirectsAnonymousUserToLoginWithoutCallingRequestServices() {
+        RecordingUI ui = new RecordingUI();
+        UI.setCurrent(ui);
+        RequestService requestService = mock(RequestService.class);
+        ChatService chatService = mock(ChatService.class);
+        BookingService bookingService = mock(BookingService.class);
+        PetsitterDetailPopUp popup = new PetsitterDetailPopUp(
+                ownerOfferCard(List.of()),
+                "ca. 2 km",
+                4,
+                new OtherUserOfferService(),
+                requestService,
+                chatService,
+                new AnonymousUser(),
+                null,
+                bookingService
+        );
+
+        findButtonByText(popup, "Auftrag anfragen").click();
+
+        assertThat(ui.navigationTarget).isEqualTo(LoginView.class);
+        verifyNoInteractions(requestService, chatService, bookingService);
+    }
+
     private OfferCardDto ownerOfferCard(List<PetDto> pets) {
         return ownerOfferCard(pets, "Offer-Beschreibung");
     }
@@ -174,6 +215,21 @@ class PetsitterDetailPopUpTest {
         return root.getChildren().anyMatch(child -> containsText(child, text));
     }
 
+    private Button findButtonByText(Component root, String text) {
+        return findButtonsByText(root, text).stream()
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private List<Button> findButtonsByText(Component root, String text) {
+        List<Button> matches = new ArrayList<>();
+        if (root instanceof Button button && text.equals(button.getText())) {
+            matches.add(button);
+        }
+        root.getChildren().forEach(child -> matches.addAll(findButtonsByText(child, text)));
+        return matches;
+    }
+
     private static final class OwnOfferService extends OfferService {
 
         private OwnOfferService() {
@@ -188,6 +244,46 @@ class PetsitterDetailPopUpTest {
         @Override
         public boolean canCurrentUserEditOffer(UUID offerId) {
             return false;
+        }
+    }
+
+    private static final class OtherUserOfferService extends OfferService {
+
+        private OtherUserOfferService() {
+            super(null, null, null, null);
+        }
+
+        @Override
+        public boolean isCurrentUserOffer(UUID offerId) {
+            return false;
+        }
+
+        @Override
+        public boolean canCurrentUserEditOffer(UUID offerId) {
+            return false;
+        }
+    }
+
+    private static final class AnonymousUser extends AuthenticatedUser {
+
+        private AnonymousUser() {
+            super(null);
+        }
+
+        @Override
+        public Optional<User> get() {
+            return Optional.empty();
+        }
+    }
+
+    private static final class RecordingUI extends UI {
+
+        private Class<?> navigationTarget;
+
+        @Override
+        public <T extends Component> Optional<T> navigate(Class<T> navigationTarget) {
+            this.navigationTarget = navigationTarget;
+            return Optional.empty();
         }
     }
 }

@@ -6,6 +6,7 @@ import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
@@ -13,6 +14,7 @@ import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.ImageCropDialog;
 import com.softwareengineering.petsitter.ui.shared.PendingImageChange;
+import com.softwareengineering.petsitter.ui.shared.RatingComponents;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
@@ -556,8 +558,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         info.setSpacing(false);
         info.getStyle().set("gap", "4px");
 
-        Span stars = new Span("★★★★★");
-        stars.getStyle().set("color", "#f5c842").set("font-size", "20px").set("letter-spacing", "2px");
+        Component rating = RatingComponents.compactRating(currentUserRatingSummary());
 
         Span verified = new Span("✓ Verifiziert");
         verified.getStyle()
@@ -567,7 +568,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         topRow.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         topRow.setWidthFull();
         topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        topRow.add(stars, verified);
+        topRow.add(rating, verified);
 
         H3 name = new H3(displayName());
         name.getStyle()
@@ -849,6 +850,13 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     private String fullName() {
         return (valueOrEmpty(currentProfile.firstName()) + " " + valueOrEmpty(currentProfile.lastName())).trim();
+    }
+
+    private UserRatingSummary currentUserRatingSummary() {
+        if (currentProfile == null || currentProfile.id() == null || userReviewService == null) {
+            return null;
+        }
+        return userReviewService.getUserRatingSummary(currentProfile.id());
     }
 
     private String displayName() {

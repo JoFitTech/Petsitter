@@ -7,6 +7,7 @@ import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
 import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.dto.UserReviewDto;
 import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
@@ -14,7 +15,6 @@ import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.ImageCropDialog;
 import com.softwareengineering.petsitter.ui.shared.PendingImageChange;
-import com.softwareengineering.petsitter.ui.shared.RatingComponents;
 import com.softwareengineering.petsitter.user.dto.UserAuthResult;
 import com.softwareengineering.petsitter.user.dto.UserProfileDto;
 import com.softwareengineering.petsitter.user.dto.UserProfileUpdateRequest;
@@ -561,7 +561,6 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         info.getStyle().set("gap", "4px");
 
         Span stars = ratingSummarySpan();
-        Component rating = RatingComponents.compactRating(currentUserRatingSummary());
 
         Span verified = new Span("✓ Verifiziert");
         verified.getStyle()
@@ -571,7 +570,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         topRow.setDefaultVerticalComponentAlignment(FlexComponent.Alignment.CENTER);
         topRow.setWidthFull();
         topRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
-        topRow.add(rating, verified);
+        topRow.add(stars, verified);
 
         H3 name = new H3(displayName());
         name.getStyle()

@@ -3,6 +3,8 @@ package com.softwareengineering.petsitter.chat.service;
 import com.softwareengineering.petsitter.booking.domain.Booking;
 import com.softwareengineering.petsitter.booking.repository.BookingRepository;
 import com.softwareengineering.petsitter.image.service.ImageAssetService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.chat.domain.ChatConversationDocument;
 import com.softwareengineering.petsitter.chat.domain.ChatMessageDocument;
 import com.softwareengineering.petsitter.chat.dto.ChatConversationDto;
@@ -31,6 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 
 /**
  * Chat-Service – zentrale Businesslogik für Chat-Operationen.
@@ -63,6 +66,7 @@ public class ChatService {
     private final AuthenticatedUser authenticatedUser;
     private final UserRepository userRepository;
     private final ImageAssetService imageAssetService;
+    private final UserReviewService userReviewService;
 
     @Autowired
     public ChatService(
@@ -75,7 +79,8 @@ public class ChatService {
             NotificationService notificationService,
             AuthenticatedUser authenticatedUser,
             UserRepository userRepository,
-            ImageAssetService imageAssetService
+            ImageAssetService imageAssetService,
+            @Lazy UserReviewService userReviewService
     ) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
@@ -87,6 +92,23 @@ public class ChatService {
         this.authenticatedUser = authenticatedUser;
         this.userRepository = userRepository;
         this.imageAssetService = imageAssetService;
+        this.userReviewService = userReviewService;
+    }
+
+    public ChatService(
+            ChatConversationRepository conversationRepository,
+            ChatMessageRepository messageRepository,
+            BookingRepository bookingRepository,
+            OfferRequestRepository offerRequestRepository,
+            ChatAccessService accessService,
+            ChatEventBus eventBus,
+            NotificationService notificationService,
+            AuthenticatedUser authenticatedUser,
+            UserRepository userRepository,
+            ImageAssetService imageAssetService
+    ) {
+        this(conversationRepository, messageRepository, bookingRepository, offerRequestRepository, accessService,
+                eventBus, notificationService, authenticatedUser, userRepository, imageAssetService, null);
     }
 
     public ChatService(
@@ -101,7 +123,7 @@ public class ChatService {
             UserRepository userRepository
     ) {
         this(conversationRepository, messageRepository, bookingRepository, offerRequestRepository, accessService,
-                eventBus, notificationService, authenticatedUser, userRepository, null);
+                eventBus, notificationService, authenticatedUser, userRepository, null, null);
     }
 
     /**
@@ -469,9 +491,23 @@ public class ChatService {
             doc.getLastMessagePreview(),
             doc.getRequestId(),
             doc.getOfferId(),
-            images.get(doc.getOwnerId()),
-            images.get(doc.getSitterId())
+            images == null ? null : images.get(doc.getOwnerId()),
+            images == null ? null : images.get(doc.getSitterId()),
+            loadRatingSummary(doc.getOwnerId()),
+            loadRatingSummary(doc.getSitterId())
         );
+    }
+
+    private UserRatingSummary loadRatingSummary(UUID userId) {
+        if (userReviewService == null || userId == null) {
+            return null;
+        }
+        try {
+            return userReviewService.getUserRatingSummary(userId);
+        } catch (Exception e) {
+            log.warn("Failed to load rating summary for user {}: {}", userId, e.getMessage());
+            return null;
+        }
     }
 
     private ChatMessageDto toMessageDto(ChatMessageDocument doc) {

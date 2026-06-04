@@ -11,13 +11,16 @@ import com.softwareengineering.petsitter.chat.service.ChatService;
 import com.softwareengineering.petsitter.chat.service.Registration;
 import com.softwareengineering.petsitter.image.dto.ImageRefDto;
 import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
+import com.softwareengineering.petsitter.ui.shared.RatingComponents;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
@@ -465,6 +468,16 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         }
     }
 
+
+    private UserRatingSummary counterpartRatingSummary(ChatConversationDto conv) {
+        if (currentUserId == null || conv == null) {
+            return null;
+        }
+        return currentUserId.equals(conv.ownerId())
+            ? conv.sitterRatingSummary()
+            : conv.ownerRatingSummary();
+    }
+
     private Component buildConversationItem(ChatConversationDto conv, long unreadCount) {
         boolean isActive = activeConversationId != null && activeConversationId.equals(conv.conversationId());
 
@@ -514,21 +527,34 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
             .set("font-size", "13px");
         nameRow.add(name);
 
-        // Stars (placeholder, 4 stars)
-        HorizontalLayout stars = new HorizontalLayout();
-        stars.setPadding(false);
-        stars.setSpacing(false);
-        stars.getStyle().set("gap", "1px");
-        for (int i = 0; i < 4; i++) {
-            Icon star = new Icon(VaadinIcon.STAR);
-            star.setSize("10px");
-            star.getStyle()
-                .set("color", "#ffdf4a")
-                .set("stroke", "#000000")
-                .set("stroke-width", "0.5");
-            stars.add(star);
+        UserRatingSummary counterpartRatingSummary = counterpartRatingSummary(conv);
+        if (counterpartRatingSummary != null && counterpartRatingSummary.ratingCount() > 0) {
+            HorizontalLayout stars = new HorizontalLayout();
+            stars.setPadding(false);
+            stars.setSpacing(false);
+            stars.getStyle().set("gap", "1px");
+            int starCount = Math.max(0, Math.min(5, (int) Math.round(counterpartRatingSummary.averageRating())));
+            for (int i = 0; i < starCount; i++) {
+                Icon star = new Icon(VaadinIcon.STAR);
+                star.setSize("10px");
+                star.getStyle()
+                    .set("color", "#ffdf4a")
+                    .set("stroke", "#000000")
+                    .set("stroke-width", "0.5");
+                stars.add(star);
+            }
+            nameRow.add(stars);
+        } else {
+            Span newRating = new Span("Neu");
+            newRating.getStyle()
+                .set("font-size", "11px")
+                .set("color", "#9a7a62")
+                .set("font-weight", "600");
+            nameRow.add(newRating);
         }
-        nameRow.add(stars);
+        Component rating = RatingComponents.compactRating(counterpartRatingSummary(conv));
+        rating.getElement().getStyle().set("transform", "scale(0.75)").set("transform-origin", "left center");
+        nameRow.add(rating);
 
         content.add(nameRow);
 
@@ -1256,6 +1282,18 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         Div avatar = ImageComponents.avatar(image, size, "#c8dce6");
         avatar.getStyle().set("flex-shrink", "0");
         return avatar;
+    }
+
+    private UserRatingSummary counterpartRatingSummary(ChatConversationDto conversation) {
+        UUID counterpartId = currentUserId.equals(conversation.ownerId())
+                ? conversation.sitterId()
+                : conversation.ownerId();
+        if (counterpartId == null || userService == null) {
+            return null;
+        }
+        return userService.getPublicUserProfile(counterpartId)
+                .map(profile -> profile.ratingSummary())
+                .orElse(null);
     }
 
     private ImageRefDto counterpartImage(ChatConversationDto conversation) {

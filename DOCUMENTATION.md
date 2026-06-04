@@ -98,6 +98,8 @@ https://trello.com/invite/b/69fdcb6ae3e23219aa1334e8/ATTI5f3a546b73406f627ff1511
 
 Trello half dabei, Aufgaben sichtbar zu machen und den Projektfortschritt nachvollziehbar zu halten. Die Review-Spalte war besonders wichtig, weil Aufgaben nicht direkt nach der Umsetzung als abgeschlossen galten.
 
+Für das Trello-Board wurden zusätzlich einige Automationen eingerichtet. Wenn eine Aufgabe in die Spalte Review verschoben wird, wird automatisch eine E-Mail an alle Teammitglieder verschickt. Außerdem wird der Karte eine Checkliste hinzugefügt, mit der die Reviews abgehakt und nachvollzogen werden können. Dadurch war klarer sichtbar, welche Aufgaben bereits geprüft wurden und bei welchen Karten noch Review-Schritte offen waren.
+
 Beispiele für UI-Aufgaben:
 
 - Logo und visuelle Gestaltung,
@@ -144,7 +146,7 @@ Die Entwicklung erfolgte in einem gemeinsamen GitHub-Repository. Git wurde genut
 
 - Versionskontrolle,
 - regelmäßige Commits,
-- Arbeit an unterschiedlichen Feature-Ständen,
+- Arbeit an unterschiedlichen Feature-Branches,
 - Zusammenführung von UI- und Backend-Arbeit,
 - Nachvollziehbarkeit der Entwicklung,
 - Vorbereitung der Abgabe.

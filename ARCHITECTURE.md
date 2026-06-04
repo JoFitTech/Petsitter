@@ -198,7 +198,7 @@ Ein Offer beschreibt entweder:
 
 Angebote besitzen Status, Preis, Zeitraum oder wiederkehrende Wochentage, Betreuungsart, Tierart und optionale Haustierbezüge. Die Suche filtert offene und sichtbare Angebote nach Rolle, Datum, Preis, Betreuungsart, Frequenz, Tierart und Entfernung.
 
-Die Distanzsuche nutzt deutsche PLZ-Daten. `PostalCodeService` validiert PLZ, ruft bei Bedarf Ortsdaten über einen Client ab, cached Koordinaten in MySQL und berechnet Entfernungen mit einer Haversine-Formel.
+Die Distanzsuche nutzt deutsche PLZ-Daten. `PostalCodeService` validiert PLZ, ruft bei Bedarf Ortsdaten über `PostalCodeClient` ab, cached Koordinaten in MySQL und berechnet Entfernungen mit einer Haversine-Formel. Die konkrete Implementierung `NominatimPostalCodeClient` nutzt dafür die externe Nominatim-REST-API von OpenStreetMap. Der Client sendet einen HTTP-GET-Request an `/search` mit Parametern wie `country=Germany`, `postalcode=<PLZ>`, `format=jsonv2`, `addressdetails=1` und `limit=1`. Die JSON-Antwort wird auf passende Postleitzahl, Ortsdaten sowie Breiten- und Längengrad geprüft und anschließend als `PostalCodeLookup` an den Service zurückgegeben. Gefundene Koordinaten werden im PLZ-Ortscache gespeichert, damit spätere Validierungen, Kartendarstellungen und Distanzberechnungen ohne erneuten externen API-Aufruf möglich sind.
 
 ### Anfragen
 
@@ -313,16 +313,6 @@ Tests liegen unter `src/test/java`. Es gibt Unit-Tests, Integrationstests, Smoke
 
 Details stehen in `TEST_DOCUMENTATION.md`.
 
-## CI-Architektur
-
-GitHub Actions führt bei Pushes und Pull Requests Maven Verify aus:
-
-```bash
-./mvnw -B verify -Dspring.docker.compose.enabled=false
-```
-
-Docker Compose wird in der CI deaktiviert, damit die Pipeline ohne lokale Container startet.
-
 ## Bekannte Architekturgrenzen
 
 | Grenze                                                | Bewertung                                                        |
@@ -334,19 +324,3 @@ Docker Compose wird in der CI deaktiviert, damit die Pipeline ohne lokale Contai
 | Kein produktiver Mailversand                          | Codes werden lokal angezeigt, SMTP wäre produktiv nötig          |
 | Keine vollständigen E2E-Browsertests                  | Unit-, Integration- und UI-nahe Tests decken Kernlogik ab        |
 | Keine automatisierten Security-Scans                  | Als produktionsnahe Erweiterung sinnvoll                         |
-
-## Ausblick
-
-Für eine produktionsnahe Weiterentwicklung wären sinnvoll:
-
-- Deployment mit HTTPS und sicheren Cookie-Flags,
-- Secret Store statt Dev-Fallbacks,
-- SMTP-Integration,
-- Rate-Limiting und CAPTCHA für Code-Flows,
-- verteiltes Chat-Eventing,
-- Audit-Logging,
-- Backup- und Restore-Prozesse,
-- Monitoring und Alerting,
-- Datenschutzprozesse für Löschung und Auskunft,
-- Security-Scans in CI,
-- echte Browser-End-to-End-Tests.

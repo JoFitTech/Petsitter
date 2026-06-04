@@ -529,21 +529,9 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
 
         UserRatingSummary counterpartRatingSummary = counterpartRatingSummary(conv);
         if (counterpartRatingSummary != null && counterpartRatingSummary.ratingCount() > 0) {
-            HorizontalLayout stars = new HorizontalLayout();
-            stars.setPadding(false);
-            stars.setSpacing(false);
-            stars.getStyle().set("gap", "1px");
-            int starCount = Math.max(0, Math.min(5, (int) Math.round(counterpartRatingSummary.averageRating())));
-            for (int i = 0; i < starCount; i++) {
-                Icon star = new Icon(VaadinIcon.STAR);
-                star.setSize("10px");
-                star.getStyle()
-                    .set("color", "#ffdf4a")
-                    .set("stroke", "#000000")
-                    .set("stroke-width", "0.5");
-                stars.add(star);
-            }
-            nameRow.add(stars);
+            Component rating = RatingComponents.compactRating(counterpartRatingSummary);
+            rating.getElement().getStyle().set("transform", "scale(0.75)").set("transform-origin", "left center");
+            nameRow.add(rating);
         } else {
             Span newRating = new Span("Neu");
             newRating.getStyle()
@@ -552,9 +540,6 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                 .set("font-weight", "600");
             nameRow.add(newRating);
         }
-        Component rating = RatingComponents.compactRating(counterpartRatingSummary(conv));
-        rating.getElement().getStyle().set("transform", "scale(0.75)").set("transform-origin", "left center");
-        nameRow.add(rating);
 
         content.add(nameRow);
 
@@ -1284,17 +1269,6 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         return avatar;
     }
 
-    private UserRatingSummary counterpartRatingSummary(ChatConversationDto conversation) {
-        UUID counterpartId = currentUserId.equals(conversation.ownerId())
-                ? conversation.sitterId()
-                : conversation.ownerId();
-        if (counterpartId == null || userService == null) {
-            return null;
-        }
-        return userService.getPublicUserProfile(counterpartId)
-                .map(profile -> profile.ratingSummary())
-                .orElse(null);
-    }
 
     private ImageRefDto counterpartImage(ChatConversationDto conversation) {
         return currentUserId.equals(conversation.ownerId())

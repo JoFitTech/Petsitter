@@ -5,6 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.pet.service.PetService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.dto.UserReviewDto;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class UserServiceTest {
 
@@ -100,6 +104,38 @@ class UserServiceTest {
             assertThat(profile.accountRole()).isEqualTo(AccountRole.SIGNED_IN_USER);
             assertThat(profile.accountStatus()).isEqualTo(AccountStatus.VERIFIED);
         });
+    }
+
+    @Test
+    void getCurrentUserProfileIncludesRatingSummaryAndRecentReviews() {
+        UUID userId = UUID.randomUUID();
+        User domainUser = user(userId);
+        UserService userService = service(
+                repositoryReturning(domainUser),
+                authenticatedUser(Optional.of(domainUser)),
+                new LoginCodeServiceFake(),
+                petService("1 Hund")
+        );
+        UserRatingSummary ratingSummary = new UserRatingSummary(4.7d, 12L);
+        UserReviewDto review = new UserReviewDto(
+                UUID.randomUUID(),
+                "Ben Betreuung",
+                5,
+                "Sehr zuverlässig und freundlich.",
+                LocalDateTime.of(2026, 1, 15, 10, 30)
+        );
+        UserReviewServiceFake userReviewService = new UserReviewServiceFake(ratingSummary, List.of(review));
+        ReflectionTestUtils.setField(userService, "userReviewService", userReviewService);
+
+        Optional<UserProfileDto> result = userService.getCurrentUserProfile();
+
+        assertThat(result).hasValueSatisfying(profile -> {
+            assertThat(profile.ratingSummary()).isSameAs(ratingSummary);
+            assertThat(profile.recentReviews()).containsExactly(review);
+        });
+        assertThat(userReviewService.summaryUserId).isEqualTo(userId);
+        assertThat(userReviewService.recentReviewsUserId).isEqualTo(userId);
+        assertThat(userReviewService.recentReviewsLimit).isEqualTo(3);
     }
 
     @Test
@@ -676,6 +712,33 @@ class UserServiceTest {
 
     private UserRepository repositoryReturning(User user) {
         return new UserRepositoryFake(user).repository();
+    }
+
+    private static class UserReviewServiceFake extends UserReviewService {
+        private final UserRatingSummary ratingSummary;
+        private final List<UserReviewDto> recentReviews;
+        private UUID summaryUserId;
+        private UUID recentReviewsUserId;
+        private int recentReviewsLimit;
+
+        UserReviewServiceFake(UserRatingSummary ratingSummary, List<UserReviewDto> recentReviews) {
+            super(null, null, null);
+            this.ratingSummary = ratingSummary;
+            this.recentReviews = recentReviews;
+        }
+
+        @Override
+        public UserRatingSummary getUserRatingSummary(UUID revieweeId) {
+            this.summaryUserId = revieweeId;
+            return ratingSummary;
+        }
+
+        @Override
+        public List<UserReviewDto> getRecentReviews(UUID revieweeId, int limit) {
+            this.recentReviewsUserId = revieweeId;
+            this.recentReviewsLimit = limit;
+            return recentReviews;
+        }
     }
 
     private static class LoginCodeServiceFake extends LoginCodeService {

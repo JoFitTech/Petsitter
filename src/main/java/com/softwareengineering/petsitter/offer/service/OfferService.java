@@ -349,7 +349,15 @@ public class OfferService {
     public boolean canCurrentUserEditOffer(UUID offerId) {
         return authenticatedUser.get()
                 .flatMap(user -> findOfferById(offerId)
-                        .map(offer -> isCreatedBy(offer, user) && offer.getStatus() == OfferStatus.OPEN))
+                        .map(offer -> isCreatedBy(offer, user) && isEditableStatus(offer.getStatus())))
+                .orElse(false);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isCurrentUserDraftOffer(UUID offerId) {
+        return authenticatedUser.get()
+                .flatMap(user -> findOfferById(offerId)
+                        .map(offer -> isCreatedBy(offer, user) && offer.getStatus() == OfferStatus.DRAFT))
                 .orElse(false);
     }
 
@@ -808,6 +816,9 @@ public class OfferService {
         if (offer.getTitle() != null && !offer.getTitle().isBlank()) {
             return offer.getTitle();
         }
+        if (offer.getStatus() == OfferStatus.DRAFT) {
+            return "Unbenannter Entwurf";
+        }
         return offer.getOfferType() == OfferType.OWNER_OFFER ? "Auftrag" : "Angebot";
     }
 
@@ -954,24 +965,23 @@ public class OfferService {
                 .orElseThrow(() -> new BusinessRuleViolationException(
                         "Kein eingeloggter DB-User gefunden. Bitte mit einem gespeicherten User anmelden."));
         validateCreateOfferRequest(request);
-        OfferFrequency frequency = normalizedFrequency(request.frequency());
 
         Offer offer = new Offer();
-        offer.setStartDate(frequency == OfferFrequency.REGULAR ? null : request.startDate());
-        offer.setEndDate(frequency == OfferFrequency.REGULAR ? null : request.endDate());
-        offer.setCreateUser(currentUser);
-        offer.setUpdateUser(currentUser);
-        offer.setPets(resolvePets(request.petIds(), currentUser));
-        offer.setTitle(cleanText(request.title()));
-        offer.setFrequency(frequency);
-        offer.setRecurringWeekdays(request.recurringWeekdays());
-        offer.setTimeSlot(request.timeSlot());
-        offer.setCareType(request.careType());
-        offer.setAnimalType(request.animalType());
-        offer.setOfferType(request.offerType());
-        offer.setPrice(request.price());
-        offer.setDescription(cleanText(request.description()));
+        applyRequestToOffer(offer, request, currentUser);
         offer.setStatus(OfferStatus.OPEN);
+
+        Offer savedOffer = offerRepository.save(offer);
+        return new CreateOfferResult(savedOffer.getOfferId());
+    }
+
+    @Transactional
+    public CreateOfferResult saveDraft(CreateOfferRequest request) {
+        User currentUser = currentUserOrThrow();
+        validateDraftOfferRequest(request);
+
+        Offer offer = new Offer();
+        applyRequestToOffer(offer, request, currentUser);
+        offer.setStatus(OfferStatus.DRAFT);
 
         Offer savedOffer = offerRepository.save(offer);
         return new CreateOfferResult(savedOffer.getOfferId());
@@ -986,25 +996,51 @@ public class OfferService {
     @Transactional
     public CreateOfferResult updateCurrentUserOffer(UUID offerId, CreateOfferRequest request) {
         User currentUser = currentUserOrThrow();
-        Offer offer = loadEditableCurrentUserOffer(offerId, currentUser);
+        Offer offer = loadCurrentUserOfferWithStatus(
+                offerId,
+                currentUser,
+                OfferStatus.OPEN,
+                "Nur offene Offers koennen bearbeitet werden.");
         validateCreateOfferRequest(request);
-        OfferFrequency frequency = normalizedFrequency(request.frequency());
-        if (request.offerType() != offer.getOfferType()) {
-            throw new BusinessRuleViolationException("Der Angebotstyp kann nicht geaendert werden.");
-        }
+        validateOfferTypeUnchanged(offer, request);
 
-        offer.setStartDate(frequency == OfferFrequency.REGULAR ? null : request.startDate());
-        offer.setEndDate(frequency == OfferFrequency.REGULAR ? null : request.endDate());
-        offer.setUpdateUser(currentUser);
-        offer.setPets(resolvePets(request.petIds(), currentUser));
-        offer.setTitle(cleanText(request.title()));
-        offer.setFrequency(frequency);
-        offer.setRecurringWeekdays(request.recurringWeekdays());
-        offer.setTimeSlot(request.timeSlot());
-        offer.setCareType(request.careType());
-        offer.setAnimalType(request.animalType());
-        offer.setPrice(request.price());
-        offer.setDescription(cleanText(request.description()));
+        applyRequestToOffer(offer, request, currentUser);
+
+        Offer savedOffer = offerRepository.save(offer);
+        return new CreateOfferResult(savedOffer.getOfferId());
+    }
+
+    @Transactional
+    public CreateOfferResult updateCurrentUserDraft(UUID offerId, CreateOfferRequest request) {
+        User currentUser = currentUserOrThrow();
+        Offer offer = loadCurrentUserOfferWithStatus(
+                offerId,
+                currentUser,
+                OfferStatus.DRAFT,
+                "Nur Entwuerfe koennen als Entwurf gespeichert werden.");
+        validateDraftOfferRequest(request);
+        validateOfferTypeUnchanged(offer, request);
+
+        applyRequestToOffer(offer, request, currentUser);
+        offer.setStatus(OfferStatus.DRAFT);
+
+        Offer savedOffer = offerRepository.save(offer);
+        return new CreateOfferResult(savedOffer.getOfferId());
+    }
+
+    @Transactional
+    public CreateOfferResult publishCurrentUserDraft(UUID offerId, CreateOfferRequest request) {
+        User currentUser = currentUserOrThrow();
+        Offer offer = loadCurrentUserOfferWithStatus(
+                offerId,
+                currentUser,
+                OfferStatus.DRAFT,
+                "Nur Entwuerfe koennen veroeffentlicht werden.");
+        validateCreateOfferRequest(request);
+        validateOfferTypeUnchanged(offer, request);
+
+        applyRequestToOffer(offer, request, currentUser);
+        offer.setStatus(OfferStatus.OPEN);
 
         Offer savedOffer = offerRepository.save(offer);
         return new CreateOfferResult(savedOffer.getOfferId());
@@ -1191,10 +1227,26 @@ public class OfferService {
         if (!isCreatedBy(offer, currentUser)) {
             throw new ForbiddenOperationException("Offer gehoert nicht dem aktuellen User.");
         }
-        if (offer.getStatus() != OfferStatus.OPEN) {
-            throw new BusinessRuleViolationException("Nur offene Offers koennen bearbeitet werden.");
+        if (!isEditableStatus(offer.getStatus())) {
+            throw new BusinessRuleViolationException("Nur offene Offers und Entwuerfe koennen bearbeitet werden.");
         }
         return offer;
+    }
+
+    private Offer loadCurrentUserOfferWithStatus(UUID offerId, User currentUser, OfferStatus status, String message) {
+        Offer offer = findOfferById(offerId)
+                .orElseThrow(() -> new NotFoundException("Offer nicht gefunden."));
+        if (!isCreatedBy(offer, currentUser)) {
+            throw new ForbiddenOperationException("Offer gehoert nicht dem aktuellen User.");
+        }
+        if (offer.getStatus() != status) {
+            throw new BusinessRuleViolationException(message);
+        }
+        return offer;
+    }
+
+    private boolean isEditableStatus(OfferStatus status) {
+        return status == OfferStatus.OPEN || status == OfferStatus.DRAFT;
     }
 
     private boolean isCreatedBy(Offer offer, User user) {
@@ -1246,6 +1298,32 @@ public class OfferService {
                 offer.getTimeSlot());
     }
 
+    private void applyRequestToOffer(Offer offer, CreateOfferRequest request, User currentUser) {
+        OfferFrequency frequency = normalizedFrequency(request.frequency());
+        offer.setStartDate(frequency == OfferFrequency.REGULAR ? null : request.startDate());
+        offer.setEndDate(frequency == OfferFrequency.REGULAR ? null : request.endDate());
+        if (offer.getCreateUser() == null) {
+            offer.setCreateUser(currentUser);
+        }
+        offer.setUpdateUser(currentUser);
+        offer.setPets(resolvePets(request.petIds(), currentUser));
+        offer.setTitle(cleanText(request.title()));
+        offer.setFrequency(frequency);
+        offer.setRecurringWeekdays(request.recurringWeekdays());
+        offer.setTimeSlot(request.timeSlot());
+        offer.setCareType(request.careType());
+        offer.setAnimalType(request.animalType());
+        offer.setOfferType(request.offerType());
+        offer.setPrice(request.price());
+        offer.setDescription(cleanText(request.description()));
+    }
+
+    private void validateOfferTypeUnchanged(Offer offer, CreateOfferRequest request) {
+        if (request.offerType() != offer.getOfferType()) {
+            throw new BusinessRuleViolationException("Der Angebotstyp kann nicht geaendert werden.");
+        }
+    }
+
     private void validateCreateOfferRequest(CreateOfferRequest request) {
         if (request == null || request.offerType() == null) {
             throw new BusinessRuleViolationException("Bitte alle Pflichtfelder korrekt ausfuellen.");
@@ -1256,6 +1334,24 @@ public class OfferService {
 
         if (request.offerType() == OfferType.OWNER_OFFER && request.petIds().isEmpty()) {
             throw new BusinessRuleViolationException("Bitte ein Haustier fuer den Auftrag auswaehlen.");
+        }
+
+        validateOfferShape(request, frequency);
+    }
+
+    private void validateDraftOfferRequest(CreateOfferRequest request) {
+        if (request == null || request.offerType() == null) {
+            throw new BusinessRuleViolationException("Bitte einen Angebotstyp auswaehlen.");
+        }
+
+        OfferFrequency frequency = normalizedFrequency(request.frequency());
+        validateDraftSchedule(request, frequency);
+        validateOfferShape(request, frequency);
+    }
+
+    private void validateOfferShape(CreateOfferRequest request, OfferFrequency frequency) {
+        if (request.price() != null && request.price().signum() < 0) {
+            throw new BusinessRuleViolationException("Der Preis darf nicht negativ sein.");
         }
 
         if (request.offerType() == OfferType.OWNER_OFFER && request.animalType() != null) {
@@ -1277,6 +1373,19 @@ public class OfferService {
         if (request.description() != null
                 && request.description().length() > createOfferFormRules.descriptionMaxLength()) {
             throw new BusinessRuleViolationException("Die Beschreibung darf maximal 255 Zeichen enthalten.");
+        }
+    }
+
+    private void validateDraftSchedule(CreateOfferRequest request, OfferFrequency frequency) {
+        if (frequency == OfferFrequency.ONE_TIME) {
+            if (!request.recurringWeekdays().isEmpty()) {
+                throw new BusinessRuleViolationException("Wochentage werden nur bei regelmaessigen Angeboten gespeichert.");
+            }
+            if (request.startDate() != null
+                    && request.endDate() != null
+                    && request.startDate().isAfter(request.endDate())) {
+                throw new BusinessRuleViolationException("Das Enddatum muss am oder nach dem Startdatum liegen.");
+            }
         }
     }
 

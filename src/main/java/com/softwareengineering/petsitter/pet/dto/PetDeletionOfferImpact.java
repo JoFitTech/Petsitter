@@ -16,10 +16,14 @@ public record PetDeletionOfferImpact(
     }
 
     public boolean blocksDeletion() {
-        return status != OfferStatus.OPEN;
+        return !isEditableOfferStatus();
     }
 
     public boolean requiresDecision() {
-        return status == OfferStatus.OPEN && petCount > 1;
+        return isEditableOfferStatus() && petCount > 1;
+    }
+
+    private boolean isEditableOfferStatus() {
+        return status == OfferStatus.OPEN || status == OfferStatus.DRAFT;
     }
 }

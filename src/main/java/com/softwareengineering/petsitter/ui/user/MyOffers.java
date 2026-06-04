@@ -62,18 +62,26 @@ public class MyOffers extends Div {
     private final UserService userService;
     private final Div offersContainer = new Div();
 
-    private String activeStatusFilter = "ALLE";  // ALLE | OFFEN | GEBUCHT | VERGANGEN
+    private String activeStatusFilter = "ALLE";  // ALLE | OFFEN | GEBUCHT | VERGANGEN | ENTWUERFE
     private String activeTypeFilter   = "ALLE";  // ALLE | HALTER | SITTER
 
     public MyOffers(OfferService offerService, RequestService requestService,
                     ChatService chatService, BookingService bookingService,
                     AuthenticatedUser authenticatedUser, UserService userService) {
+        this(offerService, requestService, chatService, bookingService, authenticatedUser, userService, null);
+    }
+
+    public MyOffers(OfferService offerService, RequestService requestService,
+                    ChatService chatService, BookingService bookingService,
+                    AuthenticatedUser authenticatedUser, UserService userService,
+                    String initialStatusFilter) {
         this.offerService = offerService;
         this.requestService = requestService;
         this.chatService = chatService;
         this.bookingService = bookingService;
         this.authenticatedUser = authenticatedUser;
         this.userService = userService;
+        this.activeStatusFilter = normalizeStatusFilter(initialStatusFilter);
 
         setWidthFull();
         getStyle()
@@ -118,7 +126,10 @@ public class MyOffers extends Div {
         return switch (activeStatusFilter) {
             case "OFFEN"     -> o.status() == OfferStatus.OPEN && (o.startDate() == null || !o.startDate().isBefore(LocalDate.now()));
             case "GEBUCHT"   -> o.status() == OfferStatus.BOOKED;
-            case "VERGANGEN" -> o.startDate() != null && o.startDate().isBefore(LocalDate.now());
+            case "VERGANGEN" -> o.status() == OfferStatus.OPEN
+                    && o.startDate() != null
+                    && o.startDate().isBefore(LocalDate.now());
+            case "ENTWUERFE" -> o.status() == OfferStatus.DRAFT;
             default          -> true;
         };
     }
@@ -157,8 +168,8 @@ public class MyOffers extends Div {
         controls.getStyle().set("gap", "12px").set("flex-wrap", "wrap");
 
         Select<String> statusSelect = new Select<>();
-        statusSelect.setItems("Alle", "Offen", "Gebucht", "Vergangen");
-        statusSelect.setValue("Alle");
+        statusSelect.setItems("Alle", "Offen", "Gebucht", "Vergangen", "Entwürfe");
+        statusSelect.setValue(statusFilterLabel(activeStatusFilter));
         statusSelect.setLabel("Status");
         statusSelect.getStyle().set("min-width", "120px");
         statusSelect.addValueChangeListener(e -> {
@@ -166,6 +177,7 @@ public class MyOffers extends Div {
                 case "Offen"     -> "OFFEN";
                 case "Gebucht"   -> "GEBUCHT";
                 case "Vergangen" -> "VERGANGEN";
+                case "Entwürfe"  -> "ENTWUERFE";
                 default          -> "ALLE";
             };
             renderOffers();
@@ -322,7 +334,7 @@ public class MyOffers extends Div {
                 .set("min-width", "0");
         titleRow.add(title);
 
-        if (offer.status() == OfferStatus.OPEN) {
+        if (offer.status() == OfferStatus.OPEN || offer.status() == OfferStatus.DRAFT) {
             titleRow.add(createDeleteButton(offer));
         }
 
@@ -585,6 +597,13 @@ public class MyOffers extends Div {
     }
 
     private void openOfferDialog(MyOfferCardDto offer) {
+        if (offer.status() == OfferStatus.DRAFT) {
+            UI ui = UI.getCurrent();
+            if (ui != null) {
+                ui.navigate("auftrag-erstellen", QueryParameters.of("edit", offer.id().toString()));
+            }
+            return;
+        }
         OfferCardDto dto = toOfferCardDto(offer);
         new PetsitterDetailPopUp(dto, "–",
                 OfferCardComponent.starsForAverage(dto.creatorAverageRating()),
@@ -730,6 +749,7 @@ public class MyOffers extends Div {
             return "Unbekannt";
         }
         return switch (status) {
+            case DRAFT -> "Entwurf";
             case OPEN -> "Offen";
             case BOOKED -> "Gebucht";
             case CANCELLED -> "Storniert";
@@ -737,6 +757,9 @@ public class MyOffers extends Div {
     }
 
     private String statusBackground(OfferStatus status) {
+        if (status == OfferStatus.DRAFT) {
+            return "#fff3cd";
+        }
         if (status == OfferStatus.BOOKED) {
             return "#e7f0f0";
         }
@@ -747,6 +770,9 @@ public class MyOffers extends Div {
     }
 
     private String statusColor(OfferStatus status) {
+        if (status == OfferStatus.DRAFT) {
+            return "#8a5a00";
+        }
         if (status == OfferStatus.BOOKED) {
             return "#37636b";
         }
@@ -795,5 +821,28 @@ public class MyOffers extends Div {
             return "–";
         }
         return price.stripTrailingZeros().toPlainString() + " €";
+    }
+
+    private String normalizeStatusFilter(String value) {
+        if (value == null) {
+            return "ALLE";
+        }
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "draft", "drafts", "entwurf", "entwuerfe", "entwürfe" -> "ENTWUERFE";
+            case "open", "offen" -> "OFFEN";
+            case "booked", "gebucht" -> "GEBUCHT";
+            case "past", "expired", "vergangen" -> "VERGANGEN";
+            default -> "ALLE";
+        };
+    }
+
+    private String statusFilterLabel(String filter) {
+        return switch (filter) {
+            case "OFFEN" -> "Offen";
+            case "GEBUCHT" -> "Gebucht";
+            case "VERGANGEN" -> "Vergangen";
+            case "ENTWUERFE" -> "Entwürfe";
+            default -> "Alle";
+        };
     }
 }

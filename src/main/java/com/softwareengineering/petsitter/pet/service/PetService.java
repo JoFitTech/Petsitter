@@ -151,7 +151,7 @@ public class PetService {
         User user = currentUserOrThrow();
         Pet pet = loadCurrentUserPet(petId, user);
         List<Offer> offers = findCurrentUserOffersForPet(user, pet);
-        if (offers.stream().anyMatch(offer -> offer.getStatus() != OfferStatus.OPEN)) {
+        if (offers.stream().anyMatch(offer -> !isEditablePetDeletionOffer(offer))) {
             throw new BusinessRuleViolationException(
                     "Das Tier ist noch in gebuchten oder stornierten Angeboten hinterlegt.");
         }
@@ -253,7 +253,7 @@ public class PetService {
 
     private PetDeletionOfferImpact toDeletionOfferImpact(Offer offer) {
         int petCount = petCount(offer);
-        List<PetDeletionAction> actions = offer.getStatus() == OfferStatus.OPEN && petCount > 1
+        List<PetDeletionAction> actions = isEditablePetDeletionOffer(offer) && petCount > 1
                 ? List.of(PetDeletionAction.REMOVE_PET_FROM_OFFER, PetDeletionAction.DELETE_OFFER)
                 : List.of();
         return new PetDeletionOfferImpact(
@@ -262,6 +262,10 @@ public class PetService {
                 offer.getStatus(),
                 petCount,
                 actions);
+    }
+
+    private boolean isEditablePetDeletionOffer(Offer offer) {
+        return offer.getStatus() == OfferStatus.OPEN || offer.getStatus() == OfferStatus.DRAFT;
     }
 
     private Map<UUID, PetDeletionAction> normalizeDecisions(List<PetDeletionDecision> decisions) {

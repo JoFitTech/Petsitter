@@ -277,6 +277,47 @@ class OfferServiceTest {
     }
 
     @Test
+    void saveDraftStoresDraftAndAllowsMissingPublishFields() {
+        UUID savedOfferId = UUID.randomUUID();
+        User owner = user(UUID.randomUUID());
+        AtomicReference<Offer> savedOfferReference = new AtomicReference<>();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepository(savedOfferReference, saveCount, savedOfferId),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(owner)
+        );
+        CreateOfferRequest request = new CreateOfferRequest(
+                OfferType.OWNER_OFFER,
+                null,
+                null,
+                null,
+                List.of(),
+                null,
+                "",
+                OfferFrequency.ONE_TIME,
+                null,
+                null,
+                null
+        );
+
+        CreateOfferResult result = offerService.saveDraft(request);
+
+        Offer savedOffer = savedOfferReference.get();
+        assertThat(result.offerId()).isEqualTo(savedOfferId);
+        assertThat(saveCount).hasValue(1);
+        assertThat(savedOffer.getStatus()).isEqualTo(OfferStatus.DRAFT);
+        assertThat(savedOffer.getOfferType()).isEqualTo(OfferType.OWNER_OFFER);
+        assertThat(savedOffer.getCreateUser()).isSameAs(owner);
+        assertThat(savedOffer.getUpdateUser()).isSameAs(owner);
+        assertThat(savedOffer.getPets()).isEmpty();
+        assertThat(savedOffer.getStartDate()).isNull();
+        assertThat(savedOffer.getEndDate()).isNull();
+        assertThat(savedOffer.getTitle()).isNull();
+        assertThat(savedOffer.getPrice()).isNull();
+    }
+
+    @Test
     void createOfferRejectsMissingAuthenticatedUser() {
         AtomicInteger saveCount = new AtomicInteger();
         OfferService offerService = serviceWithAuthenticatedUser(
@@ -471,8 +512,13 @@ class OfferServiceTest {
         Offer ownerCancelled = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.CANCELLED,
                 LocalDate.of(2026, 8, 10), LocalDate.of(2026, 8, 11), null);
         ownerCancelled.setTitle(null);
+        Offer ownerDraft = offer(UUID.randomUUID(), OfferType.OWNER_OFFER, OfferStatus.DRAFT,
+                null, null, null);
+        ownerDraft.setTitle(null);
         OfferService offerService = serviceWithAuthenticatedUser(
-                offerRepositoryReturningCurrentUserOffers(List.of(ownerOpen, sitterBooked, ownerCancelled), requestedUserId),
+                offerRepositoryReturningCurrentUserOffers(
+                        List.of(ownerOpen, sitterBooked, ownerCancelled, ownerDraft),
+                        requestedUserId),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.of(currentUser)
         );
@@ -481,11 +527,13 @@ class OfferServiceTest {
 
         assertThat(requestedUserId).hasValue(currentUser.getId());
         assertThat(result).extracting(MyOfferCardDto::id)
-                .containsExactly(ownerOpen.getOfferId(), sitterBooked.getOfferId(), ownerCancelled.getOfferId());
+                .containsExactly(ownerOpen.getOfferId(), sitterBooked.getOfferId(),
+                        ownerCancelled.getOfferId(), ownerDraft.getOfferId());
         assertThat(result).extracting(MyOfferCardDto::offerType)
-                .containsExactly(OfferType.OWNER_OFFER, OfferType.SITTER_OFFER, OfferType.OWNER_OFFER);
+                .containsExactly(OfferType.OWNER_OFFER, OfferType.SITTER_OFFER,
+                        OfferType.OWNER_OFFER, OfferType.OWNER_OFFER);
         assertThat(result).extracting(MyOfferCardDto::status)
-                .containsExactly(OfferStatus.OPEN, OfferStatus.BOOKED, OfferStatus.CANCELLED);
+                .containsExactly(OfferStatus.OPEN, OfferStatus.BOOKED, OfferStatus.CANCELLED, OfferStatus.DRAFT);
         assertThat(result.get(0).title()).isEqualTo("Katzenbetreuung");
         assertThat(result.get(0).description()).isEqualTo("Füttern und spielen");
         assertThat(result.get(0).frequency()).isEqualTo(OfferFrequency.ONE_TIME);
@@ -507,6 +555,7 @@ class OfferServiceTest {
         assertThat(result.get(0).pets().get(1).tags()).containsExactly(PetTag.VERSPIELT);
         assertThat(result.get(1).animalType()).isEqualTo(OfferAnimalType.DOG);
         assertThat(result.get(2).title()).isEqualTo("Auftrag");
+        assertThat(result.get(3).title()).isEqualTo("Unbenannter Entwurf");
     }
 
     @Test
@@ -531,6 +580,9 @@ class OfferServiceTest {
         Offer ownOpen = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.OPEN,
                 LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
         ownOpen.setCreateUser(currentUser);
+        Offer ownDraft = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.DRAFT,
+                null, null, null);
+        ownDraft.setCreateUser(currentUser);
         Offer ownBooked = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.BOOKED,
                 LocalDate.now(), LocalDate.now().plusDays(1), BigDecimal.TEN);
         ownBooked.setCreateUser(currentUser);
@@ -543,6 +595,8 @@ class OfferServiceTest {
 
         assertThat(serviceWithEditableOffer(ownOpen, Optional.of(currentUser))
                 .canCurrentUserEditOffer(ownOpen.getOfferId())).isTrue();
+        assertThat(serviceWithEditableOffer(ownDraft, Optional.of(currentUser))
+                .canCurrentUserEditOffer(ownDraft.getOfferId())).isTrue();
         assertThat(serviceWithEditableOffer(ownBooked, Optional.of(currentUser))
                 .canCurrentUserEditOffer(ownBooked.getOfferId())).isFalse();
         assertThat(serviceWithEditableOffer(ownCancelled, Optional.of(currentUser))
@@ -637,6 +691,87 @@ class OfferServiceTest {
     }
 
     @Test
+    void updateCurrentUserDraftKeepsDraftStatusWithIncompleteData() {
+        User currentUser = user(UUID.randomUUID());
+        Offer draft = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.DRAFT,
+                null, null, null);
+        draft.setCreateUser(currentUser);
+        draft.setUpdateUser(currentUser);
+        AtomicReference<Offer> savedOffer = new AtomicReference<>();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryForEdit(draft, savedOffer, saveCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser)
+        );
+
+        CreateOfferResult result = offerService.updateCurrentUserDraft(draft.getOfferId(), new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                null,
+                null,
+                null,
+                List.of(),
+                null,
+                "Noch unfertig",
+                OfferFrequency.REGULAR,
+                null,
+                OfferAnimalType.CAT,
+                null,
+                Set.of(),
+                null));
+
+        assertThat(result.offerId()).isEqualTo(draft.getOfferId());
+        assertThat(saveCount).hasValue(1);
+        assertThat(savedOffer.get()).isSameAs(draft);
+        assertThat(draft.getStatus()).isEqualTo(OfferStatus.DRAFT);
+        assertThat(draft.getTitle()).isEqualTo("Noch unfertig");
+        assertThat(draft.getFrequency()).isEqualTo(OfferFrequency.REGULAR);
+        assertThat(draft.getStartDate()).isNull();
+        assertThat(draft.getEndDate()).isNull();
+        assertThat(draft.getRecurringWeekdays()).isEmpty();
+        assertThat(draft.getTimeSlot()).isNull();
+    }
+
+    @Test
+    void publishCurrentUserDraftValidatesAndSetsOpenStatus() {
+        User currentUser = user(UUID.randomUUID());
+        Offer draft = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.DRAFT,
+                null, null, null);
+        draft.setCreateUser(currentUser);
+        draft.setUpdateUser(currentUser);
+        AtomicReference<Offer> savedOffer = new AtomicReference<>();
+        AtomicInteger saveCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryForEdit(draft, savedOffer, saveCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser)
+        );
+        LocalDate start = LocalDate.now();
+
+        CreateOfferResult result = offerService.publishCurrentUserDraft(draft.getOfferId(), new CreateOfferRequest(
+                OfferType.SITTER_OFFER,
+                start,
+                start.plusDays(2),
+                null,
+                List.of(),
+                BigDecimal.valueOf(35),
+                "Katzenbetreuung",
+                OfferFrequency.ONE_TIME,
+                OfferCareType.PET_SITTING,
+                OfferAnimalType.CAT,
+                "Ich habe Erfahrung mit Katzen"));
+
+        assertThat(result.offerId()).isEqualTo(draft.getOfferId());
+        assertThat(saveCount).hasValue(1);
+        assertThat(savedOffer.get()).isSameAs(draft);
+        assertThat(draft.getStatus()).isEqualTo(OfferStatus.OPEN);
+        assertThat(draft.getStartDate()).isEqualTo(start);
+        assertThat(draft.getEndDate()).isEqualTo(start.plusDays(2));
+        assertThat(draft.getPrice()).isEqualByComparingTo("35");
+        assertThat(draft.getTitle()).isEqualTo("Katzenbetreuung");
+    }
+
+    @Test
     void updateCurrentUserOfferRejectsForbiddenNonOpenAndInvalidUpdates() {
         User currentUser = user(UUID.randomUUID());
         User otherUser = user(UUID.randomUUID());
@@ -700,6 +835,27 @@ class OfferServiceTest {
         assertThat(deleteCount).hasValue(1);
         assertThat(deletedOffer).hasValue(ownOpen);
         assertThat(saveCount).hasValue(0);
+    }
+
+    @Test
+    void deleteCurrentUserOfferDeletesOwnDraftOffer() {
+        User currentUser = user(UUID.randomUUID());
+        Offer ownDraft = offer(UUID.randomUUID(), OfferType.SITTER_OFFER, OfferStatus.DRAFT,
+                null, null, null);
+        ownDraft.setCreateUser(currentUser);
+        AtomicReference<Offer> deletedOffer = new AtomicReference<>();
+        AtomicInteger deleteCount = new AtomicInteger();
+        OfferService offerService = serviceWithAuthenticatedUser(
+                offerRepositoryForEditAndDelete(ownDraft, new AtomicReference<>(), new AtomicInteger(),
+                        deletedOffer, deleteCount),
+                petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
+                Optional.of(currentUser)
+        );
+
+        offerService.deleteCurrentUserOffer(ownDraft.getOfferId());
+
+        assertThat(deleteCount).hasValue(1);
+        assertThat(deletedOffer).hasValue(ownDraft);
     }
 
     @Test

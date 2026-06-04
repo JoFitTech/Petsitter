@@ -513,6 +513,7 @@ public class MyPetView extends Div {
 
     private String statusLabel(PetDeletionOfferImpact offer) {
         return switch (offer.status()) {
+            case DRAFT -> "Entwurf";
             case OPEN -> "Offen";
             case BOOKED -> "Gebucht";
             case CANCELLED -> "Storniert";

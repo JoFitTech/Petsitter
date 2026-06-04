@@ -142,6 +142,25 @@ class PetServiceTest {
     }
 
     @Test
+    void analyzeCurrentUserPetDeletionTreatsDraftOffersLikeOpenOffers() {
+        User owner = user(UUID.randomUUID());
+        Pet pet = pet(UUID.randomUUID(), owner, PetSpecies.DOG);
+        Pet secondPet = pet(UUID.randomUUID(), owner, PetSpecies.CAT);
+        Offer draftOffer = offer(UUID.randomUUID(), owner, OfferStatus.DRAFT, "Entwurf", pet, secondPet);
+        OfferRepositoryFake offerRepository = new OfferRepositoryFake(List.of(draftOffer));
+        PetService petService = service(owner, new PetRepositoryFake(List.of(pet)).repository(),
+                offerRepository.repository());
+
+        PetDeletionImpact result = petService.analyzeCurrentUserPetDeletion(pet.getId());
+
+        assertThat(result.offers()).hasSize(1);
+        assertThat(result.offers().getFirst().blocksDeletion()).isFalse();
+        assertThat(result.offers().getFirst().requiresDecision()).isTrue();
+        assertThat(result.offers().getFirst().availableActions())
+                .containsExactly(PetDeletionAction.REMOVE_PET_FROM_OFFER, PetDeletionAction.DELETE_OFFER);
+    }
+
+    @Test
     void deleteCurrentUserPetDeletesPetWithoutOffers() {
         User owner = user(UUID.randomUUID());
         Pet pet = pet(UUID.randomUUID(), owner, PetSpecies.DOG);
@@ -208,6 +227,26 @@ class PetServiceTest {
 
         assertThat(offerRepository.deletedOffers).containsExactly(offer);
         assertThat(offerRepository.savedOffers).isEmpty();
+        assertThat(petRepository.deletedPets).containsExactly(pet);
+    }
+
+    @Test
+    void deleteCurrentUserPetCanRemovePetFromMultiPetDraftOffer() {
+        User owner = user(UUID.randomUUID());
+        Pet pet = pet(UUID.randomUUID(), owner, PetSpecies.DOG);
+        Pet secondPet = pet(UUID.randomUUID(), owner, PetSpecies.CAT);
+        Offer draftOffer = offer(UUID.randomUUID(), owner, OfferStatus.DRAFT, "Entwurf", pet, secondPet);
+        PetRepositoryFake petRepository = new PetRepositoryFake(List.of(pet));
+        OfferRepositoryFake offerRepository = new OfferRepositoryFake(List.of(draftOffer));
+        PetService petService = service(owner, petRepository.repository(), offerRepository.repository());
+
+        petService.deleteCurrentUserPet(pet.getId(), List.of(
+                new PetDeletionDecision(draftOffer.getOfferId(), PetDeletionAction.REMOVE_PET_FROM_OFFER)));
+
+        assertThat(offerRepository.deletedOffers).isEmpty();
+        assertThat(offerRepository.savedOffers).containsExactly(draftOffer);
+        assertThat(draftOffer.getPets()).containsExactly(secondPet);
+        assertThat(draftOffer.getUpdateUser()).isSameAs(owner);
         assertThat(petRepository.deletedPets).containsExactly(pet);
     }
 

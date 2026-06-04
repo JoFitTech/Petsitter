@@ -124,8 +124,12 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
 
     @Override
     public void beforeEnter(BeforeEnterEvent event) {
-        java.util.List<String> tabs = event.getLocation().getQueryParameters().getParameters().get("tab");
+        java.util.Map<String, java.util.List<String>> parameters =
+                event.getLocation().getQueryParameters().getParameters();
+        java.util.List<String> tabs = parameters.get("tab");
         String tab = (tabs != null && !tabs.isEmpty()) ? tabs.get(0) : null;
+        java.util.List<String> offerStatuses = parameters.get("status");
+        String offerStatus = (offerStatuses != null && !offerStatuses.isEmpty()) ? offerStatuses.get(0) : null;
         if ("favorites".equals(tab)) {
             setActiveStyle(btnMeineFavoriten);
             showMeineFavoriten();
@@ -133,7 +137,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         }
         if ("offers".equals(tab)) {
             setActiveStyle(btnMeineAuftraege);
-            showMeineAuftraege();
+            showMeineAuftraege(offerStatus);
             return;
         }
         if ("bookings".equals(tab)) {
@@ -737,9 +741,13 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
     }
 
     private void showMeineAuftraege() {
+        showMeineAuftraege(null);
+    }
+
+    private void showMeineAuftraege(String statusFilter) {
         contentPanel.removeAll();
         contentPanel.add(new MyOffers(offerService, requestService, chatService, bookingService,
-                authenticatedUser, userService));
+                authenticatedUser, userService, statusFilter));
     }
 
     private void showMeineBuchungen() {

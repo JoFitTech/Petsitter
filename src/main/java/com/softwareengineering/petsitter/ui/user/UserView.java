@@ -6,6 +6,8 @@ import com.softwareengineering.petsitter.favorite.service.FavoriteService;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.offer.service.OfferService;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.dto.UserReviewDto;
 import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.pet.service.PetService;
@@ -47,6 +49,8 @@ import jakarta.annotation.security.PermitAll;
 import java.time.LocalDate;
 import java.io.IOException;
 import java.util.Base64;
+import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Route(value = "profile", layout = MainLayout.class)
@@ -556,8 +560,7 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         info.setSpacing(false);
         info.getStyle().set("gap", "4px");
 
-        Span stars = new Span("★★★★★");
-        stars.getStyle().set("color", "#f5c842").set("font-size", "20px").set("letter-spacing", "2px");
+        Span stars = ratingSummarySpan();
 
         Span verified = new Span("✓ Verifiziert");
         verified.getStyle()
@@ -646,6 +649,57 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         return layout;
     }
 
+    private Span ratingSummarySpan() {
+        UserRatingSummary summary = currentProfile == null ? null : currentProfile.ratingSummary();
+        boolean hasRatings = summary != null && summary.ratingCount() > 0;
+        String text = hasRatings
+                ? starsForRating(summary.averageRating()) + " "
+                        + String.format(Locale.GERMAN, "%.1f", summary.averageRating())
+                        + " (" + summary.ratingCount() + ")"
+                : "☆☆☆☆☆ Noch keine Bewertungen";
+
+        Span stars = new Span(text);
+        stars.getStyle()
+                .set("color", hasRatings ? "#f5c842" : "#b8a99d")
+                .set("font-size", "20px")
+                .set("letter-spacing", hasRatings ? "2px" : "1px");
+        return stars;
+    }
+
+    private String starsForRating(double rating) {
+        int filledStars = (int) Math.round(Math.max(0, Math.min(5, rating)));
+        return "★".repeat(filledStars) + "☆".repeat(5 - filledStars);
+    }
+
+    private Div reviewsEmptyState() {
+        Div emptyState = new Div();
+        emptyState.setText("Noch keine Bewertungen vorhanden. Sobald du bewertet wurdest, erscheinen die neuesten Einträge hier.");
+        emptyState.getStyle()
+                .set("box-sizing", "border-box")
+                .set("background", "#fffdf8")
+                .set("border", "1px dashed #d4b896")
+                .set("border-radius", "14px")
+                .set("padding", "18px 22px")
+                .set("color", "#8a7060")
+                .set("font-size", "14px");
+        return emptyState;
+    }
+
+    private String reviewHeadline(UserReviewDto review) {
+        String reviewerName = review.reviewerName();
+        if (reviewerName == null || reviewerName.isBlank()) {
+            reviewerName = "Anonym";
+        }
+        return "Bewertung von " + reviewerName;
+    }
+
+    private String reviewText(UserReviewDto review) {
+        String comment = review.comment();
+        return comment == null || comment.isBlank()
+                ? "Keine schriftliche Bewertung hinterlassen."
+                : comment;
+    }
+
     private Component buildBioSection(boolean editMode, TextArea existingArea) {
         VerticalLayout section = new VerticalLayout();
         section.setPadding(false);
@@ -698,10 +752,18 @@ public class UserView extends VerticalLayout implements BeforeEnterObserver {
         reviewTitle.getStyle().set("margin", "0").set("font-size", "20px").set("font-weight", "800").set("color", DARK);
         section.add(reviewTitle);
 
-        section.add(reviewCard("★★★★★", "Sehr zuverlässig",
-            "Bruno war bestens betreut. Kommunikation und Übergabe waren super unkompliziert."));
-        section.add(reviewCard("★★★★★", "Freundlich und flexibel",
-            "Sehr angenehmer Kontakt, unsere Katze Mia hat sich schnell wohlgefühlt."));
+        List<UserReviewDto> recentReviews = currentProfile == null ? List.of() : currentProfile.recentReviews();
+        if (recentReviews == null || recentReviews.isEmpty()) {
+            section.add(reviewsEmptyState());
+            return section;
+        }
+
+        for (UserReviewDto review : recentReviews) {
+            section.add(reviewCard(
+                    starsForRating(review.rating()),
+                    reviewHeadline(review),
+                    reviewText(review)));
+        }
         return section;
     }
 

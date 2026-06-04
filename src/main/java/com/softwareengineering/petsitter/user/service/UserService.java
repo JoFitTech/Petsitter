@@ -5,6 +5,7 @@ import com.softwareengineering.petsitter.image.service.ImageAssetService;
 import com.softwareengineering.petsitter.location.dto.PostalCodeValidationResult;
 import com.softwareengineering.petsitter.location.service.PostalCodeService;
 import com.softwareengineering.petsitter.pet.service.PetService;
+import com.softwareengineering.petsitter.review.dto.UserReviewDto;
 import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.AccountRole;
@@ -330,6 +331,11 @@ public class UserService {
     }
 
     private UserProfileDto toProfileDto(User user) {
+        var ratingSummary = userReviewService != null ? userReviewService.getUserRatingSummary(user.getId()) : null;
+        List<UserReviewDto> recentReviews = userReviewService != null
+                ? userReviewService.getRecentReviews(user.getId(), 3)
+                : List.of();
+
         return new UserProfileDto(
                 user.getId(),
                 user.getEmail(),
@@ -352,7 +358,9 @@ public class UserService {
                 petService.getPetSummaryForOwner(user.getId()),
                 user.getAccountRole(),
                 user.getAccountStatus(),
-                profileImage(user)
+                profileImage(user),
+                ratingSummary,
+                recentReviews
         );
     }
 

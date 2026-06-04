@@ -12,10 +12,12 @@ import com.softwareengineering.petsitter.offer.domain.OfferType;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDto;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.user.domain.User;
 import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.HasText;
+import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -65,6 +67,99 @@ class ChatViewIntegrationTest {
         ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
 
         assertThat(containsText(view, "Ben Sitter")).isTrue();
+    }
+
+
+    @Test
+    void chatView_rendersCounterpartRatingStarsFromAverage() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        User currentUser = new User();
+        currentUser.setId(currentUserId);
+        currentUser.setFirstName("Anna");
+        currentUser.setLastName("Owner");
+
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        RequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
+
+        ChatConversationDto conversation = new ChatConversationDto(
+                "conv-rated",
+                UUID.randomUUID(),
+                currentUserId,
+                otherUserId,
+                "Anna Owner",
+                "Ben Sitter",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                "Preview",
+                null,
+                null,
+                null,
+                null,
+                new UserRatingSummary(1.2d, 7L),
+                new UserRatingSummary(3.6d, 4L)
+        );
+
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
+        Component item = (Component) invokePrivate(
+                view,
+                "buildConversationItem",
+                new Class<?>[]{ChatConversationDto.class, long.class},
+                conversation,
+                0L);
+
+        assertThat(countStarIcons(item)).isEqualTo(4);
+        assertThat(containsText(item, "Neu")).isFalse();
+    }
+
+    @Test
+    void chatView_rendersNewLabelWhenCounterpartHasNoRatings() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        UUID otherUserId = UUID.randomUUID();
+
+        User currentUser = new User();
+        currentUser.setId(currentUserId);
+        currentUser.setFirstName("Anna");
+        currentUser.setLastName("Owner");
+
+        TestChatService chatService = new TestChatService();
+        ChatEventBus eventBus = new ChatEventBus();
+        AuthenticatedUser authenticatedUser = new TestAuthenticatedUser(currentUser);
+        RequestService requestService = new TestRequestService();
+        BookingService bookingService = new TestBookingService();
+
+        ChatConversationDto conversation = new ChatConversationDto(
+                "conv-new",
+                UUID.randomUUID(),
+                currentUserId,
+                otherUserId,
+                "Anna Owner",
+                "Ben Sitter",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                "Preview",
+                null,
+                null,
+                null,
+                null,
+                new UserRatingSummary(5.0d, 2L),
+                new UserRatingSummary(0.0d, 0L)
+        );
+
+        ChatView view = new ChatView(chatService, eventBus, authenticatedUser, requestService, bookingService, null);
+        Component item = (Component) invokePrivate(
+                view,
+                "buildConversationItem",
+                new Class<?>[]{ChatConversationDto.class, long.class},
+                conversation,
+                0L);
+
+        assertThat(countStarIcons(item)).isZero();
+        assertThat(containsText(item, "Neu")).isTrue();
     }
 
     @Test
@@ -306,6 +401,16 @@ class ChatViewIntegrationTest {
 
         assertThat(containsText(bubble, "Alter gespeicherter Titel")).isTrue();
         assertThat(containsText(bubble, "Unbekannter Status")).isTrue();
+    }
+
+
+    private long countStarIcons(Component root) {
+        long self = 0;
+        if (root instanceof Icon icon) {
+            String iconName = icon.getElement().getAttribute("icon");
+            self = "vaadin:star".equals(iconName) ? 1 : 0;
+        }
+        return self + root.getChildren().mapToLong(this::countStarIcons).sum();
     }
 
     private boolean containsText(Component root, String text) {

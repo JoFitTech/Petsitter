@@ -19,6 +19,8 @@ import com.softwareengineering.petsitter.chat.dto.ChatMessageDto;
 import com.softwareengineering.petsitter.chat.repository.ChatConversationRepository;
 import com.softwareengineering.petsitter.chat.repository.ChatMessageRepository;
 import com.softwareengineering.petsitter.notification.service.NotificationService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
+import com.softwareengineering.petsitter.review.service.UserReviewService;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.shared.exception.BusinessRuleViolationException;
 import com.softwareengineering.petsitter.shared.exception.NotFoundException;
@@ -43,6 +45,7 @@ class ChatServiceTest {
     private NotificationService notificationService;
     private AuthenticatedUser authenticatedUser;
     private UserRepository userRepository;
+    private UserReviewService userReviewService;
     private ChatService chatService;
 
     @BeforeEach
@@ -56,6 +59,7 @@ class ChatServiceTest {
         notificationService = Mockito.mock(NotificationService.class);
         authenticatedUser = Mockito.mock(AuthenticatedUser.class);
         userRepository = Mockito.mock(UserRepository.class);
+        userReviewService = Mockito.mock(UserReviewService.class);
 
         chatService = new ChatService(
                 conversationRepository,
@@ -66,7 +70,9 @@ class ChatServiceTest {
                 eventBus,
                 notificationService,
                 authenticatedUser,
-                userRepository
+                userRepository,
+                null,
+                userReviewService
         );
     }
 
@@ -113,6 +119,90 @@ class ChatServiceTest {
         assertThat(dto.conversationId()).isEqualTo("conv-existing");
         verify(conversationRepository, never()).save(any(ChatConversationDocument.class));
         verify(bookingRepository, never()).findById(any(UUID.class));
+    }
+
+
+    @Test
+    void createConversationForBooking_addsRatingSummaries() {
+        UUID bookingId = UUID.randomUUID();
+        User owner = user("Anna", "Owner");
+        User sitter = user("Ben", "Sitter");
+
+        Booking booking = new Booking();
+        booking.setId(bookingId);
+        booking.setOwner(owner);
+        booking.setSitter(sitter);
+
+        when(conversationRepository.findByBookingId(bookingId)).thenReturn(Optional.empty());
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(conversationRepository.save(any(ChatConversationDocument.class))).thenAnswer(invocation -> {
+            ChatConversationDocument doc = invocation.getArgument(0);
+            doc.setId("conv-with-ratings");
+            return doc;
+        });
+        when(userReviewService.getUserRatingSummary(owner.getId())).thenReturn(new UserRatingSummary(4.5d, 8L));
+        when(userReviewService.getUserRatingSummary(sitter.getId())).thenReturn(new UserRatingSummary(3.8d, 5L));
+
+        ChatConversationDto dto = chatService.createConversationForBooking(bookingId);
+
+        assertThat(dto.ownerRatingSummary()).isEqualTo(new UserRatingSummary(4.5d, 8L));
+        assertThat(dto.sitterRatingSummary()).isEqualTo(new UserRatingSummary(3.8d, 5L));
+    }
+
+    @Test
+    void createConversationForBooking_toleratesMissingReviewService() {
+        UUID bookingId = UUID.randomUUID();
+        User owner = user("Anna", "Owner");
+        User sitter = user("Ben", "Sitter");
+
+        ChatService serviceWithoutReviews = new ChatService(
+                conversationRepository,
+                messageRepository,
+                bookingRepository,
+                offerRequestRepository,
+                accessService,
+                eventBus,
+                notificationService,
+                authenticatedUser,
+                userRepository
+        );
+
+        Booking booking = new Booking();
+        booking.setId(bookingId);
+        booking.setOwner(owner);
+        booking.setSitter(sitter);
+        when(conversationRepository.findByBookingId(bookingId)).thenReturn(Optional.empty());
+        when(bookingRepository.findById(bookingId)).thenReturn(Optional.of(booking));
+        when(conversationRepository.save(any(ChatConversationDocument.class))).thenAnswer(invocation -> {
+            ChatConversationDocument doc = invocation.getArgument(0);
+            doc.setId("conv-without-review-service");
+            return doc;
+        });
+
+        ChatConversationDto dto = serviceWithoutReviews.createConversationForBooking(bookingId);
+
+        assertThat(dto.ownerRatingSummary()).isNull();
+        assertThat(dto.sitterRatingSummary()).isNull();
+    }
+
+    @Test
+    void chatConversationDto_legacyConstructorKeepsRatingsOptional() {
+        ChatConversationDto dto = new ChatConversationDto(
+                "conv-legacy",
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Anna Owner",
+                "Ben Sitter",
+                LocalDateTime.now(),
+                LocalDateTime.now(),
+                "Hallo",
+                null,
+                null
+        );
+
+        assertThat(dto.ownerRatingSummary()).isNull();
+        assertThat(dto.sitterRatingSummary()).isNull();
     }
 
     @Test

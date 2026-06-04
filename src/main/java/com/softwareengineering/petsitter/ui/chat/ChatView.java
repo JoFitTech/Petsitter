@@ -14,11 +14,13 @@ import com.softwareengineering.petsitter.offerrequest.dto.OfferRequestChatCardDt
 import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.offerrequest.domain.RequestStatus;
 import com.softwareengineering.petsitter.offerrequest.service.RequestService;
+import com.softwareengineering.petsitter.review.dto.UserRatingSummary;
 import com.softwareengineering.petsitter.security.AuthenticatedUser;
 import com.softwareengineering.petsitter.ui.shared.MainLayout;
 import com.softwareengineering.petsitter.ui.shared.ExternalPaymentMethods;
 import com.softwareengineering.petsitter.ui.shared.ImageComponents;
 import com.softwareengineering.petsitter.ui.shared.OfferCardComponent;
+import com.softwareengineering.petsitter.ui.shared.RatingComponents;
 import com.softwareengineering.petsitter.shared.exception.InsufficientBalanceException;
 import com.softwareengineering.petsitter.user.service.UserService;
 import com.vaadin.flow.component.Component;
@@ -550,6 +552,9 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
                 .set("font-weight", "600");
             nameRow.add(newRating);
         }
+        Component rating = RatingComponents.compactRating(counterpartRatingSummary(conv));
+        rating.getElement().getStyle().set("transform", "scale(0.75)").set("transform-origin", "left center");
+        nameRow.add(rating);
 
         content.add(nameRow);
 
@@ -1277,6 +1282,18 @@ public class ChatView extends VerticalLayout implements BeforeEnterObserver {
         Div avatar = ImageComponents.avatar(image, size, "#c8dce6");
         avatar.getStyle().set("flex-shrink", "0");
         return avatar;
+    }
+
+    private UserRatingSummary counterpartRatingSummary(ChatConversationDto conversation) {
+        UUID counterpartId = currentUserId.equals(conversation.ownerId())
+                ? conversation.sitterId()
+                : conversation.ownerId();
+        if (counterpartId == null || userService == null) {
+            return null;
+        }
+        return userService.getPublicUserProfile(counterpartId)
+                .map(profile -> profile.ratingSummary())
+                .orElse(null);
     }
 
     private ImageRefDto counterpartImage(ChatConversationDto conversation) {

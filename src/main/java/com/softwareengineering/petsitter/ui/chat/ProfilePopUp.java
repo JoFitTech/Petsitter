@@ -1,8 +1,10 @@
 package com.softwareengineering.petsitter.ui.chat;
 
+import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.softwareengineering.petsitter.ui.shared.RatingComponents;
 import com.softwareengineering.petsitter.user.domain.AccountStatus;
 import com.softwareengineering.petsitter.user.dto.PublicUserProfileDto;
-import com.softwareengineering.petsitter.ui.shared.ImageComponents;
+import com.vaadin.flow.component.Component;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.dialog.Dialog;
@@ -108,22 +110,8 @@ public class ProfilePopUp extends Dialog {
         infoSection.setPadding(false);
         infoSection.setSpacing(false);
 
-        // Stars
-        HorizontalLayout starsLayout = new HorizontalLayout();
-        starsLayout.setSpacing(false);
-        starsLayout.getStyle().set("gap", "4px").set("margin-bottom", "10px");
-
-        int starsCount = 0;
-        if (safeProfile.ratingSummary() != null && safeProfile.ratingSummary().averageRating() > 0) {
-            starsCount = Math.round((float) safeProfile.ratingSummary().averageRating());
-        }
-
-        for (int i = 0; i < 5; i++) {
-            Icon star = new Icon(i < starsCount ? VaadinIcon.STAR : VaadinIcon.STAR_O);
-            star.setSize("20px");
-            star.getStyle().set("color", i < starsCount ? "#ffdf4a" : "#d0d0d0");
-            starsLayout.add(star);
-        }
+        Component rating = RatingComponents.compactRating(safeProfile.ratingSummary());
+        rating.getElement().getStyle().set("margin-bottom", "10px");
 
         // Name
         H3 name = new H3(displayName);
@@ -189,7 +177,7 @@ public class ProfilePopUp extends Dialog {
         Paragraph desc1 = new Paragraph(valueOrDefault(safeProfile.bio(), "Noch keine Beschreibung hinterlegt."));
         desc1.getStyle().set("margin", "0 0 10px 0").set("color", "#6b5446").set("font-size", "15px");
 
-        infoSection.add(starsLayout, name, detailsLayout, desc1);
+        infoSection.add(rating, name, detailsLayout, desc1);
 
         // Verified Badge (absolute positioned top right inside profileCard)
         Div verifiedBadge = new Div();

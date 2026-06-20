@@ -902,7 +902,8 @@ class OfferServiceTest {
                                 LocalDate.of(2026, 6, 15), LocalDate.of(2026, 6, 18), BigDecimal.valueOf(150))
                 ), requestedType, requestedStatus),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1142,7 +1143,8 @@ class OfferServiceTest {
                                 from, to, BigDecimal.valueOf(130))
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1166,7 +1168,8 @@ class OfferServiceTest {
                                 from, to, null)
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1214,7 +1217,8 @@ class OfferServiceTest {
                                 LocalDate.of(2026, 6, 16), LocalDate.of(2026, 6, 21), BigDecimal.valueOf(80))
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1246,7 +1250,8 @@ class OfferServiceTest {
                                 LocalDate.of(2026, 6, 23), LocalDate.of(2026, 6, 24), BigDecimal.valueOf(80))
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1269,7 +1274,8 @@ class OfferServiceTest {
                                 LocalDate.of(2026, 6, 4), LocalDate.of(2026, 6, 7), BigDecimal.valueOf(80))
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1295,7 +1301,8 @@ class OfferServiceTest {
                                 from, to, BigDecimal.valueOf(80), null, null, null)
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1321,7 +1328,8 @@ class OfferServiceTest {
                                 from, to, BigDecimal.valueOf(80), null, null, null)
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1351,7 +1359,8 @@ class OfferServiceTest {
                                 from, to, BigDecimal.valueOf(80), null, null, null)
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1381,7 +1390,8 @@ class OfferServiceTest {
                                 from, to, BigDecimal.valueOf(120), null, null, OfferAnimalType.SMALL_ANIMAL)
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> dogOnlyResult = offerService.searchOpenOffers(
@@ -1428,7 +1438,8 @@ class OfferServiceTest {
                         outsideDateOffer
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
@@ -1467,7 +1478,7 @@ class OfferServiceTest {
                         new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.empty(),
-                new CreateOfferFormRules(),
+                fixedCreateOfferFormRules(),
                 postalCodeService(Map.of(
                         "10000", location("10000", 0, 0),
                         "20000", location("20000", 0, 0.05),
@@ -1506,7 +1517,7 @@ class OfferServiceTest {
                         new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
                 Optional.empty(),
-                new CreateOfferFormRules(),
+                fixedCreateOfferFormRules(),
                 postalCodeService(Map.of(
                         "10000", location("10000", 0, 0),
                         "20000", location("20000", 0, 0.05),
@@ -1535,7 +1546,8 @@ class OfferServiceTest {
                         offer(secondOfferId, OfferType.SITTER_OFFER, OfferStatus.OPEN, from, to, BigDecimal.valueOf(80))
                 ), new AtomicReference<>(), new AtomicReference<>()),
                 petRepository(List.of(), new AtomicReference<>(), new AtomicReference<>()),
-                Optional.empty()
+                Optional.empty(),
+                fixedCreateOfferFormRules()
         );
 
         List<OfferCardDto> result = offerService.searchOpenOffers(
